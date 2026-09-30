@@ -1,0 +1,7 @@
+Yanımda Türkiye; eczane, hastane, ATM, polis, itfaiye, akaryakıt, taksi ve günlük ihtiyaç hizmetlerini yakınınızda bulmanıza yardımcı olan ücretsiz bir çözüm merkezidir.
+
+Konumunuzu kullanabilir veya 81 il arasından il ve ilçe seçebilirsiniz. Sonuçlar mümkün olduğunda OpenStreetMap gibi açık veri kaynaklarından alınır. Bir yeri arayabilir, yol tarifi alabilir, haritada açabilir ve cihazınıza favori olarak kaydedebilirsiniz.
+
+Acil ekranından Türkiye Acil Çağrı Merkezi 112’ye tek dokunuşla ulaşabilirsiniz. Uygulama satış, ödeme, reklam veya premium üyelik içermez.
+
+Konum geçmişiniz tutulmaz. Açık veri kaynağında sonuç yoksa uygulama bunu açıkça bildirir ve sahte kayıt göstermez.

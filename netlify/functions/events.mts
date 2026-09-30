@@ -1,0 +1,4 @@
+import type{Config}from'@netlify/functions';import{db}from'../../db/index.js';import{events}from'../../db/schema.js';
+const allowed=new Set(['page_view','search','location_click','pharmacy_click','hospital_click','atm_click','service_click','phone_click','whatsapp_click','directions_click','emergency_click','favorite_click']);
+export default async(req:Request)=>{if(req.method!=='POST')return new Response(null,{status:405});try{const body=await req.json();if(!allowed.has(body.type))return new Response(null,{status:400});const metadata=typeof body.metadata==='object'&&body.metadata?Object.fromEntries(Object.entries(body.metadata).slice(0,10).map(([k,v])=>[String(k).slice(0,40),String(v).slice(0,120)])):{};await db.insert(events).values({type:body.type,metadata,city:typeof metadata.city==='string'?metadata.city:null});return new Response(null,{status:204})}catch{return new Response(null,{status:202})}};
+export const config:Config={path:'/api/events'};
