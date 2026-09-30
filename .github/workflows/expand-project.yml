@@ -1,10 +1,6 @@
-name: Expand project archive
+name: Expand Yaninda Turkiye project
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    types: [opened, synchronize]
   workflow_dispatch:
 
 permissions:
@@ -12,22 +8,22 @@ permissions:
 
 jobs:
   expand:
-    if: ${{ hashFiles('package.json', 'frontend/package.json', 'src/package.json') == '' && hashFiles('yaninda-turkiye-fixed.zip') != '' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
 
-      - name: Validate archive
+      - name: Check archive
         shell: bash
         run: |
           set -euo pipefail
           test -s yaninda-turkiye-fixed.zip
           unzip -tq yaninda-turkiye-fixed.zip
 
-      - name: Expand project
+      - name: Extract project
         shell: bash
         run: |
           set -euo pipefail
@@ -43,18 +39,12 @@ jobs:
           fi
           rm -rf .yaninda_extract yaninda-turkiye-fixed.zip
 
-      - name: Publish expanded project branch
+      - name: Commit expanded project
         shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          if git diff --cached --quiet; then
-            echo "No project changes to publish."
-            exit 0
-          fi
-          git commit -m "chore: expand Yanımda Türkiye project"
-          git push origin "HEAD:auto/expand-project" --force-with-lease
+          git commit -m "chore: expand Yanında Türkiye project" || exit 0
+          git push origin HEAD:main
