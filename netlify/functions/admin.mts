@@ -1,4 +1,4 @@
-import type{Config}from'@netlify/functions';import{getUser,verifyRequestOrigin}from'@netlify/identity';import{and,count,desc,eq,gte}from'drizzle-orm';import{db}from'../../db/index.js';import{events,submissions}from'../../db/schema.js';
+import type{Config}from'@netlify/functions';import{getUser,verifyRequestOrigin}from'@netlify/identity';import{and,count,desc,eq,gte}from'drizzle-orm';import{db}from'../../db/index.js';import{events,reports,submissions}from'../../db/schema.js';
 export default async(req:Request)=>{
   const user=await getUser();
   if(!user)return new Response('Unauthorized',{status:401});
@@ -24,7 +24,7 @@ export default async(req:Request)=>{
           });
           const found=(await g.json())[0] as {lat?:string;lon?:string}|undefined;
           if(found){latitude=Number(found.lat);longitude=Number(found.lon);}
-        }catch{}
+        }catch{/* Geocoding failure does not block approval. */}
         await db.update(submissions).set({status:'approved',latitude,longitude}).where(eq(submissions.id,body.id));
       }else if(body.action==='reject_submission'){
         await db.update(submissions).set({status:'rejected'}).where(eq(submissions.id,body.id));
