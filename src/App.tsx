@@ -195,7 +195,7 @@ function Admin(){
           <h2>Açık hata bildirimleri</h2>
           {reports.length?reports.map(r=><div className="application" key={String(r.id)}>
             <b>{String(r.placeName||'')}</b><span>{String(r.reason||'')}</span><em>{String(r.status||'')}</em>
-            {r.status==='open'&&<div className="place-actions"><button disabled={busy===`resolve_report:${r.id}`} onClick={()=>action('resolve_report',Number(r.id))}>{busy===`resolve_report:${r.id`?'İşleniyor…':'Çözüldü'}</button></div>}
+            {r.status==='open'&&<div className="place-actions"><button disabled={busy===`resolve_report:${r.id}`} onClick={()=>action('resolve_report',Number(r.id))}>{busy===`resolve_report:${r.id}`?'İşleniyor…':'Çözüldü'}</button></div>}
           </div>):<p>Açık hata bildirimi yok.</p>}
         </div>
       </>}
