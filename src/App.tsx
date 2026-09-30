@@ -113,6 +113,94 @@ function AddBusinessPage(){
 function MenuPage(){const nav=useNavigate();const favs:Place[]=JSON.parse(localStorage.getItem('favorites')||'[]');return <main className="inner"><div className="page-head"><div><span className="kicker">YANIMDA TÜRKİYE</span><h1>Menü</h1></div></div><div className="menu-list"><button onClick={()=>nav('/add-business')}><Building2/><span>İşletmeni / Hizmetini Ekle</span><ChevronRight/></button><button onClick={()=>nav('/favorites')}><Star/><span>Favoriler ({favs.length})</span><ChevronRight/></button><button onClick={()=>navigator.share?.({title:'Yanımda Türkiye',text:'İhtiyacın olanı, sana en yakın yerde bul.',url:location.origin})}><Share2/><span>Uygulamayı Paylaş</span><ChevronRight/></button><button onClick={()=>nav('/legal/privacy')}><ShieldCheck/><span>Gizlilik ve Yasal Metinler</span><ChevronRight/></button><button onClick={()=>nav('/admin')}><Building2/><span>Admin Girişi</span><ChevronRight/></button></div></main>}
 function Favorites({lang}:{lang:Lang}){const nav=useNavigate();const[favs]=useState<Place[]>(()=>JSON.parse(localStorage.getItem('favorites')||'[]'));return <main className="inner"><div className="page-head"><button className="back" onClick={()=>nav(-1)}>‹</button><h1>Favoriler</h1></div>{favs.length?<div className="places-list">{favs.map(p=><PlaceCard key={p.id} place={p} lang={lang}/>)}</div>:<Empty text="Henüz favori eklemediniz."/>}</main>}
 function Legal(){return <main className="inner legal"><span className="kicker">ŞEFFAFLIK</span><h1>Gizlilik ve yasal bilgiler</h1><nav><a href="#privacy">Gizlilik</a><a href="#kvkk">KVKK</a><a href="#cookies">Çerezler</a><a href="#terms">Kullanım</a></nav><section id="privacy"><h2>Gizlilik Politikası</h2><p>Yanımda Türkiye, yakın yerleri göstermek için konumunuzu yalnızca cihazınızda ve ilgili sorgu sırasında işler. Konum geçmişi oluşturmaz. Hizmet başvuruları inceleme amacıyla güvenli veritabanında saklanır.</p></section><section id="kvkk"><h2>KVKK Aydınlatması</h2><p>Başvuruyla paylaşılan işletme ve iletişim bilgileri, kaydı doğrulamak ve yayınlamak amacıyla işlenir. Düzeltme veya silme talepleri uygulama yöneticisine iletilebilir. Gereksiz özel nitelikli kişisel veri toplanmaz.</p></section><section id="cookies"><h2>Çerez Politikası</h2><p>Zorunlu oturum ve tercih depolaması dışında reklam veya takip çerezi kullanılmaz. Dil ve favoriler cihazınızda tutulur.</p></section><section id="terms"><h2>Kullanım Koşulları</h2><p>Açık veri kaynakları değişebilir. Acil durumda harita sonucuna güvenmek yerine 112 aranmalıdır. İşletme bilgileri yayınlanmadan önce incelenir; yanlış kayıtlar bildirildiğinde kaldırılır.</p></section></main>}
-function Admin(){const[email,setEmail]=useState('');const[password,setPassword]=useState('');const[user,setUser]=useState<unknown>(null);const[error,setError]=useState('');const[data,setData]=useState<Record<string,unknown>|null>(null);useEffect(()=>{import('@netlify/identity').then(async m=>{const u=await m.getUser();setUser(u);if(u)fetch('/api/admin').then(r=>r.ok?r.json():Promise.reject()).then(setData).catch(()=>setError('Bu hesap admin yetkisine sahip değil.'))})},[]);const login=async(e:React.FormEvent)=>{e.preventDefault();try{const m=await import('@netlify/identity');const u=await m.login(email,password);setUser(u);location.reload()}catch{setError('Giriş başarısız. Bilgilerinizi kontrol edin.')}};if(!user)return <main className="admin-login"><div><ShieldCheck/><h1>Admin girişi</h1><p>Yetkili hesabınızla güvenli giriş yapın.</p><form onSubmit={login}><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="E-posta" required/><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Şifre" required/><button className="primary">Giriş Yap</button>{error&&<p>{error}</p>}</form></div></main>;const stats=(data?.stats||{}) as Record<string,number>;return <main className="admin"><aside><b>YT / ADMIN</b>{['Genel Bakış','Hizmetler','Hizmet Verenler','Eczaneler','Hastaneler','ATM','Başvurular','İstatistikler','Ayarlar'].map(x=><button key={x}>{x}</button>)}</aside><section><span className="kicker">GERÇEK ZAMANLI</span><h1>Genel Bakış</h1>{error?<Empty text={error}/>:!data?<div className="skeleton"/>:<><div className="stat-grid">{Object.entries({'Bugünkü ziyaretçi':'visitorsToday','Toplam ziyaretçi':'visitorsTotal','Bugünkü arama':'searchesToday','Toplam arama':'searchesTotal','Telefon tıklaması':'phoneClicks','Yol tarifi tıklaması':'directionsClicks','Acil tıklaması':'emergencyClicks','Favori sayısı':'favoriteClicks'}).map(([label,key])=><article key={key}><small>{label}</small><strong>{stats[key]||0}</strong></article>)}</div><div className="admin-panel"><h2>Son başvurular</h2>{((data.submissions||[]) as Array<Record<string,string>>).length?((data.submissions||[]) as Array<Record<string,string>>).map(s=><div className="application" key={s.id}><b>{s.name}</b><span>{s.category} · {s.province}/{s.district}</span><em>{s.status}</em></div>):<p>Henüz veri yok.</p>}</div></>}</section></main>}
+function Admin(){
+  const[email,setEmail]=useState('');
+  const[password,setPassword]=useState('');
+  const[user,setUser]=useState<unknown>(null);
+  const[error,setError]=useState('');
+  const[data,setData]=useState<Record<string,unknown>|null>(null);
+  const[busy,setBusy]=useState<string|null>(null);
 
-export default function App(){const[lang,setLangState]=useState<Lang>(getInitialLang);const setLang=(l:Lang)=>{setLangState(l);localStorage.setItem('lang',l);document.documentElement.lang=l.toLowerCase()};useEffect(()=>{track('page_view',{path:location.pathname});let remove:undefined|(()=>void);import('@capacitor/app').then(async({App})=>{const h=await App.addListener('backButton',({canGoBack})=>{if(location.pathname!=='/'&&canGoBack)history.back();else if(location.pathname!=='/')location.href='/';else App.exitApp()});remove=()=>h.remove()}).catch(()=>undefined);return()=>remove?.()},[]);return <Layout lang={lang} setLang={setLang}><Routes><Route path="/" element={<HomePage lang={lang}/>}/><Route path="/nearby" element={<NearbyPage lang={lang}/>}/><Route path="/services" element={<ServicesPage/>}/><Route path="/emergency" element={<EmergencyPage/>}/><Route path="/add-business" element={<AddBusinessPage/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/favorites" element={<Favorites lang={lang}/>}/><Route path="/legal/:page" element={<Legal/>}/><Route path="/admin/*" element={<Admin/>}/><Route path="*" element={<main className="inner"><Empty text="Bu sayfa bulunamadı."/><NavLink to="/" className="primary">Ana sayfaya dön</NavLink></main>}/></Routes></Layout>}
+  const load=async()=>{
+    const r=await fetch('/api/admin');
+    if(!r.ok)throw new Error(r.status===403?'Bu hesap admin yetkisine sahip değil.':'Admin verileri alınamadı.');
+    setData(await r.json());
+  };
+
+  useEffect(()=>{
+    let active=true;
+    import('@netlify/identity').then(async m=>{
+      try{
+        await m.handleAuthCallback();
+        const u=await m.getUser();
+        if(!active)return;
+        setUser(u);
+        if(u)await load();
+      }catch{if(active)setError('Admin oturumu doğrulanamadı.')}
+    });
+    return()=>{active=false};
+  },[]);
+
+  const login=async(e:React.FormEvent)=>{
+    e.preventDefault();setError('');
+    try{
+      const m=await import('@netlify/identity');
+      const u=await m.login(email,password);
+      setUser(u);
+      await load();
+    }catch{setError('Giriş başarısız. Bilgilerinizi kontrol edin.')}
+  };
+
+  const action=async(actionName:string,id:number)=>{
+    setBusy(`${actionName}:${id}`);setError('');
+    try{
+      const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:actionName,id})});
+      if(!r.ok)throw new Error();
+      await load();
+    }catch{setError('İşlem tamamlanamadı. Lütfen tekrar deneyin.')}
+    finally{setBusy(null)}
+  };
+
+  const logout=async()=>{
+    const m=await import('@netlify/identity');await m.logout();setUser(null);setData(null);
+  };
+
+  if(!user)return <main className="admin-login"><div><ShieldCheck/><h1>Admin girişi</h1><p>Yetkili hesabınızla güvenli giriş yapın.</p><form onSubmit={login}><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="E-posta" required/><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Şifre" required/><button className="primary">Giriş Yap</button>{error&&<p>{error}</p>}</form></div></main>;
+
+  const stats=(data?.stats||{}) as Record<string,number>;
+  const submissions=((data?.submissions||[]) as Array<Record<string,unknown>>);
+  const reports=((data?.reports||[]) as Array<Record<string,unknown>>);
+
+  return <main className="admin">
+    <aside>
+      <b>YT / ADMIN</b>
+      {['Genel Bakış','Hizmetler','Hizmet Verenler','Eczaneler','Hastaneler','ATM','Başvurular','Hatalı Kayıtlar','İstatistikler','Ayarlar'].map(x=><button key={x}>{x}</button>)}
+      <button onClick={logout}>Çıkış Yap</button>
+    </aside>
+    <section>
+      <span className="kicker">GERÇEK ZAMANLI</span><h1>Genel Bakış</h1>
+      {error&&<div className="location-error inner-error" role="alert">{error}</div>}
+      {!data?<div className="skeleton"/>:<>
+        <div className="stat-grid">
+          {Object.entries({'Bugünkü sayfa görüntüleme':'visitorsToday','Toplam sayfa görüntüleme':'visitorsTotal','Bugünkü arama':'searchesToday','Toplam arama':'searchesTotal','Telefon tıklaması':'phoneClicks','Yol tarifi tıklaması':'directionsClicks','Acil tıklaması':'emergencyClicks','Favori tıklaması':'favoriteClicks'}).map(([label,key])=><article key={key}><small>{label}</small><strong>{stats[key]||0}</strong></article>)}
+        </div>
+        <div className="admin-panel">
+          <h2>Son başvurular</h2>
+          {submissions.length?submissions.map(s=><div className="application" key={String(s.id)}>
+            <b>{String(s.name||'')}</b><span>{String(s.category||'')} · {String(s.province||'')}/{String(s.district||'')}</span><em>{String(s.status||'')}</em>
+            {s.status==='pending'&&<div className="place-actions"><button disabled={busy===`approve_submission:${s.id}`} onClick={()=>action('approve_submission',Number(s.id))}>{busy===`approve_submission:${s.id}`?'İşleniyor…':'Onayla'}</button><button disabled={busy===`reject_submission:${s.id}`} onClick={()=>action('reject_submission',Number(s.id))}>Reddet</button></div>}
+          </div>):<p>Henüz başvuru yok.</p>}
+        </div>
+        <div className="admin-panel">
+          <h2>Açık hata bildirimleri</h2>
+          {reports.length?reports.map(r=><div className="application" key={String(r.id)}>
+            <b>{String(r.placeName||'')}</b><span>{String(r.reason||'')}</span><em>{String(r.status||'')}</em>
+            {r.status==='open'&&<div className="place-actions"><button disabled={busy===`resolve_report:${r.id}`} onClick={()=>action('resolve_report',Number(r.id))}>{busy===`resolve_report:${r.id`?'İşleniyor…':'Çözüldü'}</button></div>}
+          </div>):<p>Açık hata bildirimi yok.</p>}
+        </div>
+      </>}
+    </section>
+  </main>;
+}
+
+export default function App(){const[lang,setLangState]=useState<Lang>(getInitialLang);const setLang=(l:Lang)=>{setLangState(l);localStorage.setItem('lang',l);document.documentElement.lang=l.toLowerCase()};useEffect(()=>{import('@netlify/identity').then(({handleAuthCallback})=>handleAuthCallback()).catch(()=>undefined);track('page_view',{path:location.pathname});let remove:undefined|(()=>void);import('@capacitor/app').then(async({App})=>{const h=await App.addListener('backButton',({canGoBack})=>{if(location.pathname!=='/'&&canGoBack)history.back();else if(location.pathname!=='/')location.href='/';else App.exitApp()});remove=()=>h.remove()}).catch(()=>undefined);return()=>remove?.()},[]);return <Layout lang={lang} setLang={setLang}><Routes><Route path="/" element={<HomePage lang={lang}/>}/><Route path="/nearby" element={<NearbyPage lang={lang}/>}/><Route path="/services" element={<ServicesPage/>}/><Route path="/emergency" element={<EmergencyPage/>}/><Route path="/add-business" element={<AddBusinessPage/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/favorites" element={<Favorites lang={lang}/>}/><Route path="/legal/:page" element={<Legal/>}/><Route path="/admin/*" element={<Admin/>}/><Route path="*" element={<main className="inner"><Empty text="Bu sayfa bulunamadı."/><NavLink to="/" className="primary">Ana sayfaya dön</NavLink></main>}/></Routes></Layout>}
