@@ -17,7 +17,7 @@ export async function startAds():Promise<void>{
 }
 export async function stopAds():Promise<void>{
  if(!Capacitor.isNativePlatform())return;
- try{const{AdMob}=await import('@capacitor-community/admob');await AdMob.removeBanner()}catch{}
+ try{const{AdMob}=await import('@capacitor-community/admob');await AdMob.removeBanner()}catch{/* AdMob cleanup is optional. */}
 }
 export function initWebAds():void{
  if(Capacitor.isNativePlatform())return;
