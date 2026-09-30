@@ -15,7 +15,7 @@ const query=category==='government'
     const q=encodeURIComponent(term);
     const g=await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=40&countrycodes=tr&bounded=1&viewbox=${viewbox}&q=${q}`,{headers:{'User-Agent':`YanimdaTurkiye/1.0 (${process.env.OSM_CONTACT_EMAIL||'public-web-app'})`},signal:AbortSignal.timeout(9000)});
     if(g.ok){
-      const rows=await g.json() as Array<{place_id:number;display_name:string;lat:string;lon:string;type?:string;category?:string;name?:string;address?:Record<string,string>}>;
+      const rows=(await g.json()) as Array<{place_id:number;display_name:string;lat:string;lon:string;type?:string;category?:string;name?:string;address?:Record<string,string>}>;
       body={elements:rows.map(r=>({type:'nominatim',id:r.place_id,lat:Number(r.lat),lon:Number(r.lon),tags:{name:r.name||r.display_name.split(',')[0],display_name:r.display_name,source:'OpenStreetMap/Nominatim',phone:r.address?.phone||''}}))};
     }
   }catch{/* fallback exhausted */}
