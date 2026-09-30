@@ -4,4 +4,6 @@
     <string name="title_activity_main">Yanımda Türkiye</string>
     <string name="package_name">tr.yaninda.turkiye</string>
     <string name="custom_url_scheme">tr.yaninda.turkiye</string>
+    <!-- Google demo App ID for development only. Replace before publishing. -->
+    <string name="admob_app_id">ca-app-pub-3940256099942544~3347511713</string>
 </resources>
