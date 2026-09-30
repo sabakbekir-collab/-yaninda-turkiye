@@ -27,23 +27,24 @@ async function nativeLocation(): Promise<Position> {
   }
   if (permissions.location !== 'granted') throw new LocationError('permission_denied');
 
+  // Prefer a fast network-assisted fix first. It is much more reliable indoors
+  // and is already accurate enough for nearby-place searches.
   try {
     const result = await Geolocation.getCurrentPosition({
-      enableHighAccuracy: true,
-      timeout: 15000,
-      maximumAge: 0,
+      enableHighAccuracy: false,
+      timeout: 12000,
+      maximumAge: 60000,
     });
     return { lat: result.coords.latitude, lon: result.coords.longitude };
-  } catch (error) {
-    // A GPS fix can take longer indoors. Retry once with network-assisted accuracy.
+  } catch {
     try {
       const result = await Geolocation.getCurrentPosition({
-        enableHighAccuracy: false,
-        timeout: 15000,
-        maximumAge: 30000,
+        enableHighAccuracy: true,
+        timeout: 20000,
+        maximumAge: 0,
       });
       return { lat: result.coords.latitude, lon: result.coords.longitude };
-    } catch {
+    } catch (error) {
       if (error instanceof Error && /permission/i.test(error.message)) {
         throw new LocationError('permission_denied');
       }
@@ -53,19 +54,36 @@ async function nativeLocation(): Promise<Position> {
 }
 
 async function browserLocation(): Promise<Position> {
+  if (!window.isSecureContext) {
+    throw new LocationError('unsupported', 'Konum için güvenli (HTTPS) bağlantı gerekir.');
+  }
   if (!('geolocation' in navigator)) throw new LocationError('unsupported');
 
-  return new Promise((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => resolve({ lat: coords.latitude, lon: coords.longitude }),
-      (error) => reject(mapError(error.code)),
-      {
-        enableHighAccuracy: true,
-        timeout: 20000,
-        maximumAge: 0,
-      },
-    );
-  });
+  const read = (enableHighAccuracy: boolean, timeout: number, maximumAge: number) =>
+    new Promise<Position>((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(
+        ({ coords }) => {
+          if (!Number.isFinite(coords.latitude) || !Number.isFinite(coords.longitude)) {
+            reject(new LocationError('unavailable'));
+            return;
+          }
+          resolve({ lat: coords.latitude, lon: coords.longitude });
+        },
+        (error) => reject(mapError(error.code)),
+        { enableHighAccuracy, timeout, maximumAge },
+      );
+    });
+
+  // iPhone/Safari often gets a cached or network-assisted position faster
+  // than a cold GPS fix. Try that first, then fall back to GPS.
+  try {
+    return await read(false, 12000, 60000);
+  } catch (firstError) {
+    if (firstError instanceof LocationError && firstError.code === 'permission_denied') {
+      throw firstError;
+    }
+    return read(true, 20000, 0);
+  }
 }
 
 export async function getCurrentLocation(): Promise<Position> {
