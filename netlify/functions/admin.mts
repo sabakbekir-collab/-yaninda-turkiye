@@ -17,7 +17,7 @@ export default async(req:Request)=>{
         let latitude:number|undefined;
         let longitude:number|undefined;
         try{
-          const q=encodeURIComponent(`${submission.district}, ${submission.province}, Türkiye`);
+          const q=encodeURIComponent(`${submission.address}, ${submission.district}, ${submission.province}, Türkiye`);
           const g=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=tr&q=${q}`,{
             headers:{'User-Agent':`YanimdaTurkiye/1.0 (${process.env.OSM_CONTACT_EMAIL||'public-web-app'})`},
             signal:AbortSignal.timeout(7000),
