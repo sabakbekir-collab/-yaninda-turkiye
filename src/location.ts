@@ -6,7 +6,7 @@ export type LocationErrorCode = 'permission_denied' | 'timeout' | 'unavailable' 
 
 export class LocationError extends Error {
   code: LocationErrorCode;
-  constructor(code: LocationErrorCode, message = code) {
+  constructor(code: LocationErrorCode, message: string = code) {
     super(message);
     this.name = 'LocationError';
     this.code = code;
