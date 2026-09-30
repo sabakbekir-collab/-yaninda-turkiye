@@ -15,8 +15,19 @@ jobs:
     if: ${{ hashFiles('package.json', 'frontend/package.json', 'src/package.json') == '' && hashFiles('yaninda-turkiye-fixed.zip') != '' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Extract project
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s yaninda-turkiye-fixed.zip
+          unzip -tq yaninda-turkiye-fixed.zip
+
+      - name: Expand project
         shell: bash
         run: |
           set -euo pipefail
@@ -31,8 +42,19 @@ jobs:
             cp -a .yaninda_extract/. .
           fi
           rm -rf .yaninda_extract yaninda-turkiye-fixed.zip
+
+      - name: Publish expanded project branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "chore: expand Yanımda Türkiye project" || exit 0
-          git push
+          if git diff --cached --quiet; then
+            echo "No project changes to publish."
+            exit 0
+          fi
+          git commit -m "chore: expand Yanımda Türkiye project"
+          git push origin "HEAD:auto/expand-project" --force-with-lease
