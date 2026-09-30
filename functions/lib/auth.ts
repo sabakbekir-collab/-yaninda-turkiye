@@ -1,8 +1,7 @@
 import type {Env} from './types';
 
 const encoder=new TextEncoder();
-const toB64=(bytes:ArrayBuffer)=>btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g,'').replace(/\\+/g,'-').replace(/\\//g,'_');
-const fromB64=(value:string)=>{const s=value.replace(/-/g,'+').replace(/_/g,'/');const pad='='.repeat((4-s.length%4)%4);return Uint8Array.from(atob(s+pad),c=>c.charCodeAt(0));};
+const toB64=(bytes:ArrayBuffer)=>btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
 
 async function sign(value:string,secret:string){
   const key=await crypto.subtle.importKey('raw',encoder.encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
@@ -20,7 +19,7 @@ export async function validSession(request:Request,env:Env){
   const secret=env.ADMIN_SESSION_SECRET;
   if(!secret)return false;
   const cookie=request.headers.get('Cookie')||'';
-  const match=cookie.match(/(?:^|;\\s*)yt_admin=([^;]+)/);
+  const match=cookie.match(/(?:^|;\s*)yt_admin=([^;]+)/);
   if(!match)return false;
   const [exp,sig]=decodeURIComponent(match[1]).split('.');
   if(!exp||!sig||Number(exp)<Math.floor(Date.now()/1000))return false;
