@@ -49,9 +49,9 @@ function PlaceCard({place,lang}:{place:Place;lang:Lang}){const[fav,setFav]=useSt
 function NearbyPage({lang}:{lang:Lang}){
   const nav=useNavigate();
   const routerLocation=useLocation();
-  const state=(routerLocation.state||{}) as {category?:string;position?:Position;province?:string;district?:string};
+  const state=(routerLocation.state||{}) as {category?:string;position?:Position;province?:string;district?:string};const savedPosition=(()=>{try{const raw=sessionStorage.getItem('yanimda-location');return raw?JSON.parse(raw) as Position:undefined}catch{return undefined}})();
   const[category,setCategory]=useState(state.category||'pharmacy');
-  const[position,setPosition]=useState<Position|undefined>(state.position);
+  const[position,setPosition]=useState<Position|undefined>(state.position||savedPosition);
   const[province,setProvince]=useState(state.province||'');
   const[district,setDistrict]=useState(state.district||'');
   const[places,setPlaces]=useState<Place[]>([]);
