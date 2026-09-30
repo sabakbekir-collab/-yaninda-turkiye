@@ -35,6 +35,7 @@ function HomePage({lang}:{lang:Lang}){
     setLocating(true);setLocationError('');setLocOpen(false);
     try{
       const pos=await getCurrentLocation();
+      try{localStorage.setItem('yanimda-location',JSON.stringify(pos))}catch{}
       track('location_click',{lat:pos.lat,lon:pos.lon});
       go('service',pos,'','');
     }catch(error){
@@ -49,7 +50,7 @@ function PlaceCard({place,lang}:{place:Place;lang:Lang}){const[fav,setFav]=useSt
 function NearbyPage({lang}:{lang:Lang}){
   const nav=useNavigate();
   const routerLocation=useLocation();
-  const state=(routerLocation.state||{}) as {category?:string;position?:Position;province?:string;district?:string};const savedPosition=(()=>{try{const raw=sessionStorage.getItem('yanimda-location');return raw?JSON.parse(raw) as Position:undefined}catch{return undefined}})();
+  const state=(routerLocation.state||{}) as {category?:string;position?:Position;province?:string;district?:string};const savedPosition=(()=>{try{const raw=localStorage.getItem('yanimda-location');return raw?JSON.parse(raw) as Position:undefined}catch{return undefined}})();
   const[category,setCategory]=useState(state.category||'pharmacy');
   const[position,setPosition]=useState<Position|undefined>(state.position||savedPosition);
   const[province,setProvince]=useState(state.province||'');
@@ -90,6 +91,7 @@ function NearbyPage({lang}:{lang:Lang}){
     setLocating(true);setError('');
     try{
       const pos=await getCurrentLocation();
+      try{localStorage.setItem('yanimda-location',JSON.stringify(pos))}catch{}
       setPosition(pos);setProvince('');setDistrict('');
       track('location_click',{lat:pos.lat,lon:pos.lon});
     }catch(e){setError(locationMessage(e))}finally{setLocating(false)}
