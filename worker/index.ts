@@ -46,7 +46,10 @@ export default {
         return await postReports({ request, env });
       }
 
-      return json404();
+      // All non-API requests must be served by the Vite build. Without this
+      // fallback the Worker returns 404 for the homepage and Safari reports
+      // that the page cannot be opened even though the deployment succeeds.
+      return await env.ASSETS.fetch(request);
     } catch {
       return Response.json({ error: "server_error" }, { status: 500 });
     }
