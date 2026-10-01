@@ -23,8 +23,26 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
     if(!(await isAdmin(request,env)))return new Response('Unauthorized',{status:401});
     if(!env.DB)return Response.json({error:'database_unavailable'},{status:503});
     const id=Number(body.id);
-    if(!Number.isInteger(id))return Response.json({error:'invalid_id'},{status:400});
-    if(action==='approve_submission'){
+    if(action==='save_ad'){
+      const title=clean(body.title,120);
+      const text=clean(body.text,300);
+      const imageUrl=clean(body.image_url,1000);
+      const targetUrl=clean(body.target_url,1000);
+      const placement=clean(body.placement,30)||'home_top';
+      if(!title)return Response.json({error:'title_required'},{status:400});
+      if(Number.isInteger(id)){
+        await env.DB.prepare('UPDATE ads SET title=?,text=?,image_url=?,target_url=?,placement=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(title,text,imageUrl,targetUrl,placement,id).run();
+      }else{
+        await env.DB.prepare('INSERT INTO ads(title,text,image_url,target_url,placement,status) VALUES(?,?,?,?,?,\'active\')').bind(title,text,imageUrl,targetUrl,placement).run();
+      }
+    }else if(action==='toggle_ad'){
+      if(!Number.isInteger(id))return Response.json({error:'invalid_id'},{status:400});
+      await env.DB.prepare("UPDATE ads SET status=CASE WHEN status='active' THEN 'paused' ELSE 'active' END,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(id).run();
+    }else if(action==='delete_ad'){
+      if(!Number.isInteger(id))return Response.json({error:'invalid_id'},{status:400});
+      await env.DB.prepare('DELETE FROM ads WHERE id=?').bind(id).run();
+    }else if(action==='approve_submission'){
+      if(!Number.isInteger(id))return Response.json({error:'invalid_id'},{status:400});
       const row=await env.DB.prepare('SELECT * FROM submissions WHERE id=? LIMIT 1').bind(id).first<Record<string,unknown>>();
       if(!row)return Response.json({error:'not_found'},{status:404});
       let latitude:number|undefined,longitude:number|undefined;
@@ -38,6 +56,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
     }else if(action==='reject_submission'){
       await env.DB.prepare('UPDATE submissions SET status=\'rejected\' WHERE id=?').bind(id).run();
     }else if(action==='resolve_report'){
+      if(!Number.isInteger(id))return Response.json({error:'invalid_id'},{status:400});
       await env.DB.prepare('UPDATE reports SET status=\'resolved\' WHERE id=?').bind(id).run();
     }else{return Response.json({error:'invalid_action'},{status:400});}
     return Response.json({ok:true});
@@ -56,7 +75,8 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   const [visitorsToday,visitorsTotal,searchesToday,searchesTotal,phoneClicks,directionsClicks,emergencyClicks,favoriteClicks,submissions,reports]=await Promise.all([
     count('page_view',today),count('page_view'),count('search',today),count('search'),count('phone_click'),count('directions_click'),count('emergency_click'),count('favorite_click'),
     env.DB.prepare('SELECT * FROM submissions ORDER BY created_at DESC LIMIT 50').all(),
-    env.DB.prepare("SELECT * FROM reports WHERE status='open' ORDER BY created_at DESC LIMIT 50").all()
+    env.DB.prepare("SELECT * FROM reports WHERE status='open' ORDER BY created_at DESC LIMIT 50").all(),
+    env.DB.prepare('SELECT * FROM ads ORDER BY updated_at DESC LIMIT 50').all()
   ]);
-  return Response.json({stats:{visitorsToday,visitorsTotal,searchesToday,searchesTotal,phoneClicks,directionsClicks,emergencyClicks,favoriteClicks},submissions:submissions.results,reports:reports.results});
+  return Response.json({stats:{visitorsToday,visitorsTotal,searchesToday,searchesTotal,phoneClicks,directionsClicks,emergencyClicks,favoriteClicks},submissions:submissions.results,reports:reports.results,ads:ads.results});
 }
