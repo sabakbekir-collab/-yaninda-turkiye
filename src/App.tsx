@@ -4,7 +4,28 @@ import{categories,keywordMap,provinces,services}from'./data';import{districtsFor
 const marker=L.divIcon({className:'place-marker',html:'<span></span>',iconSize:[28,36],iconAnchor:[14,36]});
 function AdSenseSlot(){const[enabled,setEnabled]=useState(false);useEffect(()=>{const client=document.querySelector('meta[name="google-adsense-client"]')?.getAttribute('content')||'';const slot=document.querySelector('meta[name="google-adsense-slot"]')?.getAttribute('content')||'';if(!client||!slot||client==='ca-pub-REPLACE_ME'||slot==='REPLACE_ME')return;setEnabled(true);const w=window as typeof window&{adsbygoogle?:unknown[]};w.adsbygoogle=w.adsbygoogle||[];try{w.adsbygoogle.push({})}catch{/* optional */}},[]);if(!enabled)return null;return <div className="web-ad" aria-label="Reklam"><ins className="adsbygoogle" style={{display:'block'}} data-ad-client={document.querySelector('meta[name="google-adsense-client"]')?.getAttribute('content')||''} data-ad-slot={document.querySelector('meta[name="google-adsense-slot"]')?.getAttribute('content')||''} data-ad-format="auto" data-full-width-responsive="true"/></div>}
 
-function AdBanner({placement='home_top'}:{placement?:string}){const[ad,setAd]=useState<Record<string,unknown>|null>(null);useEffect(()=>{let live=true;fetch('/api/ads?placement='+encodeURIComponent(placement)).then(r=>r.ok?r.json():{ads:[]}).then((d)=>{if(live)setAd((d.ads||[])[0]||null)}).catch(()=>{});return()=>{live=false}},[placement]);if(!ad)return <div className={`promo-ad promo-empty promo-${placement}`}><div><span>REKLAM ALANI</span><strong>İşletmenizi burada görünür yapın.</strong><small>Bu alan yönetim panelinden yayınlanır.</small></div><ArrowRight/></div>;const image=String(ad.image_url||'');const title=String(ad.title||'');const text=String(ad.text||'');const href=String(ad.target_url||'#');return <a className={`promo-ad promo-${placement}`} href={href} target={href.startsWith('http')?'_blank':undefined} rel={href.startsWith('http')?'noreferrer':undefined} onClick={()=>track('ad_click',{placement,id:Number(ad.id)||0})}>{image&&<img src={image} alt="" loading="lazy"/>}<div><span>REKLAM</span><strong>{title}</strong>{text&&<small>{text}</small>}</div><ArrowRight/></a>}
+function AdBanner({placement='home_top'}:{placement?:string}) {
+  const [ad,setAd]=useState<Record<string,unknown>|null>(null);
+  useEffect(()=>{
+    let live=true;
+    fetch('/api/ads?placement='+encodeURIComponent(placement))
+      .then(r=>r.ok?r.json():{ads:[]})
+      .then(d=>{if(live)setAd((d.ads||[])[0]||null)})
+      .catch(()=>{});
+    return()=>{live=false};
+  },[placement]);
+  if(!ad)return <div className={`promo-ad promo-empty promo-${placement}`}><div><span>REKLAM ALANI</span><strong>İşletmenizi burada görünür yapın.</strong><small>Bu alan yönetim panelinden yayınlanır.</small></div><ArrowRight/></div>;
+  const image=String(ad.image_url||'');
+  const title=String(ad.title||'');
+  const adText=String(ad.text||'');
+  const href=String(ad.target_url||'#');
+  const external=href.startsWith('http');
+  return <a className={`promo-ad promo-${placement}`} href={href} target={external?'_blank':undefined} rel={external?'noreferrer':undefined} onClick={()=>track('ad_click',{placement,id:Number(ad.id)||0})}>
+    {image&&<img src={image} alt="" loading="lazy"/>}
+    <div><span>REKLAM</span><strong>{title}</strong>{adText&&<small>{adText}</small>}</div>
+    <ArrowRight/>
+  </a>;
+}
 
 function Layout({children,lang,setLang}:{children:React.ReactNode;lang:Lang;setLang:(l:Lang)=>void}){return <div dir={lang==='ar'?'rtl':'ltr'}><header className="topbar"><NavLink to="/" className="brand"><span className="brand-pin"><MapPin/></span><span>YANIMDA <b>TÜRKİYE</b></span></NavLink><label className="lang"><Languages/><select value={lang} onChange={e=>setLang(e.target.value as Lang)} aria-label="Dil"><option value="tr">TR</option><option value="en">EN</option><option value="de">DE</option><option value="ru">RU</option><option value="ar">AR</option><option value="fr">FR</option></select></label></header>{children}<AdSenseSlot/><nav className="bottom-nav"><NavLink to="/"><Home/><span>{t(lang,'home')}</span></NavLink><NavLink to="/nearby"><Compass/><span>{t(lang,'nearby')}</span></NavLink><NavLink to="/services"><Wrench/><span>{t(lang,'services')}</span></NavLink><NavLink to="/emergency" className="emergency-tab"><Siren/><span>{t(lang,'emergency')}</span></NavLink><NavLink to="/menu"><MenuIcon/><span>{t(lang,'menu')}</span></NavLink></nav></div>}
 
@@ -128,7 +149,8 @@ function Admin(){
   const action=async(actionName:string,id:number)=>{setBusy(actionName+':'+id);setError('');try{const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:actionName,id})});if(!r.ok)throw new Error();await load()}catch{setError('İşlem tamamlanamadı. Lütfen tekrar deneyin.')}finally{setBusy(null)}};
   const logout=async()=>{await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'logout'})});setUser(false);setData(null)};
   if(!user)return <main className="admin-login"><div><ShieldCheck/><h1>Admin girişi</h1><p>Yanımda Türkiye yönetim paneli</p><form onSubmit={login}><input type="email" value={email} onChange={e=>setEmail(e.target.value)} placeholder="E-posta" autoComplete="username" required/><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Şifre" autoComplete="current-password" required/><button className="primary">Giriş Yap</button>{error&&<p role="alert">{error}</p>}</form></div></main>;
-  const stats=(data?.stats||{}) as Record<string,number>;const submissions=((data?.submissions||[]) as Array<Record<string,unknown>>);const reports=((data?.reports||[]) as Array<Record<string,unknown>>);const ads=((data?.ads||[]) as Array<Record<string,unknown>>);
+  const stats=(data?.stats||{}) as Record<string,number>;
+  const submissions=((data?.submissions||[]) as Array<Record<string,unknown>>);const reports=((data?.reports||[]) as Array<Record<string,unknown>>);const ads=((data?.ads||[]) as Array<Record<string,unknown>>);
   const[adForm,setAdForm]=useState({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});const[adBusy,setAdBusy]=useState(false);
   const statItems=[['Bugünkü görüntüleme','visitorsToday'],['Toplam görüntüleme','visitorsTotal'],['Bugünkü arama','searchesToday'],['Toplam arama','searchesTotal'],['Telefon','phoneClicks'],['Yol tarifi','directionsClicks'],['Acil','emergencyClicks'],['Favori','favoriteClicks']];
   const saveAd=async(e:React.FormEvent)=>{e.preventDefault();setAdBusy(true);setError('');try{const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'save_ad',...adForm})});if(!r.ok)throw new Error();setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});await load()}catch{setError('Reklam kaydedilemedi.')}finally{setAdBusy(false)}};
