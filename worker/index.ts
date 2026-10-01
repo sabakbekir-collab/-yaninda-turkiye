@@ -5,6 +5,7 @@ import { onRequestGet as getAdmin, onRequestPost as postAdmin } from "../functio
 import { onRequestPost as postSubmissions } from "../functions/api/submissions";
 import { onRequestPost as postReports } from "../functions/api/reports";
 import type { Env } from "../functions/lib/types";
+import { ensureSchema } from "../functions/lib/schema";
 
 type RuntimeEnv = Env & {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -18,6 +19,14 @@ export default {
     const path = url.pathname;
 
     try {
+      if (path.startsWith("/api/") && env.DB) {
+        await ensureSchema(env);
+      }
+
+      if (path === "/api/health" && request.method === "GET") {
+        return Response.json({ ok: true, database: Boolean(env.DB), version: "2026.10.01" });
+      }
+
       if (path === "/api/places" && request.method === "GET") {
         return await getPlaces({ request, env });
       }
