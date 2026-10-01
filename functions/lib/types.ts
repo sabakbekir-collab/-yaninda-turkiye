@@ -26,5 +26,5 @@ export type D1DatabaseLike = {
 export type Place = {
   id:string; name:string; category:string; lat:number; lon:number;
   address?:string; phone?:string; whatsapp?:string; openingHours?:string;
-  website?:string; operator?:string; source:string; distance?:number;
+  website?:string; operator?:string; source:string; distance?:number; isDuty?:boolean;
 };
