@@ -1,11 +1,17 @@
-type D1Result = { results?: unknown[] };
-type D1Statement = {
-  bind: (...values: unknown[]) => D1Statement;
+type AdsResult = { results?: unknown[] };
+
+type AdsStatement = {
+  bind: (...values: unknown[]) => AdsStatement;
   run: () => Promise<unknown>;
-  all: () => Promise<D1Result>;
+  all: () => Promise<AdsResult>;
 };
-type D1DatabaseLike = {
-  prepare: (query: string) => D1Statement;
+
+type AdsDatabase = {
+  prepare: (query: string) => AdsStatement;
+};
+
+type AdsEnv = {
+  DB?: AdsDatabase;
 };
 
 export async function onRequestGet({
@@ -13,7 +19,7 @@ export async function onRequestGet({
   env,
 }: {
   request: Request;
-  env: { DB?: D1DatabaseLike };
+  env: AdsEnv;
 }) {
   if (!env.DB) return Response.json({ ads: [] });
 
