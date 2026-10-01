@@ -72,7 +72,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     const row=await env.DB!.prepare(q).bind(...(since?[type,since]:[type])).first<{value:number}>();
     return Number(row?.value||0);
   };
-  const [visitorsToday,visitorsTotal,searchesToday,searchesTotal,phoneClicks,directionsClicks,emergencyClicks,favoriteClicks,submissions,reports]=await Promise.all([
+  const [visitorsToday,visitorsTotal,searchesToday,searchesTotal,phoneClicks,directionsClicks,emergencyClicks,favoriteClicks,submissions,reports,ads]=await Promise.all([
     count('page_view',today),count('page_view'),count('search',today),count('search'),count('phone_click'),count('directions_click'),count('emergency_click'),count('favorite_click'),
     env.DB.prepare('SELECT * FROM submissions ORDER BY created_at DESC LIMIT 50').all(),
     env.DB.prepare("SELECT * FROM reports WHERE status='open' ORDER BY created_at DESC LIMIT 50").all(),
