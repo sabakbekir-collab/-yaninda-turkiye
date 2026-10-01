@@ -22,6 +22,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
     if(action==='logout')return new Response(JSON.stringify({ok:true}),{status:200,headers:{'content-type':'application/json','set-cookie':clearCookie()}});
     if(!(await isAdmin(request,env)))return new Response('Unauthorized',{status:401});
     if(!env.DB)return Response.json({error:'database_unavailable'},{status:503});
+    await env.DB.prepare("CREATE TABLE IF NOT EXISTS ads (id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,text TEXT,image_url TEXT,target_url TEXT,placement TEXT NOT NULL DEFAULT 'home_top',status TEXT NOT NULL DEFAULT 'active',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
     const id=Number(body.id);
     if(action==='save_ad'){
       const title=clean(body.title,120);
@@ -66,6 +67,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
 export async function onRequestGet({request,env}:{request:Request;env:Env}){
   if(!(await isAdmin(request,env)))return new Response('Unauthorized',{status:401});
   if(!env.DB)return Response.json({error:'database_unavailable'},{status:503});
+  await env.DB.prepare("CREATE TABLE IF NOT EXISTS ads (id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,text TEXT,image_url TEXT,target_url TEXT,placement TEXT NOT NULL DEFAULT 'home_top',status TEXT NOT NULL DEFAULT 'active',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
   const today=new Date().toISOString().slice(0,10);
   const count=async(type:string,since?:string)=>{
     const q=since?'SELECT COUNT(*) AS value FROM events WHERE type=? AND created_at>=?':'SELECT COUNT(*) AS value FROM events WHERE type=?';
