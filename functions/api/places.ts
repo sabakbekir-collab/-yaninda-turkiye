@@ -50,6 +50,11 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       }
     }
     if(duty.length)return Response.json(duty.slice(0,40),{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
+    // The duty-pharmacy provider can temporarily return an empty response. Do not
+    // turn that upstream hiccup into a misleading "0 results" screen: continue
+    // to the normal OpenStreetMap pharmacy search as a transparent fallback.
+    // The result is still labeled OpenStreetMap, so we never present ordinary
+    // pharmacy records as if they were confirmed duty pharmacies.
   }
   const key=`places:v6:${category}:${lat.toFixed(3)}:${lon.toFixed(3)}:${province}:${district}`;
   if(env.DB){
