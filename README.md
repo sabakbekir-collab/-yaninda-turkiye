@@ -26,3 +26,18 @@ Android projesini web çıktısıyla eşitlemek için `npm run android:sync`, im
 ## Veri ilkeleri
 
 Uygulama sahte işletme üretmez. Açık veri yanıtı yoksa boş durum gösterir. OSM sorguları sunucu tarafında önbelleğe alınır. Konum geçmişi saklanmaz; yalnızca anonim ürün event’leri ve inceleme bekleyen işletme başvuruları kalıcıdır.
+
+
+## Cloudflare Worker kurulumu
+
+Bu proje Cloudflare Workers üzerinde çalışır. API'lerin kalıcı veri tutması için Cloudflare D1 veritabanı **DB** adıyla Worker'a bağlanmalıdır.
+
+Gerekli Worker secrets:
+- `ADMIN_EMAIL`
+- `ADMIN_PASSWORD`
+- `ADMIN_SESSION_SECRET`
+- İsteğe bağlı: `OSM_CONTACT_EMAIL`
+
+Şema ayrıca ilk API isteğinde otomatik oluşturulur. Dağıtımdan sonra `/api/health` adresi `{ ok: true, database: true }` döndürüyorsa Worker ve D1 bağlantısı hazırdır.
+
+Özel alan adı, uygulama ve yönetim panelinin fonksiyonları doğrulandıktan sonra bağlanmalıdır.
