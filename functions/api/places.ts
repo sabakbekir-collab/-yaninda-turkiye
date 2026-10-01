@@ -4,11 +4,11 @@ type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lo
 const filters:Record<string,string>={pharmacy:'["amenity"="pharmacy"]',hospital:'["amenity"~"hospital|clinic"]',atm:'["amenity"="atm"]',police:'["amenity"="police"]',fire_station:'["amenity"="fire_station"]',fuel:'["amenity"="fuel"]',taxi:'["amenity"="taxi"]',market:'["shop"~"supermarket|convenience"]',restaurant:'["amenity"~"restaurant|fast_food"]',hotel:'["tourism"~"hotel|hostel|guest_house"]',cargo:'["amenity"="post_office"]',towing:'["service:vehicle:recovery"="yes"]',government:'["office"="government"]',electrician:'["craft"="electrician"]',plumber:'["craft"="plumber"]',locksmith:'["craft"="locksmith"]',cleaning:'["craft"="cleaning"]',moving:'["craft"="moving_company"]',hvac:'["craft"~"hvac|heating_engineer"]',painter:'["craft"="painter"]',car_repair:'["shop"="car_repair"]',tyres:'["shop"="tyres"]',phone_repair:'["shop"="mobile_phone"]',computer_repair:'["shop"="computer"]',furniture:'["craft"="carpenter"]',gardener:'["craft"="gardener"]',other:'["craft"]',service:'["craft"]'};
 const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
 const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').slice(0,n):undefined;
-const slug=(s:string)=>s.toLocaleLowerCase('tr').normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/ı/g,'i').replace(/ğ/g,'g').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ö/g,'o').replace(/ü/g,'u').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const slug=(s:string)=>s.toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/ğ/g,'g').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ö/g,'o').replace(/ü/g,'u').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const dutyPharmacies=async(lat:number|undefined,lon:number|undefined,province:string,district:string):Promise<Place[]>=>{
   try{
     const url=new URL('https://eczaneadresi.com/api/public/v1/'+(lat!==undefined&&lon!==undefined?'nearest-pharmacies':'duty-pharmacies'));
-    if(lat!==undefined&&lon!==undefined){url.searchParams.set('lat',String(lat));url.searchParams.set('lng',String(lon));url.searchParams.set('limit','15')}
+    if(lat!==undefined&&lon!==undefined){url.searchParams.set('lat',String(lat));url.searchParams.set('lng',String(lon));url.searchParams.set('radius','25000');url.searchParams.set('limit','15')}
     else{url.searchParams.set('city',slug(province));if(district)url.searchParams.set('district',slug(district));url.searchParams.set('limit','50')}
     const r=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(9000)});
     if(!r.ok)return [];
@@ -38,8 +38,18 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   }
   if(lat<35||lat>43||lon<25||lon>46)return Response.json([]);
   if(category==='pharmacy'){
-    const duty=await dutyPharmacies(u.searchParams.has('lat')?lat:undefined,u.searchParams.has('lon')?lon:undefined,province,district);
-    if(duty.length)return Response.json(duty,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
+    let duty=await dutyPharmacies(u.searchParams.has('lat')?lat:undefined,u.searchParams.has('lon')?lon:undefined,province,district);
+    // If a district-specific lookup temporarily returns no rows, retry at city level
+    // and filter the returned records locally. This keeps the search resilient to
+    // provider-side district slug/index mismatches.
+    if(!duty.length && !u.searchParams.has('lat')){
+      const cityRows=await dutyPharmacies(undefined,undefined,province,'');
+      if(cityRows.length){
+        const wanted=slug(district);
+        duty=cityRows.filter(p=>slug(p.address||'').includes(wanted)||slug((p as Place & {district?:string}).district||'')===wanted);
+      }
+    }
+    if(duty.length)return Response.json(duty.slice(0,40),{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
   }
   const key=`places:v6:${category}:${lat.toFixed(3)}:${lon.toFixed(3)}:${province}:${district}`;
   if(env.DB){
