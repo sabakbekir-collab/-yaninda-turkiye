@@ -88,7 +88,51 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     }));
     body=responses.find(Boolean)||null;
     if(!body)throw new Error('source_unavailable');
-    const places=body.elements.filter(x=>{const tags=x.tags||{};if(category==='pharmacy')return tags.amenity==='pharmacy';if(category==='hospital')return tags.amenity==='hospital'||tags.amenity==='clinic';if(category==='market')return tags.shop==='supermarket'||tags.shop==='convenience';if(category==='restaurant')return tags.amenity==='restaurant'||tags.amenity==='fast_food';if(category==='hotel')return tags.tourism==='hotel'||tags.tourism==='hostel'||tags.tourism==='guest_house';if(category==='government')return tags.office==='government'||['townhall','courthouse','public_building'].includes(tags.amenity||'');return Boolean(filters[category])}).map(x=>{const p=x.center||{lat:x.lat!,lon:x.lon!},tags=x.tags||{};return{id:`osm-${x.type}-${x.id}`,name:clean(tags.name||tags.operator||tags.brand)||'İsimsiz açık veri kaydı',category,lat:p.lat,lon:p.lon,address:clean([tags['addr:street'],tags['addr:housenumber'],tags['addr:district'],tags['addr:city']].filter(Boolean).join(' ')),phone:clean(tags.phone||tags['contact:phone']),openingHours:clean(tags.opening_hours),website:clean(tags.website),operator:clean(tags.operator||tags.brand),source:'OpenStreetMap',distance:distance(lat,lon,p.lat,p.lon)}}).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)).sort((a,b)=>a.distance-b.distance);
+    let places=body.elements.filter(x=>{const tags=x.tags||{};if(category==='pharmacy')return tags.amenity==='pharmacy';if(category==='hospital')return tags.amenity==='hospital'||tags.amenity==='clinic';if(category==='market')return tags.shop==='supermarket'||tags.shop==='convenience';if(category==='restaurant')return tags.amenity==='restaurant'||tags.amenity==='fast_food';if(category==='hotel')return tags.tourism==='hotel'||tags.tourism==='hostel'||tags.tourism==='guest_house';if(category==='government')return tags.office==='government'||['townhall','courthouse','public_building'].includes(tags.amenity||'');return Boolean(filters[category])}).map(x=>{const p=x.center||{lat:x.lat!,lon:x.lon!},tags=x.tags||{};return{id:`osm-${x.type}-${x.id}`,name:clean(tags.name||tags.operator||tags.brand)||'İsimsiz açık veri kaydı',category,lat:p.lat,lon:p.lon,address:clean([tags['addr:street'],tags['addr:housenumber'],tags['addr:district'],tags['addr:city']].filter(Boolean).join(' ')),phone:clean(tags.phone||tags['contact:phone']),openingHours:clean(tags.opening_hours),website:clean(tags.website),operator:clean(tags.operator||tags.brand),source:'OpenStreetMap',distance:distance(lat,lon,p.lat,p.lon)}}).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)).sort((a,b)=>a.distance-b.distance);
+
+    // Overpass can occasionally return an empty/timeout response from a
+    // Cloudflare Worker. Use Nominatim as a second public OpenStreetMap source
+    // so "Konumumu Kullan" does not become a false zero-results screen.
+    if(!places.length){
+      const nominatimTerms:Record<string,string>={
+        pharmacy:'eczane',hospital:'hastane',atm:'ATM',fuel:'akaryakıt',
+        market:'market',restaurant:'restoran',taxi:'taksi',hotel:'otel',
+        police:'polis',fire_station:'itfaiye',cargo:'kargo',
+        government:'resmi kurum',electrician:'elektrikçi',plumber:'tesisatçı',
+        locksmith:'çilingir',cleaning:'temizlik',moving:'nakliye',
+        hvac:'klima kombi',painter:'boya badana',car_repair:'oto servis',
+        tyres:'lastikçi',phone_repair:'telefon tamiri',computer_repair:'bilgisayar tamiri',
+        furniture:'mobilya',gardener:'bahçe'
+      };
+      const term=nominatimTerms[category];
+      if(term){
+        try{
+          const box=0.12;
+          const left=(lon-box).toFixed(5),right=(lon+box).toFixed(5);
+          const top=(lat+box).toFixed(5),bottom=(lat-box).toFixed(5);
+          const nu=new URL('https://nominatim.openstreetmap.org/search');
+          nu.searchParams.set('format','jsonv2');
+          nu.searchParams.set('q',term);
+          nu.searchParams.set('limit','40');
+          nu.searchParams.set('countrycodes','tr');
+          nu.searchParams.set('viewbox',`${left},${top},${right},${bottom}`);
+          nu.searchParams.set('bounded','1');
+          nu.searchParams.set('addressdetails','1');
+          nu.searchParams.set('accept-language','tr');
+          const nr=await fetch(nu,{headers:{Accept:'application/json','User-Agent':`YanimdaTurkiye/1.0 (${env.OSM_CONTACT_EMAIL||'public-web-app'})`},signal:AbortSignal.timeout(7000)});
+          if(nr.ok){
+            const rows=await nr.json() as Array<Record<string,unknown>>;
+            places=rows.map((x,i)=>{
+              const la=Number(x.lat),lo=Number(x.lon),a=(x.address||{}) as Record<string,unknown>;
+              return {id:`nominatim-${category}-${String(x.place_id??i)}`,name:clean(x.name||x.display_name)||term,category,lat:la,lon:lo,
+                address:clean(x.display_name)||clean([a.road,a.house_number,a.suburb,a.city].filter(Boolean).join(' ')),
+                phone:undefined,openingHours:undefined,website:undefined,operator:undefined,source:'OpenStreetMap / Nominatim',
+                distance:distance(lat,lon,la,lo)};
+            }).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)).sort((a,b)=>a.distance-b.distance);
+          }
+        }catch{}
+      }
+    }
     let approved:Place[]=[];
     if(env.DB){
       try{
