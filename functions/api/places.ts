@@ -155,7 +155,8 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
         approved=rows.results.filter(x=>x.latitude!=null&&x.longitude!=null).map(x=>({id:`approved-${x.id}`,name:String(x.name),category:String(x.category),lat:Number(x.latitude),lon:Number(x.longitude),address:clean(x.address),phone:clean(x.phone),openingHours:clean(x.hours),source:'Yanımda Türkiye — onaylı kayıt',distance:distance(lat,lon,Number(x.latitude),Number(x.longitude))}));
       }catch{}
     }
-    const result=[...approved,...places].slice(0,40);
+    const named=[...approved,...places].filter(p=>typeof p.name==='string'&&p.name.trim().length>0);
+    const result=named.slice(0,40);
     if(env.DB&&result.length){try{await env.DB.prepare('INSERT INTO api_cache(cache_key,payload,expires_at) VALUES(?,?,?) ON CONFLICT(cache_key) DO UPDATE SET payload=excluded.payload,expires_at=excluded.expires_at').bind(key,JSON.stringify(result),new Date(Date.now()+30*60*1000).toISOString()).run()}catch{}}
     return Response.json(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'OpenStreetMap'}});
   }catch{return Response.json([],{headers:{'Cache-Control':'no-store'}})}
