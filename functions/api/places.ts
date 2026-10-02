@@ -59,9 +59,11 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       }
     }
     if(duty.length)return Response.json(duty.slice(0,40),{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
-    // Never substitute ordinary OSM pharmacies for a "nöbetçi" search.
-    // A verified empty response is preferable to showing the wrong pharmacy type.
-    return Response.json([],{headers:{'Cache-Control':'no-store','X-Data-Source':'Eczane Adresi'}});
+    // If the duty-pharmacy source has no data, do not stop here.
+    // Fall through to the general nearby-place search so the user still gets
+    // real nearby pharmacies from OpenStreetMap instead of a misleading 0.
+    // These fallback results are intentionally not marked as duty pharmacies.
+    if(duty.length)return Response.json(duty.slice(0,40),{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
   }
   const key=`places:v6:${category}:${lat.toFixed(3)}:${lon.toFixed(3)}:${province}:${district}`;
   if(env.DB){
