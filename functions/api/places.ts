@@ -41,21 +41,27 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   }
   if(lat<35||lat>43||lon<25||lon>46)return Response.json([]);
   if(category==='pharmacy'){
-    let duty=await dutyPharmacies(u.searchParams.has('lat')?lat:undefined,u.searchParams.has('lon')?lon:undefined,province,district);
-    // If a district-specific lookup temporarily returns no rows, retry at city level
-    // and filter the returned records locally. This keeps the search resilient to
-    // provider-side district slug/index mismatches.
-    if(!duty.length && !u.searchParams.has('lat')){
-      const cityRows=await dutyPharmacies(undefined,undefined,province,'');
-      if(cityRows.length){
+    let duty:Place[]=[];
+    if(u.searchParams.has('lat')&&u.searchParams.has('lon')){
+      duty=await dutyPharmacies(lat,lon,province,district);
+    }else{
+      // Run the district and city requests together. If the district endpoint
+      // has a transient slug/index problem, the city response gives us a fast
+      // second chance without doubling the wait time.
+      const [districtRows,cityRows]=await Promise.all([
+        dutyPharmacies(undefined,undefined,province,district),
+        dutyPharmacies(undefined,undefined,province,''),
+      ]);
+      duty=districtRows;
+      if(!duty.length&&cityRows.length){
         const wanted=slug(district);
-        duty=cityRows.filter(p=>slug(p.address||'').includes(wanted)||slug((p as Place & {district?:string}).district||'')===wanted);
+        duty=cityRows.filter(p=>slug(p.address||'').includes(wanted));
       }
     }
     if(duty.length)return Response.json(duty.slice(0,40),{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
-    // This category means "nöbetçi eczane". Never substitute ordinary OSM
-    // pharmacies when the duty provider has no verified rows; that would be
-    // misleading. Return quickly so the UI never sits on a long OSM fallback.
+    // Never substitute ordinary OSM pharmacies for a "nöbetçi" search.
+    // A verified empty response is preferable to showing the wrong pharmacy type.
+    return Response.json([],{headers:{'Cache-Control':'no-store','X-Data-Source':'Eczane Adresi'}});
   }
   const key=`places:v6:${category}:${lat.toFixed(3)}:${lon.toFixed(3)}:${province}:${district}`;
   if(env.DB){
