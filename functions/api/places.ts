@@ -6,11 +6,14 @@ const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number
 const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').slice(0,n):undefined;
 const slug=(s:string)=>s.toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/ğ/g,'g').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ö/g,'o').replace(/ü/g,'u').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
 const dutyPharmacies=async(lat:number|undefined,lon:number|undefined,province:string,district:string):Promise<Place[]>=>{
+  const url=new URL('https://eczaneadresi.com/api/public/v1/'+(lat!==undefined&&lon!==undefined?'nearest-pharmacies':'duty-pharmacies'));
+  if(lat!==undefined&&lon!==undefined){
+    url.searchParams.set('lat',String(lat));url.searchParams.set('lng',String(lon));url.searchParams.set('limit','15');
+  }else{
+    url.searchParams.set('city',slug(province));if(district)url.searchParams.set('district',slug(district));url.searchParams.set('limit','50');
+  }
   try{
-    const url=new URL('https://eczaneadresi.com/api/public/v1/'+(lat!==undefined&&lon!==undefined?'nearest-pharmacies':'duty-pharmacies'));
-    if(lat!==undefined&&lon!==undefined){url.searchParams.set('lat',String(lat));url.searchParams.set('lng',String(lon));url.searchParams.set('radius','25000');url.searchParams.set('limit','15')}
-    else{url.searchParams.set('city',slug(province));if(district)url.searchParams.set('district',slug(district));url.searchParams.set('limit','50')}
-    const r=await fetch(url,{headers:{Accept:'application/json'},signal:AbortSignal.timeout(9000)});
+    const r=await fetch(url,{headers:{Accept:'application/json','User-Agent':'YanimdaTurkiye/1.0'},signal:AbortSignal.timeout(5500)});
     if(!r.ok)return [];
     const raw=await r.json() as Record<string,unknown>;
     const rows=Array.isArray(raw.pharmacies)?raw.pharmacies:Array.isArray(raw.data)?raw.data:[];
@@ -18,7 +21,7 @@ const dutyPharmacies=async(lat:number|undefined,lon:number|undefined,province:st
       id:`duty-pharmacy-${String(p.id??i)}`,name:clean(p.name??p.title,160)||'Nöbetçi Eczane',category:'pharmacy',
       lat:Number(p.lat??(p.location as Record<string,unknown>|undefined)?.lat),lon:Number(p.lng??p.lon??(p.location as Record<string,unknown>|undefined)?.lng),
       address:clean(p.address,300),phone:clean(p.phone,50),openingHours:clean(p.duty_hours??p.opening_hours,150),
-      website:clean(p.url,300),source:'Eczane Adresi'
+      website:clean(p.url,300),source:'Eczane Adresi',isDuty:true
     })).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)).map(p=>({...p,distance:lat!==undefined&&lon!==undefined?distance(lat,lon,p.lat,p.lon):undefined}));
   }catch{return []}
 };
@@ -50,11 +53,9 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       }
     }
     if(duty.length)return Response.json(duty.slice(0,40),{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
-    // The duty-pharmacy provider can temporarily return an empty response. Do not
-    // turn that upstream hiccup into a misleading "0 results" screen: continue
-    // to the normal OpenStreetMap pharmacy search as a transparent fallback.
-    // The result is still labeled OpenStreetMap, so we never present ordinary
-    // pharmacy records as if they were confirmed duty pharmacies.
+    // This category means "nöbetçi eczane". Never substitute ordinary OSM
+    // pharmacies when the duty provider has no verified rows; that would be
+    // misleading. Return quickly so the UI never sits on a long OSM fallback.
   }
   const key=`places:v6:${category}:${lat.toFixed(3)}:${lon.toFixed(3)}:${province}:${district}`;
   if(env.DB){
@@ -69,9 +70,16 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       ? `[out:json][timeout:20];(node["office"="government"](around:12000,${lat},${lon});way["office"="government"](around:12000,${lat},${lon});relation["office"="government"](around:12000,${lat},${lon});node["amenity"~"townhall|courthouse|public_building"](around:12000,${lat},${lon});way["amenity"~"townhall|courthouse|public_building"](around:12000,${lat},${lon});relation["amenity"~"townhall|courthouse|public_building"](around:12000,${lat},${lon}););out center tags 60;`
       : `[out:json][timeout:18];(node${f}(around:12000,${lat},${lon});way${f}(around:12000,${lat},${lon});relation${f}(around:12000,${lat},${lon}););out center tags 40;`;
     let body:{elements:OsmEl[]}|null=null;
-    for(const endpoint of ['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter']){
-      try{const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','User-Agent':'YanimdaTurkiye/1.0'},body:`data=${encodeURIComponent(query)}`,signal:AbortSignal.timeout(12000)});if(!response.ok)continue;const candidate=await response.json() as {elements?:OsmEl[]};if(Array.isArray(candidate.elements)){body={elements:candidate.elements};break}}catch{}
-    }
+    const endpoints=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+    const responses=await Promise.all(endpoints.map(async endpoint=>{
+      try{
+        const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','User-Agent':'YanimdaTurkiye/1.0'},body:`data=${encodeURIComponent(query)}`,signal:AbortSignal.timeout(8500)});
+        if(!response.ok)return null;
+        const candidate=await response.json() as {elements?:OsmEl[]};
+        return Array.isArray(candidate.elements)?{elements:candidate.elements}:null;
+      }catch{return null}
+    }));
+    body=responses.find(Boolean)||null;
     if(!body)throw new Error('source_unavailable');
     const places=body.elements.filter(x=>{const tags=x.tags||{};if(category==='pharmacy')return tags.amenity==='pharmacy';if(category==='hospital')return tags.amenity==='hospital'||tags.amenity==='clinic';if(category==='market')return tags.shop==='supermarket'||tags.shop==='convenience';if(category==='restaurant')return tags.amenity==='restaurant'||tags.amenity==='fast_food';if(category==='hotel')return tags.tourism==='hotel'||tags.tourism==='hostel'||tags.tourism==='guest_house';if(category==='government')return tags.office==='government'||['townhall','courthouse','public_building'].includes(tags.amenity||'');return Boolean(filters[category])}).map(x=>{const p=x.center||{lat:x.lat!,lon:x.lon!},tags=x.tags||{};return{id:`osm-${x.type}-${x.id}`,name:clean(tags.name||tags.operator||tags.brand)||'İsimsiz açık veri kaydı',category,lat:p.lat,lon:p.lon,address:clean([tags['addr:street'],tags['addr:housenumber'],tags['addr:district'],tags['addr:city']].filter(Boolean).join(' ')),phone:clean(tags.phone||tags['contact:phone']),openingHours:clean(tags.opening_hours),website:clean(tags.website),operator:clean(tags.operator||tags.brand),source:'OpenStreetMap',distance:distance(lat,lon,p.lat,p.lon)}}).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)).sort((a,b)=>a.distance-b.distance);
     let approved:Place[]=[];
