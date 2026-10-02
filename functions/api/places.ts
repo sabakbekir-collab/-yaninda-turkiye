@@ -82,6 +82,15 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     // portable form for a small read-only query and avoids request-body
     // handling differences on some edge/network paths.
     const responses=await Promise.all(endpoints.map(async endpoint=>{
+      // Try POST first (the canonical Overpass form), then GET as a transport
+      // fallback. This protects the search from edge/proxy differences.
+      try{
+        const response=await fetch(endpoint,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded','User-Agent':'YanimdaTurkiye/1.0'},body:`data=${encodeURIComponent(query)}`,signal:AbortSignal.timeout(9000)});
+        if(response.ok){
+          const candidate=await response.json() as {elements?:OsmEl[]};
+          if(Array.isArray(candidate.elements))return {elements:candidate.elements};
+        }
+      }catch{}
       try{
         const u=new URL(endpoint);
         u.searchParams.set('data',query);
@@ -117,7 +126,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
           const top=(lat+box).toFixed(5),bottom=(lat-box).toFixed(5);
           const nu=new URL('https://nominatim.openstreetmap.org/search');
           nu.searchParams.set('format','jsonv2');
-          nu.searchParams.set('q',term);
+          nu.searchParams.set('q',term==='eczane'?'[pharmacy]':term);
           nu.searchParams.set('limit','40');
           nu.searchParams.set('countrycodes','tr');
           nu.searchParams.set('viewbox',`${left},${top},${right},${bottom}`);
