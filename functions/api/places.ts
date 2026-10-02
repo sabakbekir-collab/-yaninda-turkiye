@@ -64,7 +64,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     // These fallback results are intentionally not marked as duty pharmacies.
     if(duty.length)return Response.json(duty.slice(0,40),{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
   }
-  const key=`places:v6:${category}:${lat.toFixed(3)}:${lon.toFixed(3)}:${province}:${district}`;
+  const key=`places:v7:${category}:${lat.toFixed(3)}:${lon.toFixed(3)}:${province}:${district}`;
   if(env.DB){
     try{
       const cached=await env.DB.prepare('SELECT payload,expires_at FROM api_cache WHERE cache_key=? AND expires_at>? LIMIT 1').bind(key,new Date().toISOString()).first<{payload:string;expires_at:string}>();
