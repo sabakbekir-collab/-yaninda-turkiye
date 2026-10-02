@@ -11,6 +11,7 @@ export async function findPlaces(category:string,position?:Position,province?:st
   if(!r.ok)throw new Error('places unavailable');
   const data=await r.json();
   if(!Array.isArray(data))throw new Error('invalid places response');
-  return data;
+  // Never show anonymous/open-data placeholders as real businesses.
+  return data.filter((p):p is Place=>Boolean(p&&typeof p.name==='string'&&p.name.trim()));
 }
 export function track(type:string,metadata:Record<string,string|number|boolean>={}){fetch('/api/events',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({type,metadata}),keepalive:true}).catch(()=>undefined)}
