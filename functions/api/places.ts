@@ -64,11 +64,11 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     // These fallback results are intentionally not marked as duty pharmacies.
     if(duty.length)return Response.json(duty.slice(0,40),{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
   }
-  const key=`places:v7:${category}:${lat.toFixed(3)}:${lon.toFixed(3)}:${province}:${district}`;
+  const key=`places:v8:${category}:${lat.toFixed(3)}:${lon.toFixed(3)}:${province}:${district}`;
   if(env.DB){
     try{
       const cached=await env.DB.prepare('SELECT payload,expires_at FROM api_cache WHERE cache_key=? AND expires_at>? LIMIT 1').bind(key,new Date().toISOString()).first<{payload:string;expires_at:string}>();
-      if(cached){const parsed=JSON.parse(cached.payload);if(Array.isArray(parsed)&&parsed.length)return Response.json(parsed,{headers:{'X-Data-Source':'cache'}});}
+      if(cached){const parsed=JSON.parse(cached.payload);if(Array.isArray(parsed)&&parsed.length){const named=parsed.filter((p:unknown)=>{const n=typeof (p as {name?:unknown})?.name==='string'?String((p as {name:string}).name).trim():'';return n.length>=2&&!/^isimsiz( açık veri kaydı)?$/i.test(n);});if(named.length)return Response.json(named,{headers:{'X-Data-Source':'cache','X-Places-Version':'v8'}});}}
     }catch{}
   }
   try{
