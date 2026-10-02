@@ -78,9 +78,14 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       : `[out:json][timeout:18];(node${f}(around:12000,${lat},${lon});way${f}(around:12000,${lat},${lon});relation${f}(around:12000,${lat},${lon}););out center tags 40;`;
     let body:{elements:OsmEl[]}|null=null;
     const endpoints=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+    // Use GET for the first Overpass attempt. It is the simplest and most
+    // portable form for a small read-only query and avoids request-body
+    // handling differences on some edge/network paths.
     const responses=await Promise.all(endpoints.map(async endpoint=>{
       try{
-        const response=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/x-www-form-urlencoded','User-Agent':'YanimdaTurkiye/1.0'},body:`data=${encodeURIComponent(query)}`,signal:AbortSignal.timeout(8500)});
+        const u=new URL(endpoint);
+        u.searchParams.set('data',query);
+        const response=await fetch(u.toString(),{method:'GET',headers:{Accept:'application/json','User-Agent':'YanimdaTurkiye/1.0'},signal:AbortSignal.timeout(9000),cache:'no-store'});
         if(!response.ok)return null;
         const candidate=await response.json() as {elements?:OsmEl[]};
         return Array.isArray(candidate.elements)?{elements:candidate.elements}:null;
