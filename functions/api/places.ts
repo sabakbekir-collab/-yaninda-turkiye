@@ -156,7 +156,13 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       }catch{}
     }
     const named=[...approved,...places].filter((p):p is NonNullable<typeof p>=>p!==null&&typeof p.name==='string'&&p.name.trim().length>0);
-    const result=named.slice(0,40);
+    // Never expose records without a real human-readable business name.
+    // Some public OSM/open-data records contain coordinates but no name; those
+    // are useful internally but must not appear as "İsimsiz" cards to users.
+    const result=named.filter(p=>{
+      const n=typeof p.name==='string'?p.name.trim():'';
+      return n.length>=2 && !/^isimsiz( açık veri kaydı)?$/i.test(n);
+    }).slice(0,40);
     if(env.DB&&result.length){try{await env.DB.prepare('INSERT INTO api_cache(cache_key,payload,expires_at) VALUES(?,?,?) ON CONFLICT(cache_key) DO UPDATE SET payload=excluded.payload,expires_at=excluded.expires_at').bind(key,JSON.stringify(result),new Date(Date.now()+30*60*1000).toISOString()).run()}catch{}}
     return Response.json(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'OpenStreetMap'}});
   }catch{return Response.json([],{headers:{'Cache-Control':'no-store'}})}
