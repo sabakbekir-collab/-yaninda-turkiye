@@ -58,7 +58,6 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
         duty=cityRows.filter(p=>slug(p.address||'').includes(wanted));
       }
     }
-    if(duty.length)return Response.json(duty.slice(0,40),{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
     // If the duty-pharmacy source has no data, do not stop here.
     // Fall through to the general nearby-place search so the user still gets
     // real nearby pharmacies from OpenStreetMap instead of a misleading 0.
