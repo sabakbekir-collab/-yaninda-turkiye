@@ -212,7 +212,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
         address:clean(x.address),phone:clean(x.phone,60),openingHours:clean(x.hours,180),
         source:'Yanımda Türkiye — onaylı kayıt',distance:distance(lat,lon,Number(x.latitude),Number(x.longitude)),
         district:district||undefined
-      })).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&p.distance!>effectiveRadius);
+      })).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&p.distance!==undefined&&p.distance<=effectiveRadius);
       approved=approved.filter(p=>p.name.trim().length>=2);
     }catch{}
   }
