@@ -24,7 +24,15 @@ export default {
       }
 
       if (path === "/api/health" && request.method === "GET") {
-        return Response.json({ ok: true, database: Boolean(env.DB), version: "2026.10.01" });
+        if (!env.DB) {
+          return Response.json({ ok: true, database: false, version: "2026.10.01" });
+        }
+        try {
+          await env.DB.prepare("SELECT 1 AS ok").first();
+          return Response.json({ ok: true, database: true, version: "2026.10.01" });
+        } catch {
+          return Response.json({ ok: false, database: false, version: "2026.10.01" }, { status: 503 });
+        }
       }
 
       if (path === "/api/places" && request.method === "GET") {
