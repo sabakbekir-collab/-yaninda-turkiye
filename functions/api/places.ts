@@ -1,5 +1,5 @@
 import type {Env,Place} from '../lib/types';
-import {trSlug} from '../../src/text';
+import {isCentralDistrict,trSlug} from '../../src/text';
 
 type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
 
