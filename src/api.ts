@@ -27,6 +27,9 @@ export async function findPlaces(
   let data:unknown;
   try { data=await r.json(); } catch { data=undefined; }
   if(!r.ok){
+    if(r.status===400 && data && typeof data==='object' && 'error' in data && (data as {error?:unknown}).error==='duty_pharmacy_location_unknown'){
+      throw new Error('Nöbetçi eczane araması için il bilgisi belirlenemedi. Lütfen il seç veya konum izni ver.');
+    }
     if(r.status===503 && data && typeof data==='object' && 'error' in data){
       const code=(data as {error?:unknown}).error;
       if(code==='duty_pharmacy_unavailable'){
