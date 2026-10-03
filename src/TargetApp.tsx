@@ -247,7 +247,7 @@ function Nearby(){
 
  const categoryList=categories.filter(c=>!['service','emergency'].includes(c.id));
  const activeLabel=pharmacyMode?'Nöbetçi Eczaneler':(categoryList.find(c=>c.id===cat)?.label||services.find(s=>s[0]===cat)?.[1]||'Hizmet');
- const officialPharmacyUrl=province==='İstanbul'?'https://www.istanbuleczaciodasi.org.tr/nobetci-eczane/':'https://enabiz.gov.tr/NobetciEczane';
+ const officialPharmacyUrl='https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama';
 
  return <main className="inner nearby-page">
    <div className="page-title nearby-title">
@@ -257,8 +257,8 @@ function Nearby(){
    </div>
 
    {pharmacyMode&&<div className="pharmacy-warning">
-     <div><Info/><div><b>Nöbetçi eczaneler</b><span>Sonuçlar güncel nöbet verisinden alınır. Yola çıkmadan önce telefonla teyit et.</span></div></div>
-     <a href={officialPharmacyUrl} target="_blank" rel="noreferrer">İstanbul Eczacı Odası <ExternalLink/></a>
+     <div><Info/><div><b>Nöbetçi eczaneler</b><span>Sonuçlar güncel nöbet verisinden alınır. Resmî teyit için TİTCK / e-Devlet bağlantısı da burada. Yola çıkmadan önce telefonla teyit et.</span></div></div>
+     <a href={officialPharmacyUrl} target="_blank" rel="noreferrer">Resmî TİTCK / e-Devlet <ExternalLink/></a>
    </div>}
 
    {locationState==='denied'&&<div className="location-denied"><Info/><span>Konum izni kapalı. İl / ilçe seçimiyle devam edebilirsin.</span></div>}
