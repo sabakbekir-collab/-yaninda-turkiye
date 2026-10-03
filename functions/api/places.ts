@@ -186,7 +186,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   // Manual district searches are centered on the district and always honor the selected
   // radius. If nearby districts are enabled, broaden that radius by at least 1.5x.
   const effectiveRadius=district&&nearbyDistricts
-    ? Math.min(20,Math.max(radiusKm,radiusKm*1.5))
+    ? Math.min(30,Math.max(radiusKm,radiusKm*1.5))
     : radiusKm;
 
   // Never label an OSM pharmacy as "nöbetçi". Official duty integration is deliberately
