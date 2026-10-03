@@ -23,13 +23,13 @@ export default {
       // binding reports a useful 503 instead of being hidden by ensureSchema().
       if (path === "/api/health" && request.method === "GET") {
         if (!env.DB) {
-          return Response.json({ ok: true, database: false, version: "2026.10.01" });
+          return Response.json({ ok: true, database: false, version: "2026.10.03" });
         }
         try {
           await env.DB.prepare("SELECT 1 AS ok").first();
-          return Response.json({ ok: true, database: true, version: "2026.10.01" });
+          return Response.json({ ok: true, database: true, version: "2026.10.03" });
         } catch {
-          return Response.json({ ok: false, database: false, version: "2026.10.01" }, { status: 503 });
+          return Response.json({ ok: false, database: false, version: "2026.10.03" }, { status: 503 });
         }
       }
 
