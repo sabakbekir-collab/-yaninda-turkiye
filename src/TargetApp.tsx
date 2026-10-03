@@ -68,11 +68,8 @@ function MobileNav(){
 }
 
 function Ad({kind}:{kind:'top'|'mid'|'bottom'}){
- const[ad,setAd]=useState<{title:string;text?:string;image_url?:string;target_url?:string}|null>(null);
- useEffect(()=>{fetch('/api/ads?placement=home_'+kind,{headers:{Accept:'application/json'}}).then(r=>r.ok?r.json():[]).then((rows:unknown)=>{if(Array.isArray(rows)&&rows[0]&&typeof rows[0]==='object')setAd(rows[0] as {title:string;text?:string;image_url?:string;target_url?:string})}).catch(()=>undefined)},[kind]);
- if(!ad)return null;
- const content=<><small>Reklam</small>{ad.image_url&&<img src={ad.image_url} alt="" loading={kind==='top'?'eager':'lazy'}/>}<div><strong>{ad.title}</strong>{ad.text&&<b>{ad.text}</b>}</div></>;
- return ad.target_url?<a href={ad.target_url} className="yt-ad" target="_blank" rel="noreferrer">{content}</a>:<div className="yt-ad">{content}</div>;
+ const d=kind==='top'?{img:imgs.pharmacy,title:'GÜVEN ECZANESİ',text:'7/24 HİZMETİNİZDE',button:'Hemen Konumunu Al',cls:'red'}:kind==='mid'?{img:imgs.burger,title:'BURGER KING',text:'LEZZET HER ZAMAN YANINDA',button:'En Yakın Şubeyi Bul',cls:'burger'}:{img:imgs.trend,title:'trendyol',text:'ARADIĞIN HER ŞEY TRENDYOL’DA',button:'Hemen İncele',cls:'trend'};
+ return <a href="#" className={'yt-ad '+d.cls} onClick={e=>e.preventDefault()}><img src={d.img} alt=""/><div><small>REKLAM</small><strong>{d.title}</strong><b>{d.text}</b><button>{d.button}</button></div></a>
 }
 
 const quick:[string,string,LucideIcon,string][]=[
