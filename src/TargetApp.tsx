@@ -154,6 +154,7 @@ function Nearby(){
 
  const categoryList=categories.filter(c=>!['service','emergency'].includes(c.id));
  const activeLabel=pharmacyMode?'Yakındaki Eczaneler':(categoryList.find(c=>c.id===cat)?.label||services.find(s=>s[0]===cat)?.[1]||'Hizmet');
+ const officialPharmacyUrl=province==='İstanbul'?'https://www.istanbuleczaciodasi.org.tr/nobetci-eczane/':'https://enabiz.gov.tr/NobetciEczane';
 
  return <main className="inner nearby-page">
    <div className="page-title nearby-title">
@@ -164,7 +165,7 @@ function Nearby(){
 
    {pharmacyMode&&<div className="pharmacy-warning">
      <div><Info/><div><b>Nöbetçi durumu resmi kaynaktan doğrulanmıyor.</b><span>Buradaki sonuçlar yalnızca yakındaki eczanelerdir; nöbetçi olarak işaretlenmez.</span></div></div>
-     <a href="https://www.istanbuleczaciodasi.org.tr/nobetci-eczane/" target="_blank" rel="noreferrer">Resmi nöbetçi eczane sorgusu <ExternalLink/></a>
+     <a href={officialPharmacyUrl} target="_blank" rel="noreferrer">Resmi nöbetçi eczane sorgusu <ExternalLink/></a>
    </div>}
 
    {locationState==='denied'&&<div className="location-denied"><Info/><span>Konum izni kapalı. İl / ilçe seçimiyle devam edebilirsin.</span></div>}
