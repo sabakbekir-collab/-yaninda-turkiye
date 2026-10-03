@@ -134,7 +134,7 @@ function Nearby(){
  const validProvince=useMemo(()=>provinces.includes(province),[province]);
  const validDistrict=useMemo(()=>!district||ds.includes(district),[district,ds]);
  const pharmacyMode=cat==='pharmacy';
- const effectiveRadius=district&&nearbyDistricts?Math.min(20,Math.max(radius,radius*1.5)):radius;
+ const effectiveRadius=district&&nearbyDistricts?Math.min(30,Math.max(radius,radius*1.5)):radius;
 
  useEffect(()=>{
    writeNearbyMemory({category:cat,province,district,radius,nearbyDistricts});
