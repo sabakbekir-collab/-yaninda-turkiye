@@ -5,6 +5,7 @@ const filters:Record<string,string>={pharmacy:'["amenity"="pharmacy"]',hospital:
 const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
 const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').slice(0,n):undefined;
 const slug=(s:string)=>s.toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/ğ/g,'g').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ö/g,'o').replace(/ü/g,'u').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const officialDutyUrl=(province:string)=>province==='İstanbul'?'https://istanbulism.saglik.gov.tr/TR-157444/nobetci-eczaneler.html':'https://enabiz.gov.tr/NobetciEczane';
 const dutyPharmacies=async(lat:number|undefined,lon:number|undefined,province:string,district:string):Promise<Place[]>=>{
   const url=new URL('https://eczaneadresi.com/api/public/v1/'+(lat!==undefined&&lon!==undefined?'nearest-pharmacies':'duty-pharmacies'));
   if(lat!==undefined&&lon!==undefined){
@@ -21,7 +22,7 @@ const dutyPharmacies=async(lat:number|undefined,lon:number|undefined,province:st
       id:`duty-pharmacy-${String(p.id??i)}`,name:clean(p.name??p.title,160)||'Nöbetçi Eczane',category:'pharmacy',
       lat:Number(p.lat??(p.location as Record<string,unknown>|undefined)?.lat),lon:Number(p.lng??p.lon??(p.location as Record<string,unknown>|undefined)?.lng),
       address:clean(p.address,300),phone:clean(p.phone,50),openingHours:clean(p.duty_hours??p.opening_hours,150),
-      website:clean(p.url,300),source:'Eczane Adresi',isDuty:true
+      website:clean(p.url,300),source:'Eczane Adresi · nöbet verisi',isDuty:true,officialUrl:officialDutyUrl(province),verifiedAt:new Date().toISOString()
     })).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)).map(p=>({...p,distance:lat!==undefined&&lon!==undefined?distance(lat,lon,p.lat,p.lon):undefined}));
   }catch{return []}
 };
@@ -62,7 +63,8 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     // Fall through to the general nearby-place search so the user still gets
     // real nearby pharmacies from OpenStreetMap instead of a misleading 0.
     // These fallback results are intentionally not marked as duty pharmacies.
-    if(duty.length)return Response.json(duty.slice(0,40),{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
+    duty=duty.filter(p=>typeof p.distance!=='number'||p.distance<=8).sort((a,b)=>(a.distance??999)-(b.distance??999));
+    if(duty.length)return Response.json(duty.slice(0,30),{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
   }
   const key=`places:v8:${category}:${lat.toFixed(3)}:${lon.toFixed(3)}:${province}:${district}`;
   if(env.DB){
@@ -74,8 +76,8 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   try{
     const f=filters[category];
     const query=category==='government'
-      ? `[out:json][timeout:20];(node["office"="government"](around:12000,${lat},${lon});way["office"="government"](around:12000,${lat},${lon});relation["office"="government"](around:12000,${lat},${lon});node["amenity"~"townhall|courthouse|public_building"](around:12000,${lat},${lon});way["amenity"~"townhall|courthouse|public_building"](around:12000,${lat},${lon});relation["amenity"~"townhall|courthouse|public_building"](around:12000,${lat},${lon}););out center tags 60;`
-      : `[out:json][timeout:18];(node${f}(around:12000,${lat},${lon});way${f}(around:12000,${lat},${lon});relation${f}(around:12000,${lat},${lon}););out center tags 40;`;
+      ? `[out:json][timeout:20];(node["office"="government"](around:5000,${lat},${lon});way["office"="government"](around:5000,${lat},${lon});relation["office"="government"](around:5000,${lat},${lon});node["amenity"~"townhall|courthouse|public_building"](around:5000,${lat},${lon});way["amenity"~"townhall|courthouse|public_building"](around:5000,${lat},${lon});relation["amenity"~"townhall|courthouse|public_building"](around:5000,${lat},${lon}););out center tags 60;`
+      : `[out:json][timeout:18];(node${f}(around:5000,${lat},${lon});way${f}(around:5000,${lat},${lon});relation${f}(around:5000,${lat},${lon}););out center tags 40;`;
     let body:{elements:OsmEl[]}|null=null;
     const endpoints=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
     // Use GET for the first Overpass attempt. It is the simplest and most
@@ -143,31 +145,26 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       const cfg=nominatim[category];
       if(cfg){
         const area=[district,province,'Türkiye'].filter(Boolean).join(', ');
-        const box=0.10;
+        const box=0.045;
         const left=(lon-box).toFixed(5),right=(lon+box).toFixed(5);
         const top=(lat+box).toFixed(5),bottom=(lat-box).toFixed(5);
         const headers={Accept:'application/json','User-Agent':`YanimdaTurkiye/1.0 (${env.OSM_CONTACT_EMAIL||'public-web-app'})`};
         const rows:Record<string,unknown>[]=[];
-        for(const term of cfg.terms){
-          try{
-            const nu=new URL('https://nominatim.openstreetmap.org/search');
-            nu.searchParams.set('format','jsonv2');
-            nu.searchParams.set('q',`${term}, ${area}`);
-            nu.searchParams.set('limit','40');
-            nu.searchParams.set('countrycodes','tr');
-            nu.searchParams.set('layer','poi');
-            nu.searchParams.set('viewbox',`${left},${top},${right},${bottom}`);
-            nu.searchParams.set('bounded','1');
-            nu.searchParams.set('addressdetails','1');
-            nu.searchParams.set('accept-language','tr');
-            for(const include of (cfg.includes||[]))nu.searchParams.append('include',include);
-            const nr=await fetch(nu,{headers,signal:AbortSignal.timeout(6500)});
-            if(!nr.ok)continue;
-            const data=await nr.json() as unknown;
-            if(Array.isArray(data))rows.push(...data as Record<string,unknown>[]);
-            if(rows.length>=40)break;
-          }catch{}
-        }
+        const term=cfg.terms[0];
+        try{
+          const nu=new URL('https://nominatim.openstreetmap.org/search');
+          nu.searchParams.set('format','jsonv2');
+          nu.searchParams.set('q',term+', '+area);
+          nu.searchParams.set('limit','20');
+          nu.searchParams.set('countrycodes','tr');
+          nu.searchParams.set('layer','poi');
+          nu.searchParams.set('viewbox',left+','+top+','+right+','+bottom);
+          nu.searchParams.set('bounded','1');
+          nu.searchParams.set('addressdetails','1');
+          nu.searchParams.set('accept-language','tr');
+          const nr=await fetch(nu,{headers,signal:AbortSignal.timeout(6500)});
+          if(nr.ok){const data=await nr.json() as unknown;if(Array.isArray(data))rows.push(...data as Record<string,unknown>[]);}
+        }catch{}
         places=rows.map((x,i)=>{
           const la=Number(x.lat),lo=Number(x.lon),a=(x.address||{}) as Record<string,unknown>;
           const display=clean(x.display_name);
@@ -180,7 +177,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
             operator:clean((x.extratags as Record<string,unknown>|undefined)?.operator),source:'OpenStreetMap / Nominatim',
             distance:distance(lat,lon,la,lo)};
         }).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&p.name.trim().length>=2)
-          .filter(p=>p.distance<=15)
+          .filter(p=>p.distance<=8)
           .sort((a,b)=>a.distance-b.distance);
       }
     }
@@ -196,10 +193,14 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     // Never expose records without a real human-readable business name.
     // Some public OSM/open-data records contain coordinates but no name; those
     // are useful internally but must not appear as "İsimsiz" cards to users.
-    const result=named.filter(p=>{
-      const n=typeof p.name==='string'?p.name.trim():'';
-      return n.length>=2 && !/^isimsiz( açık veri kaydı)?$/i.test(n);
-    }).slice(0,40);
+    const result=named
+      .filter(p=>{
+        const n=typeof p.name==='string'?p.name.trim():'';
+        return n.length>=2 && !/^isimsiz( açık veri kaydı)?$/i.test(n);
+      })
+      .filter(p=>typeof p.distance!=='number'||p.distance<=8)
+      .sort((a,b)=>(a.distance??999)-(b.distance??999))
+      .slice(0,30);
     if(env.DB&&result.length){try{await env.DB.prepare('INSERT INTO api_cache(cache_key,payload,expires_at) VALUES(?,?,?) ON CONFLICT(cache_key) DO UPDATE SET payload=excluded.payload,expires_at=excluded.expires_at').bind(key,JSON.stringify(result),new Date(Date.now()+30*60*1000).toISOString()).run()}catch{}}
     return Response.json(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'OpenStreetMap'}});
   }catch{return Response.json([],{headers:{'Cache-Control':'no-store'}})}
