@@ -173,7 +173,13 @@ async function overpass(category:string,lat:number,lon:number,radiusKm:number):P
       if(!r.ok)continue;
       const data=await r.json() as {elements?:OsmEl[]};
       if(Array.isArray(data.elements)){
-        return {ok:true,places:data.elements.map(x=>osmPlace(x,category,lat,lon)).filter((x):x is Place=>Boolean(x)).sort((a,b)=>(a.distance??999)-(b.distance??999))};
+        const mapped: Place[] = [];
+        for (const x of data.elements) {
+          const p = osmPlace(x, category, lat, lon);
+          if (p !== null) mapped.push(p);
+        }
+        mapped.sort((a,b)=>(a.distance??999)-(b.distance??999));
+        return {ok:true,places:mapped};
       }
     }catch{}
   }
