@@ -104,6 +104,42 @@ function osmPlace(x:OsmEl,category:string,lat:number,lon:number):Place|null{
   };
 }
 
+async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean}>{
+  const city=slug(province||'istanbul');
+  const u=new URL('https://eczaneadresi.com/api/public/v1/duty-pharmacies');
+  u.searchParams.set('city',city);
+  if(district)u.searchParams.set('district',slug(district));
+  u.searchParams.set('limit','200');
+  try{
+    const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(10000)});
+    if(!r.ok)return {places:[],ok:false};
+    const data=await r.json() as {pharmacies?:Array<Record<string,unknown>>};
+    if(!Array.isArray(data.pharmacies))return {places:[],ok:false};
+    const places=data.pharmacies.map((x,i)=>{
+      const la=Number(x.lat??x.latitude),lo=Number(x.lng??x.lon??x.longitude);
+      const name=clean(x.name);
+      if(!name||!Number.isFinite(la)||!Number.isFinite(lo))return null;
+      const d=distance(lat,lon,la,lo);
+      return {
+        id:'duty-pharmacy-'+String(x.id??i),
+        name,category:'pharmacy',lat:la,lon:lo,
+        address:clean(x.address),phone:clean(x.phone,60),
+        openingHours:clean(x.hours||x.opening_hours||x.duty_hours,180),
+        source:'Eczane Adresi — nöbet verisi',
+        distance:d,
+        district:clean(x.district)||district||undefined,
+        isDuty:true,
+        officialUrl:province==='İstanbul'?'https://www.istanbuleczaciodasi.org.tr/nobetci-eczane/':undefined,
+        verifiedAt:new Date().toISOString(),
+        dutyUpdatedAt:new Date().toISOString()
+      } satisfies Place;
+    }).filter((x):x is Place=>Boolean(x))
+      .filter(p=>p.distance!<=radiusKm)
+      .sort((a,b)=>(a.distance??999)-(b.distance??999));
+    return {places,ok:true};
+  }catch{return {places:[],ok:false}}
+}
+
 async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean}>{
   const f=filters[category];
   const meters=Math.max(2000,Math.min(30000,Math.round(radiusKm*1000)));
@@ -198,6 +234,16 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   const key=cacheKey(category,lat.toFixed(3),lon.toFixed(3),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
   const cached=await dbCacheGet(env,key);
   if(Array.isArray(cached))return Response.json(cached,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'cache'}});
+
+  // Eczane kategorisi yalnızca güncel nöbet verisini kullanır.
+  // OSM'deki genel eczaneler nöbetçi gibi gösterilmez.
+  if(category==='pharmacy'){
+    const duty=await dutyPharmacies(env,province,district,lat,lon,effectiveRadius);
+    if(!duty.ok)return Response.json({error:'duty_pharmacy_unavailable'},{status:503,headers:{'Cache-Control':'no-store'}});
+    const dutyResult=duty.places.slice(0,40);
+    await dbCachePut(env,key,dutyResult,5*60*1000);
+    return Response.json(dutyResult,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
+  }
 
   const primary=await overpass(category,lat,lon,effectiveRadius);
   let places=primary.places;
