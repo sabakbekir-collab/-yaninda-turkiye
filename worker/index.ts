@@ -19,10 +19,8 @@ export default {
     const path = url.pathname;
 
     try {
-      if (path.startsWith("/api/") && env.DB) {
-        await ensureSchema(env);
-      }
-
+      // Health must be independent of schema initialization so a broken/missing D1
+      // binding reports a useful 503 instead of being hidden by ensureSchema().
       if (path === "/api/health" && request.method === "GET") {
         if (!env.DB) {
           return Response.json({ ok: true, database: false, version: "2026.10.01" });
@@ -33,6 +31,10 @@ export default {
         } catch {
           return Response.json({ ok: false, database: false, version: "2026.10.01" }, { status: 503 });
         }
+      }
+
+      if (path.startsWith("/api/") && env.DB) {
+        await ensureSchema(env);
       }
 
       if (path === "/api/places" && request.method === "GET") {
