@@ -24,8 +24,14 @@ export async function findPlaces(
     cache:'no-store',
     headers:{Accept:'application/json'}
   });
-  if(!r.ok)throw new Error('places unavailable');
-  const data=await r.json();
+  let data:unknown;
+  try { data=await r.json(); } catch { data=undefined; }
+  if(!r.ok){
+    if(r.status===503 && data && typeof data==='object' && 'error' in data && (data as {error?:unknown}).error==='upstream_unavailable'){
+      throw new Error('Hizmet verisi sağlayıcısına şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.');
+    }
+    throw new Error('Hizmet verileri şu anda alınamadı.');
+  }
   if(!Array.isArray(data))throw new Error('invalid places response');
   return data.filter((p):p is Place=>Boolean(
     p&&typeof p.name==='string'&&p.name.trim().length>=2&&
