@@ -117,8 +117,8 @@ async function reverseArea(lat:number,lon:number):Promise<{province:string;distr
   }catch{return null}
 }
 
-async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean}>{
-  const useNearest=!province&&!district;
+async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,radiusKm:number,preferNearest=false):Promise<{places:Place[];ok:boolean}>{
+  const useNearest=preferNearest;
   const u=new URL('https://eczaneadresi.com/api/public/v1/'+(useNearest?'nearest-pharmacies':'duty-pharmacies'));
   if(useNearest){
     u.searchParams.set('lat',String(lat));
@@ -266,7 +266,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       dutyDistrict=area?.district||'';
     }
     if(!dutyProvince)return Response.json({error:'duty_pharmacy_location_unknown'},{status:400,headers:{'Cache-Control':'no-store'}});
-    const duty=await dutyPharmacies(env,dutyProvince,dutyDistrict,lat,lon,effectiveRadius);
+    const duty=await dutyPharmacies(env,dutyProvince,dutyDistrict,lat,lon,effectiveRadius,hasPosition&&!province&&!district);
     if(!duty.ok)return Response.json({error:'duty_pharmacy_unavailable'},{status:503,headers:{'Cache-Control':'no-store'}});
     const dutyResult=duty.places.slice(0,40);
     await dbCachePut(env,key,dutyResult,5*60*1000);
