@@ -158,7 +158,24 @@ function Nearby(){
  },[cat,province,district,radius,nearbyDistricts,view,setParams]);
 
  useEffect(()=>{
-   getLocationPermissionState().then(s=>setLocationState(s)).catch(()=>setLocationState('unknown'));
+   let cancelled=false;
+   getLocationPermissionState().then(async s=>{
+     if(cancelled)return;
+     setLocationState(s);
+     // If the user already granted location permission, Yakınımda starts
+     // with the real device position. We never open a permission prompt
+     // automatically when the browser is still in "prompt" state.
+     if(s==='granted' && !province && !district && !submitted){
+       try{
+         const current=await getCurrentLocation();
+         if(cancelled)return;
+         setPos(current);
+         setHasSearched(true);
+         setSubmitted({category:cat,province:'',district:'',radius,nearbyDistricts,pos:current});
+       }catch{}
+     }
+   }).catch(()=>setLocationState('unknown'));
+   return()=>{cancelled=true};
  },[]);
 
  useEffect(()=>{
@@ -236,7 +253,7 @@ function Nearby(){
    <div className="page-title nearby-title">
      <button className="back-btn" onClick={()=>nav(-1)} aria-label="Geri">‹</button>
      <div><small>CANLI HİZMET ARAMA</small><h1>Yakınındaki Hizmetler</h1></div>
-     <button className="locate-top" onClick={locate} title="Konumumu kullan" aria-label="Konumumu kullan"><LocateFixed/></button>
+     <button className="locate-top" onClick={locate} title="Konumumu kullan" aria-label="Konumumu kullan"><LocateFixed/><span>Konumumu Kullan</span></button>
    </div>
 
    {pharmacyMode&&<div className="pharmacy-warning">
@@ -265,7 +282,7 @@ function Nearby(){
      </div>
 
      <div className="action-row">
-       <button className="search-filter primary-search" onClick={search} disabled={loading}><Search/>{loading?'Aranıyor…':'Yakınımdakileri Bul'}</button>
+       <button className="search-filter primary-search" onClick={search} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
        <button className="location-search" onClick={locate}><LocateFixed/> Konumumu Kullan</button>
      </div>
    </div>
