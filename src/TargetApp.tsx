@@ -111,15 +111,18 @@ function categoryIcon(id:string){
   };
   return map[id]||Wrench;
 }
+type NearbyNavigationState={category?:string;province?:string;district?:string;query?:string};
+
 function Nearby(){
  const location=useLocation();
  const nav=useNavigate();
  const[params,setParams]=useSearchParams();
  const memory=readNearbyMemory();
+ const state=location.state as NearbyNavigationState|null;
 
- const[cat,setCat]=useState(params.get('category')||state.category||memory.category||'pharmacy');
- const[province,setProvince]=useState(params.get('province')||state.province||memory.province||'');
- const[district,setDistrict]=useState(params.get('district')||state.district||'');
+ const[cat,setCat]=useState(params.get('category')||state?.category||memory.category||'pharmacy');
+ const[province,setProvince]=useState(params.get('province')||state?.province||memory.province||'');
+ const[district,setDistrict]=useState(params.get('district')||state?.district||memory.district||'');
  const[radius,setRadius]=useState(Number(params.get('radius')||memory.radius||5));
  const[nearbyDistricts,setNearbyDistricts]=useState(params.get('nearbyDistricts')==='1'||Boolean(memory.nearbyDistricts));
  const[places,setPlaces]=useState<Place[]>([]);
@@ -155,7 +158,7 @@ function Nearby(){
  },[]);
 
  useEffect(()=>{
-   const incoming=location.state as {category?:string;province?:string;district?:string;query?:string}|null;
+   const incoming=location.state as NearbyNavigationState|null;
    if(!incoming)return;
    if(incoming.province!==undefined)setProvince(incoming.province);
    if(incoming.district!==undefined)setDistrict(incoming.district);
