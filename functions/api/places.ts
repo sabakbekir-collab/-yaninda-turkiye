@@ -118,15 +118,22 @@ async function reverseArea(lat:number,lon:number):Promise<{province:string;distr
 }
 
 async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean}>{
-  const city=slug(province||'istanbul');
-  const u=new URL('https://eczaneadresi.com/api/public/v1/duty-pharmacies');
-  u.searchParams.set('city',city);
-  if(district)u.searchParams.set('district',slug(district));
-  u.searchParams.set('limit','200');
+  const useNearest=!province&&!district;
+  const u=new URL('https://eczaneadresi.com/api/public/v1/'+(useNearest?'nearest-pharmacies':'duty-pharmacies'));
+  if(useNearest){
+    u.searchParams.set('lat',String(lat));
+    u.searchParams.set('lng',String(lon));
+    u.searchParams.set('radius',String(Math.round(radiusKm*1000)));
+    u.searchParams.set('limit','25');
+  }else{
+    u.searchParams.set('city',slug(province||'istanbul'));
+    if(district)u.searchParams.set('district',slug(district));
+    u.searchParams.set('limit','200');
+  }
   try{
     const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(10000)});
     if(!r.ok)return {places:[],ok:false};
-    const data=await r.json() as {pharmacies?:Array<Record<string,unknown>>};
+    const data=await r.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
     if(!Array.isArray(data.pharmacies))return {places:[],ok:false};
     const places=data.pharmacies.map((x,i)=>{
       const la=Number(x.lat??x.latitude),lo=Number(x.lng??x.lon??x.longitude);
@@ -142,8 +149,8 @@ async function dutyPharmacies(env:Env,province:string,district:string,lat:number
         distance:d,
         district:clean(x.district)||district||undefined,
         isDuty:true,
-        officialUrl:province==='İstanbul'?'https://www.istanbuleczaciodasi.org.tr/nobetci-eczane/':undefined,
-        verifiedAt:new Date().toISOString(),
+        officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
+        verifiedAt:data.date||new Date().toISOString(),
         dutyUpdatedAt:new Date().toISOString()
       } satisfies Place;
     }).filter((x):x is Place=>Boolean(x))
