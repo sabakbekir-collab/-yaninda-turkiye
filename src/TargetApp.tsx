@@ -105,10 +105,10 @@ function Nearby(){
    setParams(prev=>{
      const next=new URLSearchParams(prev);
      next.set('category',cat);
-     province?next.set('province',province):next.delete('province');
-     district?next.set('district',district):next.delete('district');
+     if(province)next.set('province',province);else next.delete('province');
+     if(district)next.set('district',district);else next.delete('district');
      next.set('radius',String(radius));
-     nearbyDistricts?next.set('nearbyDistricts','1'):next.delete('nearbyDistricts');
+     if(nearbyDistricts)next.set('nearbyDistricts','1');else next.delete('nearbyDistricts');
      return next;
    },{replace:true});
  },[cat,province,district,radius,nearbyDistricts,setParams]);
