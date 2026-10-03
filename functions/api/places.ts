@@ -104,6 +104,19 @@ function osmPlace(x:OsmEl,category:string,lat:number,lon:number):Place|null{
   };
 }
 
+async function reverseArea(lat:number,lon:number):Promise<{province:string;district:string}|null>{
+  try{
+    const u=new URL('https://nominatim.openstreetmap.org/reverse');
+    u.searchParams.set('format','jsonv2');u.searchParams.set('lat',String(lat));u.searchParams.set('lon',String(lon));
+    u.searchParams.set('zoom','10');u.searchParams.set('addressdetails','1');u.searchParams.set('accept-language','tr');
+    const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(7000)});
+    if(!r.ok)return null;
+    const x=await r.json() as {address?:Record<string,string>};
+    const a=x.address||{};
+    return {province:a.province||a.state||'',district:a.city_district||a.district||a.town||''};
+  }catch{return null}
+}
+
 async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean}>{
   const city=slug(province||'istanbul');
   const u=new URL('https://eczaneadresi.com/api/public/v1/duty-pharmacies');
@@ -238,7 +251,15 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   // Eczane kategorisi yalnızca güncel nöbet verisini kullanır.
   // OSM'deki genel eczaneler nöbetçi gibi gösterilmez.
   if(category==='pharmacy'){
-    const duty=await dutyPharmacies(env,province,district,lat,lon,effectiveRadius);
+    let dutyProvince=province;
+    let dutyDistrict=district;
+    if(!dutyProvince){
+      const area=await reverseArea(lat,lon);
+      dutyProvince=area?.province||'';
+      dutyDistrict=area?.district||'';
+    }
+    if(!dutyProvince)return Response.json({error:'duty_pharmacy_location_unknown'},{status:400,headers:{'Cache-Control':'no-store'}});
+    const duty=await dutyPharmacies(env,dutyProvince,dutyDistrict,lat,lon,effectiveRadius);
     if(!duty.ok)return Response.json({error:'duty_pharmacy_unavailable'},{status:503,headers:{'Cache-Control':'no-store'}});
     const dutyResult=duty.places.slice(0,40);
     await dbCachePut(env,key,dutyResult,5*60*1000);
