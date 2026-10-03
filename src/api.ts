@@ -27,8 +27,14 @@ export async function findPlaces(
   let data:unknown;
   try { data=await r.json(); } catch { data=undefined; }
   if(!r.ok){
-    if(r.status===503 && data && typeof data==='object' && 'error' in data && (data as {error?:unknown}).error==='upstream_unavailable'){
-      throw new Error('Hizmet verisi sağlayıcısına şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.');
+    if(r.status===503 && data && typeof data==='object' && 'error' in data){
+      const code=(data as {error?:unknown}).error;
+      if(code==='duty_pharmacy_unavailable'){
+        throw new Error('Güncel nöbetçi eczane verisine şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.');
+      }
+      if(code==='upstream_unavailable'){
+        throw new Error('Hizmet verisi sağlayıcısına şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.');
+      }
     }
     throw new Error('Hizmet verileri şu anda alınamadı.');
   }
