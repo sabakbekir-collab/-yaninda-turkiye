@@ -8,7 +8,7 @@ import L from 'leaflet';
 import {categories,keywordMap,provinces,services} from './data';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName} from './text';
-import {findPlaces from './api';
+import {findPlaces} from './api';
 import {getCurrentLocation,getLocationPermissionState,LocationError} from './location';
 import type {Place,Position} from './types';
 
