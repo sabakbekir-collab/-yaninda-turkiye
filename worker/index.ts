@@ -59,7 +59,12 @@ export default {
       // fallback the Worker returns 404 for the homepage and Safari reports
       // that the page cannot be opened even though the deployment succeeds.
       return await env.ASSETS.fetch(request);
-    } catch {
+    } catch (error) {
+      console.error("Yanımda Türkiye Worker request error", {
+        path,
+        method: request.method,
+        error,
+      });
       return Response.json({ error: "server_error" }, { status: 500 });
     }
   },
