@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useState} from 'react';
 import type {FormEvent} from 'react';
 import {NavLink,useLocation,useNavigate,useSearchParams,Routes,Route} from 'react-router-dom';
-import {Activity,AlertTriangle,ArrowRight,Banknote,Bell,Building2,Bus,ChevronRight,Compass,Fuel,Heart,Hospital,Landmark,List,LocateFixed,LockKeyhole,Map as MapIcon,MapPin,Menu,Navigation,Phone,Search,ShieldCheck,Siren,Store,Pill,UserCircle,Wrench,ExternalLink,Clock,SlidersHorizontal,Info,Paintbrush,Zap,KeyRound,Truck,Snowflake,Car,Smartphone,Laptop,Armchair,TreePine,ShoppingBasket,Utensils,Hotel,Package} from 'lucide-react';
+import {Activity,ArrowRight,Banknote,Bell,Building2,Bus,ChevronRight,Compass,Fuel,Heart,Hospital,Landmark,List,LocateFixed,LockKeyhole,Map as MapIcon,MapPin,Menu,Navigation,Phone,Search,ShieldCheck,Siren,Store,Pill,UserCircle,Wrench,ExternalLink,Info,Paintbrush,Zap,KeyRound,Truck,Snowflake,Car,Smartphone,Laptop,Armchair,TreePine,ShoppingBasket,Utensils,Hotel,Package} from 'lucide-react';
 import type {LucideIcon} from 'lucide-react';
 import {MapContainer,Marker,Popup,TileLayer} from 'react-leaflet';
 import L from 'leaflet';
@@ -116,7 +116,6 @@ function categoryIcon(id:string){
 }
 function Nearby(){
  const location=useLocation();
- const state=(location.state||{}) as {category?:string;province?:string;district?:string;query?:string};
  const nav=useNavigate();
  const[params,setParams]=useSearchParams();
  const memory=readNearbyMemory();
