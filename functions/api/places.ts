@@ -12,6 +12,8 @@ const filters:Record<string,string>={
   taxi:'["amenity"="taxi"]',
   market:'["shop"~"supermarket|convenience"]',
   restaurant:'["amenity"~"restaurant|fast_food"]',
+  bakery:'["shop"="bakery"]',
+  transport:'["public_transport"]',
   hotel:'["tourism"~"hotel|hostel|guest_house"]',
   cargo:'["amenity"="post_office"]',
   towing:'["service:vehicle:recovery"="yes"]',
@@ -102,8 +104,8 @@ async function overpass(category:string,lat:number,lon:number,radiusKm:number):P
   const f=filters[category];
   const meters=Math.max(2000,Math.min(30000,Math.round(radiusKm*1000)));
   const query=category==='government'
-    ? `[out:json][timeout:20];(node["office"="government"](around:${meters},${lat},${lon});way["office"="government"](around:${meters},${lat},${lon});relation["office"="government"](around:${meters},${lat},${lon});node["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon});way["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon});relation["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon}););out center tags 80;`
-    : `[out:json][timeout:20];(node${f}(around:${meters},${lat},${lon});way${f}(around:${meters},${lat},${lon});relation${f}(around:${meters},${lat},${lon}););out center tags 60;`;
+    ? `[out:json][timeout:20];(node["office"="government"](around:${meters},${lat},${lon});way["office"="government"](around:${meters},${lat},${lon});relation["office"="government"](around:${meters},${lat},${lon});node["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon});way["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon});relation["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon}););out center tags 300;`
+    : `[out:json][timeout:20];(node${f}(around:${meters},${lat},${lon});way${f}(around:${meters},${lat},${lon});relation${f}(around:${meters},${lat},${lon}););out center tags 300;`;
   const endpoints=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
   for(const endpoint of endpoints){
     try{
@@ -181,23 +183,26 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   }
   if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<35||lat>43||lon<25||lon>46)return Response.json([]);
 
-  // A manual province search is broader; a selected district is centered on that district.
-  // The explicit nearby-district toggle controls the radius used around the selected point.
-  const effectiveRadius=hasPosition?radiusKm:(district?(nearbyDistricts?radiusKm:2):(nearbyDistricts?radiusKm:20));
+  // Manual district searches are centered on the district and always honor the selected
+  // radius. If nearby districts are enabled, broaden that radius by at least 1.5x.
+  const effectiveRadius=district&&nearbyDistricts
+    ? Math.min(20,Math.max(radiusKm,radiusKm*1.5))
+    : radiusKm;
 
   // Never label an OSM pharmacy as "nöbetçi". Official duty integration is deliberately
   // disabled until a structured, current official feed is available.
-  if(category==='pharmacy'){
-    const key=cacheKey(category,lat.toFixed(3),lon.toFixed(3),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
-    const cached=await dbCacheGet(env,key);
-    if(Array.isArray(cached))return Response.json(cached,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'OpenStreetMap cache'}});
-  }
-
   const key=cacheKey(category,lat.toFixed(3),lon.toFixed(3),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
   const cached=await dbCacheGet(env,key);
   if(Array.isArray(cached)&&cached.length)return Response.json(cached,{headers:{'Cache-Control':'public,max-age=900','X-Data-Source':'cache'}});
 
-  let places=await overpass(category,lat,lon,effectiveRadius);
+  const searchRadii=effectiveRadius>10
+    ? Array.from(new Set([Math.min(5,effectiveRadius),Math.min(10,effectiveRadius),effectiveRadius]))
+    : [effectiveRadius];
+  let places:Place[]=[];
+  for(const searchRadius of searchRadii){
+    places=await overpass(category,lat,lon,searchRadius);
+    if(places.length>=40 || searchRadius===effectiveRadius)break;
+  }
   if(!places.length)places=await nominatimFallback(env,category,[district,province,'Türkiye'].filter(Boolean).join(', '),lat,lon,effectiveRadius);
 
   let approved:Place[]=[];
