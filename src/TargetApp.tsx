@@ -5,13 +5,39 @@ import {Activity,AlertTriangle,ArrowRight,Banknote,Bell,Building2,Bus,ChevronRig
 import type {LucideIcon} from 'lucide-react';
 import {MapContainer,Marker,Popup,TileLayer} from 'react-leaflet';
 import L from 'leaflet';
-import {categories,provinces,services} from './data';
+import {categories,keywordMap,provinces,services} from './data';
 import {districtsFor} from './turkeyDistricts';
 import {findPlaces} from './api';
 import {getCurrentLocation,getLocationPermissionState,LocationError} from './location';
 import type {Place,Position} from './types';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
+
+function normalizeSearchText(value:string){
+  return value.toLocaleLowerCase('tr-TR').replace(/ı/g,'i').replace(/ş/g,'s').replace(/ğ/g,'g').replace(/ç/g,'c').replace(/ö/g,'o').replace(/ü/g,'u').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+}
+function resolveSearchCategory(query:string):string|undefined{
+  const q=normalizeSearchText(query);
+  if(!q)return undefined;
+  const keywords=Object.entries(keywordMap).map(([key,value])=>({key:normalizeSearchText(key),value})).sort((a,b)=>b.key.length-a.key.length);
+  const keyword=keywords.find(x=>q.includes(x.key));
+  if(keyword)return keyword.value;
+  const dataCategories=categories.map(c=>({key:normalizeSearchText(c.label.replace(/^En Yakın /,'').replace(/'ler$/,'')),value:c.id})).sort((a,b)=>b.key.length-a.key.length);
+  const category=dataCategories.find(x=>q.includes(x.key));
+  if(category)return category.value;
+  const service=services.map(([id,label])=>({key:normalizeSearchText(label),value:id})).sort((a,b)=>b.key.length-a.key.length).find(x=>q.includes(x.key));
+  return service?.value;
+}
+function readHeaderLocation(){
+  try{
+    const raw=localStorage.getItem('yt-nearby-selection-v5');
+    if(!raw)return 'Konum seç';
+    const value=JSON.parse(raw) as {province?:string;district?:string};
+    if(value.district&&value.province)return value.province+', '+value.district;
+    if(value.province)return value.province;
+  }catch{}
+  return 'Konum seç';
+}
 const imgs={
 hero:'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?auto=format&fit=crop&w=1500&q=85',
 pharmacy:'https://images.unsplash.com/photo-1585435557343-3b092031a831?auto=format&fit=crop&w=700&q=80',
@@ -26,11 +52,20 @@ trend:'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit
 
 
 function Header(){
- const nav=useNavigate(); const[q,setQ]=useState('');
- return <header className="yt-header"><div className="yt-head"><NavLink to="/" className="yt-logo"><span><MapPin fill="currentColor"/></span><b>YANINDA <i>TÜRKİYE</i></b></NavLink><form className="yt-search" onSubmit={e=>{e.preventDefault();nav('/nearby',{state:{query:q}})}}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Ne arıyorsunuz? (Eczane, ATM, Hastane...)"/><span><MapPin/> İstanbul, Beyoğlu</span><button>Ara</button></form><div className="yt-actions"><button>☀</button><NavLink to="/admin">Giriş Yap</NavLink><button onClick={()=>nav('/menu')}><Menu/></button></div></div><nav className="yt-nav"><NavLink to="/">⌂ Ana Sayfa</NavLink><NavLink to="/nearby"><Compass/>Yakınımda</NavLink><NavLink to="/nearby"><MapIcon/>Harita</NavLink><NavLink className="danger" to="/emergency"><Siren/>Acil</NavLink><NavLink to="/favorites"><Heart/>Favoriler</NavLink><NavLink to="/news"><Landmark/>Haberler</NavLink><NavLink to="/contact"><Phone/>İletişim</NavLink></nav></header>
+ const nav=useNavigate(); const location=useLocation(); const[q,setQ]=useState(''); const[selection,setSelection]=useState(readHeaderLocation());
+ useEffect(()=>{const refresh=()=>setSelection(readHeaderLocation()); window.addEventListener('storage',refresh); window.addEventListener('yt-nearby-memory',refresh); refresh(); return()=>{window.removeEventListener('storage',refresh);window.removeEventListener('yt-nearby-memory',refresh)}},[]);
+ const nearbyActive=location.pathname==='/nearby'&&new URLSearchParams(location.search).get('view')!=='map';
+ const mapActive=location.pathname==='/nearby'&&new URLSearchParams(location.search).get('view')==='map';
+ const submitSearch=(e:FormEvent)=>{e.preventDefault();const query=q.trim();if(query)nav('/nearby',{state:{query}})};
+ return <header className="yt-header"><div className="yt-head"><NavLink to="/" className="yt-logo"><span><MapPin fill="currentColor"/></span><b>YANINDA <i>TÜRKİYE</i></b></NavLink><form className="yt-search" onSubmit={submitSearch}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Ne arıyorsunuz? (Eczane, ATM, Hastane...)"/><span><MapPin/> {selection}</span><button type="submit">Ara</button></form><div className="yt-actions"><button type="button" aria-label="Tema"><span aria-hidden="true">☀</span></button><NavLink to="/admin">Giriş Yap</NavLink><button type="button" onClick={()=>nav('/menu')} aria-label="Menüyü aç"><Menu/></button></div></div><nav className="yt-nav"><NavLink to="/">⌂ Ana Sayfa</NavLink><NavLink className={nearbyActive?'active':''} to="/nearby"><Compass/>Yakınımda</NavLink><NavLink className={mapActive?'active':''} to="/nearby?view=map"><MapIcon/>Harita</NavLink><NavLink className="danger" to="/emergency"><Siren/>Acil</NavLink><NavLink to="/favorites"><Heart/>Favoriler</NavLink><NavLink to="/news"><Landmark/>Haberler</NavLink><NavLink to="/contact"><Phone/>İletişim</NavLink></nav></header>
 }
 
-function MobileNav(){return <nav className="mobile-nav"><NavLink to="/">⌂<small>Ana Sayfa</small></NavLink><NavLink to="/nearby"><Compass/><small>Yakınımda</small></NavLink><NavLink to="/nearby"><MapIcon/><small>Harita</small></NavLink><NavLink to="/emergency"><Siren/><small>Acil</small></NavLink><NavLink to="/menu"><Menu/><small>Menü</small></NavLink></nav>}
+function MobileNav(){
+ const location=useLocation();
+ const nearbyActive=location.pathname==='/nearby'&&new URLSearchParams(location.search).get('view')!=='map';
+ const mapActive=location.pathname==='/nearby'&&new URLSearchParams(location.search).get('view')==='map';
+ return <nav className="mobile-nav"><NavLink to="/">⌂<small>Ana Sayfa</small></NavLink><NavLink className={nearbyActive?'active':''} to="/nearby"><Compass/><small>Yakınımda</small></NavLink><NavLink className={mapActive?'active':''} to="/nearby?view=map"><MapIcon/><small>Harita</small></NavLink><NavLink className="danger" to="/emergency"><Siren/><small>Acil</small></NavLink><NavLink to="/menu"><Menu/><small>Menü</small></NavLink></nav>
+}
 
 function Ad({kind}:{kind:'top'|'mid'|'bottom'}){
  const d=kind==='top'?{img:imgs.pharmacy,title:'GÜVEN ECZANESİ',text:'7/24 HİZMETİNİZDE',button:'Hemen Konumunu Al',cls:'red'}:kind==='mid'?{img:imgs.burger,title:'BURGER KING',text:'LEZZET HER ZAMAN YANINDA',button:'En Yakın Şubeyi Bul',cls:'burger'}:{img:imgs.trend,title:'trendyol',text:'ARADIĞIN HER ŞEY TRENDYOL’DA',button:'Hemen İncele',cls:'trend'};
