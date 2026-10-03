@@ -44,7 +44,9 @@ const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number
 const cacheKey=(...parts:string[])=>'places:v11:'+parts.join(':');
 
 function tidyAddress(tags:Record<string,string>,fallback?:string){
-  const parts=[tags['addr:street'],tags['addr:housenumber'],tags['addr:neighbourhood']||tags['addr:suburb'],tags['addr:district'],tags['addr:city']||tags['addr:town']].filter(Boolean);
+  const full=tags['addr:full']||tags['contact:address'];
+  if(full)return clean(full);
+  const parts=[tags['addr:street'],tags['addr:housenumber'],tags['addr:neighbourhood']||tags['addr:suburb'],tags['addr:district'],tags['addr:city']||tags['addr:town'],tags['addr:postcode']].filter(Boolean);
   return clean(parts.join(' ')||fallback);
 }
 
@@ -92,9 +94,9 @@ function osmPlace(x:OsmEl,category:string,lat:number,lon:number):Place|null{
   return {
     id:'osm-'+x.type+'-'+x.id,name,category,lat:p.lat,lon:p.lon,
     address:tidyAddress(tags,tags.display_name),
-    phone:clean(tags.phone||tags['contact:phone'],60),
+    phone:clean(tags.phone||tags['contact:phone']||tags['contact:mobile']||tags.mobile,60),
     openingHours:clean(tags.opening_hours,180),
-    website:clean(tags.website,300),
+    website:clean(tags.website||tags['contact:website'],300),
     operator:clean(tags.operator||tags.brand,160),
     source:'OpenStreetMap',
     distance:d,
