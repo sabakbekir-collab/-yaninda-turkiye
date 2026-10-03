@@ -4,6 +4,16 @@
   "main": "./worker/index.ts",
   "workers_dev": true,
   "compatibility_date": "2026-10-01",
+  "observability": {
+    "enabled": true
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "yaninda-turkiye-db",
+      "database_id": "BURAYA_ID"
+    }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
