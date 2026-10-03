@@ -135,12 +135,13 @@ async function dutyPharmacies(env:Env,province:string,district:string,lat:number
     if(!r.ok)return {places:[],ok:false};
     const data=await r.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
     if(!Array.isArray(data.pharmacies))return {places:[],ok:false};
-    const places=data.pharmacies.map((x,i)=>{
+    const places: Place[] = [];
+    for(const [i,x] of data.pharmacies.entries()){
       const la=Number(x.lat??x.latitude),lo=Number(x.lng??x.lon??x.longitude);
       const name=clean(x.name);
-      if(!name||!Number.isFinite(la)||!Number.isFinite(lo))return null;
+      if(!name||!Number.isFinite(la)||!Number.isFinite(lo))continue;
       const d=distance(lat,lon,la,lo);
-      const place: Place = {
+      places.push({
         id:'duty-pharmacy-'+String(x.id??i),
         name,category:'pharmacy',lat:la,lon:lo,
         address:clean(x.address),phone:clean(x.phone,60),
@@ -152,11 +153,9 @@ async function dutyPharmacies(env:Env,province:string,district:string,lat:number
         officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
         verifiedAt:data.date||new Date().toISOString(),
         dutyUpdatedAt:new Date().toISOString()
-      };
-      return place;
-    }).filter((x): x is Place => x !== null)
-      .filter(p=>p.distance!<=radiusKm)
-      .sort((a,b)=>(a.distance??999)-(b.distance??999));
+      });
+    }
+    places.sort((a,b)=>(a.distance??999)-(b.distance??999));
     return {places,ok:true};
   }catch{return {places:[],ok:false}}
 }
