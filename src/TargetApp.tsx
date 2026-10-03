@@ -7,7 +7,8 @@ import {MapContainer,Marker,Popup,TileLayer} from 'react-leaflet';
 import L from 'leaflet';
 import {categories,keywordMap,provinces,services} from './data';
 import {districtsFor} from './turkeyDistricts';
-import {findPlaces} from './api';
+import {resolveName} from './text';
+import {findPlaces from './api';
 import {getCurrentLocation,getLocationPermissionState,LocationError} from './location';
 import type {Place,Position} from './types';
 
@@ -130,12 +131,15 @@ function Nearby(){
  const[view,setView]=useState<'list'|'map'>(params.get('view')==='map'?'map':'list');
  const[err,setErr]=useState('');
  const[hasSearched,setHasSearched]=useState(false);
+ const[pos,setPos]=useState<Position|undefined>();
  const[locationState,setLocationState]=useState<'unknown'|'granted'|'denied'|'prompt'|'unsupported'>('unknown');
  const[submitted,setSubmitted]=useState<{category:string;province:string;district:string;radius:number;nearbyDistricts:boolean;pos?:Position}|null>(null);
 
- const ds=useMemo(()=>districtsFor(province),[province]);
- const validProvince=useMemo(()=>provinces.includes(province),[province]);
- const validDistrict=useMemo(()=>!district||ds.includes(district),[district,ds]);
+ const canonProvince=useMemo(()=>resolveName(province,provinces)??province,[province]);
+ const ds=useMemo(()=>districtsFor(canonProvince),[canonProvince]);
+ const canonDistrict=useMemo(()=>district?(resolveName(district,ds)??district):'', [district,ds]);
+ const validProvince=useMemo(()=>provinces.includes(canonProvince),[canonProvince]);
+ const validDistrict=useMemo(()=>!district||ds.includes(canonDistrict),[district,ds,canonDistrict]);
  const pharmacyMode=cat==='pharmacy';
  const effectiveRadius=district&&nearbyDistricts?Math.min(30,Math.max(radius,radius*1.5)):radius;
 
@@ -196,11 +200,16 @@ function Nearby(){
 
  const search=()=>{
    setErr('');
-   if(!province){setErr('Arama için önce bir il seç veya Konumumu Kullan butonuna bas.');return;}
+   if(!province.trim()){
+     if(pos){setHasSearched(true);setSubmitted({category:cat,province:'',district:'',radius,nearbyDistricts,pos});return;}
+     setErr('Arama için önce bir il seç veya Konumumu Kullan butonuna bas.');return;
+   }
    if(!validProvince){setErr('İl adını listeden seç.');return;}
    if(!validDistrict){setErr('İlçeyi listeden seç veya “Tüm ilçeler” olarak bırak.');return;}
+   if(canonProvince!==province)setProvince(canonProvince);
+   if(canonDistrict!==district)setDistrict(canonDistrict);
    setHasSearched(true);
-   setSubmitted({category:cat,province,district,radius,nearbyDistricts});
+   setSubmitted({category:cat,province:canonProvince,district:canonDistrict,radius,nearbyDistricts});
  };
 
  const locate=async()=>{
@@ -208,9 +217,10 @@ function Nearby(){
      setErr('');
      const current=await getCurrentLocation();
      setLocationState('granted');
+     setPos(current);
      setHasSearched(true);
      // IMPORTANT: location search no longer clears the user's manual province/district.
-     setSubmitted({category:cat,province,district,radius,nearbyDistricts,pos:current});
+     setSubmitted({category:cat,province:canonProvince,district:canonDistrict,radius,nearbyDistricts,pos:current});
    }catch(e){
      const denied=e instanceof LocationError&&e.code==='permission_denied';
      if(denied)setLocationState('denied');
