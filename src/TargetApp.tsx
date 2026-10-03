@@ -81,7 +81,7 @@ function Home(){
  const nav=useNavigate(); const[q,setQ]=useState('');
  const go=(id:string)=>id==='emergency'?nav('/emergency'):id==='service'?nav('/services'):nav('/nearby',{state:{category:id}});
  const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();nav('/nearby',{state:{query,category:resolveSearchCategory(query)}})};
- return <main className="yt-home"><section className="yt-hero"><div className="yt-hero-bg" style={{backgroundImage:`url(${imgs.hero})`}}><div className="yt-hero-overlay"><div><h1>Türkiye'de<br/>İhtiyacın Olan<br/><b>Her Şey Şimdi Yanında.</b></h1><p>Sağlık, güvenlik, ulaşım, günlük ihtiyaçlar ve daha fazlası.<br/>Bul, keşfet, yolunu kolaylaştır.</p></div><form className="yt-hero-search" onSubmit={search}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Ne arıyorsunuz? (Eczane, ATM, Hastane...)"/><button>Ara</button></form></div><div className="hero-ad"><Ad kind="top"/></div></div></section><section className="quick-grid">{quick.map(([id,label,Icon,c])=><button key={id} onClick={()=>go(id)} className={c}><span><Icon/></span><b>{label}</b></button>)}<button onClick={()=>go('service')} className="more"><span>•••</span><b>Tüm Hizmetler</b></button></section><section className="yt-section"><div className="yt-section-head"><h2>Yakınındaki Popüler Hizmetler</h2><button onClick={()=>go('service')}>Tümünü Gör <ArrowRight/></button></div><div className="popular-grid">{[['Eczaneler','Yakınındaki eczaneler','pharmacy'],['Hastaneler','En Yakın Hastaneler','hospital'],["ATM'ler",'Tüm Bankalar','atm'],['Akaryakıt İstasyonları','En Yakın Benzinciler','fuel'],['Marketler','Zincir Marketler','market'],['Fırınlar','Taze ve Yakın','bakery'],['Ulaşım','Otobüs, Metro, Taksi','transport']].map(([a,b,k])=><button key={a} onClick={()=>go(k)}><img src={imgs[k as keyof typeof imgs]} alt=""/><strong>{a}</strong><small>{b}</small></button>)}</div></section><Ad kind="mid"/><section className="yt-section live-cta"><div><span>CANLI VERİ</span><h2>Yakındaki eczaneleri konumuna göre bul</h2><p>Sonuçları mesafeye göre sıralarız. Nöbetçi verisi için resmî Sağlık Bakanlığı / e-Nabız kaynağını da kontrol edebilirsin.</p></div><button onClick={()=>go('pharmacy')}><LocateFixed/> Eczaneleri Bul</button></section><Ad kind="bottom"/></main>
+ return <main className="yt-home"><section className="yt-hero"><div className="yt-hero-bg" style={{backgroundImage:`url(${imgs.hero})`}}><div className="yt-hero-overlay"><div><h1>Türkiye'de<br/>İhtiyacın Olan<br/><b>Her Şey Şimdi Yanında.</b></h1><p>Sağlık, güvenlik, ulaşım, günlük ihtiyaçlar ve daha fazlası.<br/>Bul, doğrula, yolunu kolaylaştır.</p></div><form className="yt-hero-search" onSubmit={search}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Ne arıyorsunuz? (Eczane, ATM, Hastane...)"/><button>Ara</button></form></div><div className="hero-ad"><Ad kind="top"/></div></div></section><section className="quick-grid">{quick.map(([id,label,Icon,c])=><button key={id} onClick={()=>go(id)} className={c}><span><Icon/></span><b>{label}</b></button>)}<button onClick={()=>go('service')} className="more"><span>•••</span><b>Tüm Hizmetler</b></button></section><section className="yt-section"><div className="yt-section-head"><h2>Yakınındaki Popüler Hizmetler</h2><button onClick={()=>go('service')}>Tümünü Gör <ArrowRight/></button></div><div className="popular-grid">{[['Eczaneler','Yakınındaki eczaneler','pharmacy'],['Hastaneler','En Yakın Hastaneler','hospital'],["ATM'ler",'Tüm Bankalar','atm'],['Akaryakıt İstasyonları','En Yakın Benzinciler','fuel'],['Marketler','Zincir Marketler','market'],['Fırınlar','Taze ve Yakın','bakery'],['Ulaşım','Otobüs, Metro, Taksi','transport']].map(([a,b,k])=><button key={a} onClick={()=>go(k)}><img src={imgs[k as keyof typeof imgs]} alt=""/><strong>{a}</strong><small>{b}</small></button>)}</div></section><Ad kind="mid"/><section className="yt-section live-cta"><div><span>CANLI VERİ</span><h2>Nöbetçi eczaneleri konumuna göre bul</h2><p>Sonuçları mesafeye göre sıralarız. Nöbetçi verisi güncel kaynaktan alınır; eczaneye gitmeden önce telefonla teyit et.</p></div><button onClick={()=>go('pharmacy')}><LocateFixed/> Eczaneleri Bul</button></section><Ad kind="bottom"/></main>
 }
 
 type NearbyMemory={category?:string;province?:string;district?:string;radius?:number;nearbyDistricts?:boolean};
@@ -229,7 +229,7 @@ function Nearby(){
  };
 
  const categoryList=categories.filter(c=>!['service','emergency'].includes(c.id));
- const activeLabel=pharmacyMode?'Yakındaki Eczaneler':(categoryList.find(c=>c.id===cat)?.label||services.find(s=>s[0]===cat)?.[1]||'Hizmet');
+ const activeLabel=pharmacyMode?'Nöbetçi Eczaneler':(categoryList.find(c=>c.id===cat)?.label||services.find(s=>s[0]===cat)?.[1]||'Hizmet');
  const officialPharmacyUrl=province==='İstanbul'?'https://www.istanbuleczaciodasi.org.tr/nobetci-eczane/':'https://enabiz.gov.tr/NobetciEczane';
 
  return <main className="inner nearby-page">
@@ -240,8 +240,8 @@ function Nearby(){
    </div>
 
    {pharmacyMode&&<div className="pharmacy-warning">
-     <div><Info/><div><b>Nöbetçi durumu resmi kaynaktan doğrulanmıyor.</b><span>Buradaki sonuçlar yalnızca yakındaki eczanelerdir; nöbetçi olarak işaretlenmez.</span></div></div>
-     <a href={officialPharmacyUrl} target="_blank" rel="noreferrer">Resmi nöbetçi eczane sorgusu <ExternalLink/></a>
+     <div><Info/><div><b>Nöbetçi eczaneler</b><span>Sonuçlar güncel nöbet verisinden alınır. Yola çıkmadan önce telefonla teyit et.</span></div></div>
+     <a href={officialPharmacyUrl} target="_blank" rel="noreferrer">İstanbul Eczacı Odası <ExternalLink/></a>
    </div>}
 
    {locationState==='denied'&&<div className="location-denied"><Info/><span>Konum izni kapalı. İl / ilçe seçimiyle devam edebilirsin.</span></div>}
@@ -289,13 +289,13 @@ function Nearby(){
 }
 function PlaceCard({p}:{p:Place}){
  const Icon=categoryIcon(p.category);
- return <article className="place nearby-place-card">
+ return <article className={'place nearby-place-card'+(p.isDuty?' duty-place':'')}>
    <div className="place-icon category-place-icon"><Icon/></div>
    <div className="place-body">
-     <div className="place-title-row"><h3>{p.name?.trim()||'İşletme adı bulunamadı'}</h3></div>
+     <div className="place-title-row"><h3>{p.name?.trim()||'İşletme adı bulunamadı'}</h3>{p.isDuty&&<span className="duty-badge">NÖBETÇİ</span>}</div>
      <p>{cleanCardAddress(p.address)}</p>
      <small className="place-meta-line"><Navigation/> <b>{formatDistance(p.distance)}</b> · Kuş uçuşu · <ShieldCheck/> {p.source}</small>
-     {p.district&&<small className="place-district">İlçe: {p.district}</small>}
+     {p.district&&<small className="place-district">İlçe: {p.district}</small>}{p.isDuty&&<small className="place-source-note">Veri: Eczane Adresi</small>}
 
      {p.phone?<footer><a href={'tel:'+p.phone}><Phone/>Ara</a><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>:<footer><span className="no-phone">Telefon bilgisi yok</span><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>}
    </div>
