@@ -91,7 +91,10 @@ function readNearbyMemory():NearbyMemory{
   try{const raw=localStorage.getItem('yt-nearby-selection-v5');if(!raw)return {};const value=JSON.parse(raw) as NearbyMemory;return value&&typeof value==='object'?value:{};}catch{return {}}
 }
 function writeNearbyMemory(value:NearbyMemory){
-  try{localStorage.setItem('yt-nearby-selection-v5',JSON.stringify(value));}catch{}
+  try{
+    localStorage.setItem('yt-nearby-selection-v5',JSON.stringify(value));
+    window.dispatchEvent(new Event('yt-nearby-memory'));
+  }catch{}
 }
 function formatDistance(km?:number){
   if(typeof km!=='number'||!Number.isFinite(km))return 'Mesafe bilinmiyor';
@@ -113,7 +116,7 @@ function categoryIcon(id:string){
 }
 function Nearby(){
  const location=useLocation();
- const state=(location.state||{}) as {category?:string;province?:string;district?:string};
+ const state=(location.state||{}) as {category?:string;province?:string;district?:string;query?:string};
  const nav=useNavigate();
  const[params,setParams]=useSearchParams();
  const memory=readNearbyMemory();
@@ -125,7 +128,7 @@ function Nearby(){
  const[nearbyDistricts,setNearbyDistricts]=useState(params.get('nearbyDistricts')==='1'||Boolean(memory.nearbyDistricts));
  const[places,setPlaces]=useState<Place[]>([]);
  const[loading,setLoading]=useState(false);
- const[view,setView]=useState<'list'|'map'>('list');
+ const[view,setView]=useState<'list'|'map'>(params.get('view')==='map'?'map':'list');
  const[err,setErr]=useState('');
  const[hasSearched,setHasSearched]=useState(false);
  const[locationState,setLocationState]=useState<'unknown'|'granted'|'denied'|'prompt'|'unsupported'>('unknown');
@@ -135,6 +138,7 @@ function Nearby(){
  const validProvince=useMemo(()=>provinces.includes(province),[province]);
  const validDistrict=useMemo(()=>!district||ds.includes(district),[district,ds]);
  const pharmacyMode=cat==='pharmacy';
+ const effectiveRadius=district&&nearbyDistricts?Math.min(20,Math.max(radius,radius*1.5)):radius;
 
  useEffect(()=>{
    writeNearbyMemory({category:cat,province,district,radius,nearbyDistricts});
@@ -145,13 +149,40 @@ function Nearby(){
      if(district)next.set('district',district);else next.delete('district');
      next.set('radius',String(radius));
      if(nearbyDistricts)next.set('nearbyDistricts','1');else next.delete('nearbyDistricts');
+     next.set('view',view);
      return next;
    },{replace:true});
- },[cat,province,district,radius,nearbyDistricts,setParams]);
+ },[cat,province,district,radius,nearbyDistricts,view,setParams]);
 
  useEffect(()=>{
    getLocationPermissionState().then(s=>setLocationState(s)).catch(()=>setLocationState('unknown'));
  },[]);
+
+ useEffect(()=>{
+   const incoming=location.state as {category?:string;province?:string;district?:string;query?:string}|null;
+   if(!incoming)return;
+   if(incoming.province!==undefined)setProvince(incoming.province);
+   if(incoming.district!==undefined)setDistrict(incoming.district);
+   if(incoming.category!==undefined)setCat(incoming.category);
+   if(incoming.query!==undefined){
+     const query=incoming.query.trim();
+     const resolved=incoming.category||resolveSearchCategory(query);
+     if(!resolved){
+       setHasSearched(true);
+       setSubmitted(null);
+       setPlaces([]);
+       setErr(query?'Aranan kelime için eşleşen bir kategori bulunamadı. Sonuç bulunamadı, kategori seç.':'Aramak için bir kelime yaz.');
+       return;
+     }
+     setCat(resolved);
+     setHasSearched(true);
+     if(province){
+       setSubmitted({category:resolved,province,district,radius,nearbyDistricts});
+     }else{
+       setErr('Kategori bulundu. Arama için il / ilçe seç veya “Konumumu Kullan” butonuna bas.');
+     }
+   }
+ },[location.key]);
 
  useEffect(()=>{
    if(!submitted)return;
@@ -231,7 +262,7 @@ function Nearby(){
    </div>
 
    <div className="selection-note">
-     <span>{province?(district?province+' / '+district:province+' — tüm ilçeler'): 'Konum veya il / ilçe seçebilirsin'} · {radius} km yarıçap</span>
+     <span>{province?(district?province+' / '+district:province+' — tüm ilçeler'): 'Konum veya il / ilçe seçebilirsin'} · {effectiveRadius} km kullanılan yarıçap</span>
      <span>Seçimler otomatik kaydedilir</span>
    </div>
 
@@ -249,15 +280,14 @@ function Nearby(){
 }
 function PlaceCard({p}:{p:Place}){
  const Icon=categoryIcon(p.category);
- const isDuty=Boolean(p.isDuty&&p.dutyUpdatedAt);
  return <article className="place nearby-place-card">
    <div className="place-icon category-place-icon"><Icon/></div>
    <div className="place-body">
-     <div className="place-title-row"><h3>{p.name?.trim()||'İşletme adı bulunamadı'}</h3>{isDuty&&<span className="duty">NÖBETÇİ</span>}</div>
+     <div className="place-title-row"><h3>{p.name?.trim()||'İşletme adı bulunamadı'}</h3></div>
      <p>{cleanCardAddress(p.address)}</p>
      <small className="place-meta-line"><Navigation/> <b>{formatDistance(p.distance)}</b> · Kuş uçuşu · <ShieldCheck/> {p.source}</small>
-     {p.district&&<small className="place-district">{p.district}</small>}
-     {isDuty&&<div className="pharmacy-verify"><Clock/> Nöbet verisi {new Date(p.dutyUpdatedAt!).toLocaleString('tr-TR',{dateStyle:'short',timeStyle:'short'})}<a href={p.officialUrl} target="_blank" rel="noreferrer">Resmi kaynağı kontrol et <ExternalLink/></a></div>}
+     {p.district&&<small className="place-district">İlçe: {p.district}</small>}
+
      {p.phone?<footer><a href={'tel:'+p.phone}><Phone/>Ara</a><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>:<footer><span className="no-phone">Telefon bilgisi yok</span><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>}
    </div>
  </article>
