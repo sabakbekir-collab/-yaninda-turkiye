@@ -1,4 +1,5 @@
 import type {Env,Place} from '../lib/types';
+import {isCentralDistrict,trSlug} from '../../src/text';
 
 type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
 
@@ -37,9 +38,10 @@ const filters:Record<string,string>={
 
 const OSM_UA='YanımdaTürkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)';
 const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').replace(/\s+/g,' ').trim().slice(0,n):undefined;
-const slug=(s:string)=>s.toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/ğ/g,'g').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ö/g,'o').replace(/ü/g,'u').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const slug=trSlug;
+const areaQuery=(district:string,province:string)=>[district&&!isCentralDistrict(district)?district:'',province,'Türkiye'].filter(Boolean).join(', ');
 const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
-const cacheKey=(...parts:string[])=>'places:v10:'+parts.join(':');
+const cacheKey=(...parts:string[])=>'places:v11:'+parts.join(':');
 
 function tidyAddress(tags:Record<string,string>,fallback?:string){
   const parts=[tags['addr:street'],tags['addr:housenumber'],tags['addr:neighbourhood']||tags['addr:suburb'],tags['addr:district'],tags['addr:city']||tags['addr:town']].filter(Boolean);
@@ -62,7 +64,7 @@ async function dbCachePut(env:Env,key:string,payload:unknown,ttlMs:number){
 }
 
 async function geocode(env:Env,query:string):Promise<{lat:number;lon:number}|null>{
-  const key='geocode:v2:'+slug(query);
+  const key='geocode:v3:'+slug(query);
   const cached=await dbCacheGet(env,key);
   if(cached&&Number.isFinite(cached.lat)&&Number.isFinite(cached.lon))return {lat:Number(cached.lat),lon:Number(cached.lon)};
   try{
@@ -100,7 +102,7 @@ function osmPlace(x:OsmEl,category:string,lat:number,lon:number):Place|null{
   };
 }
 
-async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<Place[]>{
+async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean}>{
   const f=filters[category];
   const meters=Math.max(2000,Math.min(30000,Math.round(radiusKm*1000)));
   const query=category==='government'
@@ -113,11 +115,11 @@ async function overpass(category:string,lat:number,lon:number,radiusKm:number):P
       if(!r.ok)continue;
       const data=await r.json() as {elements?:OsmEl[]};
       if(Array.isArray(data.elements)){
-        return data.elements.map(x=>osmPlace(x,category,lat,lon)).filter((x):x is Place=>Boolean(x)).sort((a,b)=>(a.distance??999)-(b.distance??999));
+        return {ok:true,places:data.elements.map(x=>osmPlace(x,category,lat,lon)).filter((x):x is Place=>Boolean(x)).sort((a,b)=>(a.distance??999)-(b.distance??999))};
       }
     }catch{}
   }
-  return [];
+  return {ok:false,places:[]};
 }
 
 const nomTerms:Record<string,string>={
@@ -128,12 +130,12 @@ const nomTerms:Record<string,string>={
   computer_repair:'bilgisayar tamiri',furniture:'mobilya',gardener:'bahçe',other:'hizmet',service:'hizmet',towing:'oto çekici'
 };
 
-async function nominatimFallback(env:Env,category:string,area:string,lat:number,lon:number,radiusKm:number):Promise<Place[]>{
-  const term=nomTerms[category];if(!term)return [];
+async function nominatimFallback(env:Env,category:string,area:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean}>{
+  const term=nomTerms[category];if(!term)return {places:[],ok:true};
   const box=Math.max(0.018,Math.min(0.18,radiusKm/80));
-  const key='nompoi:v3:'+slug([category,area,lat.toFixed(3),lon.toFixed(3),String(radiusKm)].join('|'));
+  const key='nompoi:v4:'+slug([category,area,lat.toFixed(3),lon.toFixed(3),String(radiusKm)].join('|'));
   const cached=await dbCacheGet(env,key);
-  if(Array.isArray(cached))return cached as Place[];
+  if(Array.isArray(cached))return {places:cached as Place[],ok:true};
   try{
     const u=new URL('https://nominatim.openstreetmap.org/search');
     u.searchParams.set('format','jsonv2');u.searchParams.set('q',term+', '+area);
@@ -141,7 +143,7 @@ async function nominatimFallback(env:Env,category:string,area:string,lat:number,
     u.searchParams.set('viewbox',`${(lon-box).toFixed(5)},${(lat+box).toFixed(5)},${(lon+box).toFixed(5)},${(lat-box).toFixed(5)}`);
     u.searchParams.set('bounded','1');u.searchParams.set('addressdetails','1');u.searchParams.set('accept-language','tr');
     const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':env.OSM_CONTACT_EMAIL?OSM_UA+' contact='+env.OSM_CONTACT_EMAIL:OSM_UA},signal:AbortSignal.timeout(7000)});
-    if(!r.ok)return [];
+    if(!r.ok)return {places:[],ok:false};
     const rows=await r.json() as Array<Record<string,unknown>>;
     const result=rows.map((x,i)=>{
       const la=Number(x.lat),lo=Number(x.lon),a=(x.address||{}) as Record<string,unknown>,extra=(x.extratags||{}) as Record<string,unknown>;
@@ -156,9 +158,9 @@ async function nominatimFallback(env:Env,category:string,area:string,lat:number,
       };
       return p.distance!<=radiusKm?p:null;
     }).filter((x):x is Place=>Boolean(x)).sort((a,b)=>(a.distance??999)-(b.distance??999));
-    await dbCachePut(env,key,result,15*60*1000);
-    return result;
-  }catch{return []}
+    if(result.length)await dbCachePut(env,key,result,15*60*1000);
+    return {places:result,ok:true};
+  }catch{return {places:[],ok:false}}
 }
 
 export async function onRequestGet({request,env}:{request:Request;env:Env}){
@@ -172,11 +174,12 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
 
   if(!filters[category])return Response.json([]);
 
-  let lat=Number(u.searchParams.get('lat')),lon=Number(u.searchParams.get('lon'));
+  const numParam=(name:string)=>{const raw=u.searchParams.get(name);return raw!==null&&raw.trim()!==''?Number(raw):NaN};
+  let lat=numParam('lat'),lon=numParam('lon');
   const hasPosition=Number.isFinite(lat)&&Number.isFinite(lon);
   if(!hasPosition){
     if(!province)return Response.json([]);
-    const area=[district,province,'Türkiye'].filter(Boolean).join(', ');
+    const area=areaQuery(district,province);
     const point=await geocode(env,area);
     if(!point)return Response.json([]);
     lat=point.lat;lon=point.lon;
@@ -185,25 +188,23 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
 
   // Manual district searches are centered on the district and always honor the selected
   // radius. If nearby districts are enabled, broaden that radius by at least 1.5x.
-  const effectiveRadius=district&&nearbyDistricts
-    ? Math.min(30,Math.max(radiusKm,radiusKm*1.5))
-    : radiusKm;
+  const districtScoped=Boolean(district)&&!isCentralDistrict(district);
+  const effectiveRadius=hasPosition?radiusKm:(districtScoped?(nearbyDistricts?radiusKm:2):(nearbyDistricts?radiusKm:20));
 
   // Never label an OSM pharmacy as "nöbetçi". Official duty integration is deliberately
   // disabled until a structured, current official feed is available.
   const key=cacheKey(category,lat.toFixed(3),lon.toFixed(3),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
   const cached=await dbCacheGet(env,key);
-  if(Array.isArray(cached)&&cached.length)return Response.json(cached,{headers:{'Cache-Control':'public,max-age=900','X-Data-Source':'cache'}});
+  if(Array.isArray(cached))return Response.json(cached,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'cache'}});
 
-  const searchRadii=effectiveRadius>10
-    ? Array.from(new Set([Math.min(5,effectiveRadius),Math.min(10,effectiveRadius),effectiveRadius]))
-    : [effectiveRadius];
-  let places:Place[]=[];
-  for(const searchRadius of searchRadii){
-    places=await overpass(category,lat,lon,searchRadius);
-    if(places.length>=40 || searchRadius===effectiveRadius)break;
+  const primary=await overpass(category,lat,lon,effectiveRadius);
+  let places=primary.places;
+  let upstreamOk=primary.ok;
+  if(!places.length){
+    const fallback=await nominatimFallback(env,category,areaQuery(district,province),lat,lon,effectiveRadius);
+    places=fallback.places;
+    upstreamOk=upstreamOk||fallback.ok;
   }
-  if(!places.length)places=await nominatimFallback(env,category,[district,province,'Türkiye'].filter(Boolean).join(', '),lat,lon,effectiveRadius);
 
   let approved:Place[]=[];
   if(env.DB){
@@ -228,6 +229,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     .sort((a,b)=>(a.distance??999)-(b.distance??999))
     .slice(0,40);
 
-  await dbCachePut(env,key,result,15*60*1000);
+  if(!result.length&&!upstreamOk)return Response.json({error:'upstream_unavailable'},{status:503,headers:{'Cache-Control':'no-store'}});
+  await dbCachePut(env,key,result,result.length?15*60*1000:5*60*1000);
   return Response.json(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'OpenStreetMap'}});
 }
