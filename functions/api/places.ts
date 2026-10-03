@@ -1,207 +1,228 @@
 import type {Env,Place} from '../lib/types';
 
 type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
-const filters:Record<string,string>={pharmacy:'["amenity"="pharmacy"]',hospital:'["amenity"~"hospital|clinic"]',atm:'["amenity"="atm"]',police:'["amenity"="police"]',fire_station:'["amenity"="fire_station"]',fuel:'["amenity"="fuel"]',taxi:'["amenity"="taxi"]',market:'["shop"~"supermarket|convenience"]',restaurant:'["amenity"~"restaurant|fast_food"]',hotel:'["tourism"~"hotel|hostel|guest_house"]',cargo:'["amenity"="post_office"]',towing:'["service:vehicle:recovery"="yes"]',government:'["office"="government"]',electrician:'["craft"="electrician"]',plumber:'["craft"="plumber"]',locksmith:'["craft"="locksmith"]',cleaning:'["craft"="cleaning"]',moving:'["craft"="moving_company"]',hvac:'["craft"~"hvac|heating_engineer"]',painter:'["craft"="painter"]',car_repair:'["shop"="car_repair"]',tyres:'["shop"="tyres"]',phone_repair:'["shop"="mobile_phone"]',computer_repair:'["shop"="computer"]',furniture:'["craft"="carpenter"]',gardener:'["craft"="gardener"]',other:'["craft"]',service:'["craft"]'};
-const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
-const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').slice(0,n):undefined;
-const slug=(s:string)=>s.toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/ğ/g,'g').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ö/g,'o').replace(/ü/g,'u').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
-const officialDutyUrl=(province:string)=>province==='İstanbul'?'https://istanbulism.saglik.gov.tr/TR-157444/nobetci-eczaneler.html':'https://enabiz.gov.tr/NobetciEczane';
-const dutyPharmacies=async(lat:number|undefined,lon:number|undefined,province:string,district:string):Promise<Place[]>=>{
-  const url=new URL('https://eczaneadresi.com/api/public/v1/'+(lat!==undefined&&lon!==undefined?'nearest-pharmacies':'duty-pharmacies'));
-  if(lat!==undefined&&lon!==undefined){
-    url.searchParams.set('lat',String(lat));url.searchParams.set('lng',String(lon));url.searchParams.set('limit','15');
-  }else{
-    url.searchParams.set('city',slug(province));if(district)url.searchParams.set('district',slug(district));url.searchParams.set('limit','50');
-  }
-  try{
-    const r=await fetch(url,{headers:{Accept:'application/json','User-Agent':'YanimdaTurkiye/1.0'},signal:AbortSignal.timeout(5500)});
-    if(!r.ok)return [];
-    const raw=await r.json() as Record<string,unknown>;
-    const rows=Array.isArray(raw.pharmacies)?raw.pharmacies:Array.isArray(raw.data)?raw.data:[];
-    return rows.map((p:Record<string,unknown>,i)=>({
-      id:`duty-pharmacy-${String(p.id??i)}`,name:clean(p.name??p.title,160)||'Nöbetçi Eczane',category:'pharmacy',
-      lat:Number(p.lat??(p.location as Record<string,unknown>|undefined)?.lat),lon:Number(p.lng??p.lon??(p.location as Record<string,unknown>|undefined)?.lng),
-      address:clean(p.address,300),phone:clean(p.phone,50),openingHours:clean(p.duty_hours??p.opening_hours,150),
-      website:clean(p.url,300),source:'Eczane Adresi · nöbet verisi',isDuty:true,officialUrl:officialDutyUrl(province),verifiedAt:new Date().toISOString()
-    })).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)).map(p=>({...p,distance:lat!==undefined&&lon!==undefined?distance(lat,lon,p.lat,p.lon):undefined}));
-  }catch{return []}
+
+const filters:Record<string,string>={
+  pharmacy:'["amenity"="pharmacy"]',
+  hospital:'["amenity"~"hospital|clinic"]',
+  atm:'["amenity"="atm"]',
+  police:'["amenity"="police"]',
+  fire_station:'["amenity"="fire_station"]',
+  fuel:'["amenity"="fuel"]',
+  taxi:'["amenity"="taxi"]',
+  market:'["shop"~"supermarket|convenience"]',
+  restaurant:'["amenity"~"restaurant|fast_food"]',
+  hotel:'["tourism"~"hotel|hostel|guest_house"]',
+  cargo:'["amenity"="post_office"]',
+  towing:'["service:vehicle:recovery"="yes"]',
+  government:'["office"="government"]',
+  electrician:'["craft"="electrician"]',
+  plumber:'["craft"="plumber"]',
+  locksmith:'["craft"="locksmith"]',
+  cleaning:'["craft"="cleaning"]',
+  moving:'["craft"="moving_company"]',
+  hvac:'["craft"~"hvac|heating_engineer"]',
+  painter:'["craft"="painter"]',
+  car_repair:'["shop"="car_repair"]',
+  tyres:'["shop"="tyres"]',
+  phone_repair:'["shop"="mobile_phone"]',
+  computer_repair:'["shop"="computer"]',
+  furniture:'["craft"="carpenter"]',
+  gardener:'["craft"="gardener"]',
+  other:'["craft"]',
+  service:'["craft"]'
 };
 
-export async function onRequestGet({request,env}:{request:Request;env:Env}){
-  const u=new URL(request.url),category=u.searchParams.get('category')||'pharmacy',province=clean(u.searchParams.get('province')||'')||'',district=clean(u.searchParams.get('district')||'')||'';
-  if(!filters[category])return Response.json([]);
-  let lat=Number(u.searchParams.get('lat')),lon=Number(u.searchParams.get('lon'));
-  if(!Number.isFinite(lat)||!Number.isFinite(lon)){
-    if(!province)return Response.json([]);
+const OSM_UA='YanımdaTürkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)';
+const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').replace(/\s+/g,' ').trim().slice(0,n):undefined;
+const slug=(s:string)=>s.toLocaleLowerCase('tr').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/ğ/g,'g').replace(/ş/g,'s').replace(/ç/g,'c').replace(/ö/g,'o').replace(/ü/g,'u').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
+const cacheKey=(...parts:string[])=>'places:v10:'+parts.join(':');
+
+function tidyAddress(tags:Record<string,string>,fallback?:string){
+  const parts=[tags['addr:street'],tags['addr:housenumber'],tags['addr:neighbourhood']||tags['addr:suburb'],tags['addr:district'],tags['addr:city']||tags['addr:town']].filter(Boolean);
+  return clean(parts.join(' ')||fallback);
+}
+
+async function dbCacheGet(env:Env,key:string){
+  if(!env.DB)return null;
+  try{
+    const row=await env.DB.prepare('SELECT payload,expires_at FROM api_cache WHERE cache_key=? AND expires_at>? LIMIT 1').bind(key,new Date().toISOString()).first<{payload:string;expires_at:string}>();
+    return row?JSON.parse(row.payload):null;
+  }catch{return null}
+}
+async function dbCachePut(env:Env,key:string,payload:unknown,ttlMs:number){
+  if(!env.DB)return;
+  try{
+    await env.DB.prepare('INSERT INTO api_cache(cache_key,payload,expires_at) VALUES(?,?,?) ON CONFLICT(cache_key) DO UPDATE SET payload=excluded.payload,expires_at=excluded.expires_at')
+      .bind(key,JSON.stringify(payload),new Date(Date.now()+ttlMs).toISOString()).run();
+  }catch{}
+}
+
+async function geocode(env:Env,query:string):Promise<{lat:number;lon:number}|null>{
+  const key='geocode:v2:'+slug(query);
+  const cached=await dbCacheGet(env,key);
+  if(cached&&Number.isFinite(cached.lat)&&Number.isFinite(cached.lon))return {lat:Number(cached.lat),lon:Number(cached.lon)};
+  try{
+    const u=new URL('https://nominatim.openstreetmap.org/search');
+    u.searchParams.set('format','jsonv2');u.searchParams.set('limit','1');u.searchParams.set('countrycodes','tr');
+    u.searchParams.set('q',query);
+    const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':env.OSM_CONTACT_EMAIL?OSM_UA+' contact='+env.OSM_CONTACT_EMAIL:OSM_UA},signal:AbortSignal.timeout(7000)});
+    if(!r.ok)return null;
+    const rows=await r.json() as Array<{lat?:string;lon?:string}>;
+    const row=rows[0];if(!row)return null;
+    const value={lat:Number(row.lat),lon:Number(row.lon)};
+    if(!Number.isFinite(value.lat)||!Number.isFinite(value.lon))return null;
+    await dbCachePut(env,key,value,24*60*60*1000);
+    return value;
+  }catch{return null}
+}
+
+function osmPlace(x:OsmEl,category:string,lat:number,lon:number):Place|null{
+  const p=x.center||{lat:x.lat!,lon:x.lon!};
+  const tags=x.tags||{};
+  const name=clean(tags.name||tags['name:tr']||tags.brand||tags.operator);
+  if(!name||name.length<2||/^isimsiz( açık veri kaydı)?$/i.test(name))return null;
+  const d=distance(lat,lon,p.lat,p.lon);
+  const district=clean(tags['addr:district']||tags['addr:suburb']||tags['addr:town']||tags['addr:city']);
+  return {
+    id:'osm-'+x.type+'-'+x.id,name,category,lat:p.lat,lon:p.lon,
+    address:tidyAddress(tags,tags.display_name),
+    phone:clean(tags.phone||tags['contact:phone'],60),
+    openingHours:clean(tags.opening_hours,180),
+    website:clean(tags.website,300),
+    operator:clean(tags.operator||tags.brand,160),
+    source:'OpenStreetMap',
+    distance:d,
+    district
+  };
+}
+
+async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<Place[]>{
+  const f=filters[category];
+  const meters=Math.max(2000,Math.min(30000,Math.round(radiusKm*1000)));
+  const query=category==='government'
+    ? `[out:json][timeout:20];(node["office"="government"](around:${meters},${lat},${lon});way["office"="government"](around:${meters},${lat},${lon});relation["office"="government"](around:${meters},${lat},${lon});node["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon});way["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon});relation["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon}););out center tags 80;`
+    : `[out:json][timeout:20];(node${f}(around:${meters},${lat},${lon});way${f}(around:${meters},${lat},${lon});relation${f}(around:${meters},${lat},${lon}););out center tags 60;`;
+  const endpoints=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+  for(const endpoint of endpoints){
     try{
-      const q=encodeURIComponent(`${district?district+', ':''}${province}, Türkiye`);
-      const g=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=tr&q=${q}`,{headers:{'User-Agent':`YanimdaTurkiye/1.0 (${env.OSM_CONTACT_EMAIL||'public-web-app'})`},signal:AbortSignal.timeout(7000)});
-      const found=(await g.json() as Array<{lat?:string;lon?:string}>)[0];if(!found)return Response.json([]);
-      lat=Number(found.lat);lon=Number(found.lon);
-    }catch{return Response.json([])}
-  }
-  if(lat<35||lat>43||lon<25||lon>46)return Response.json([]);
-  if(category==='pharmacy'){
-    let duty:Place[]=[];
-    if(u.searchParams.has('lat')&&u.searchParams.has('lon')){
-      duty=await dutyPharmacies(lat,lon,province,district);
-    }else{
-      // Run the district and city requests together. If the district endpoint
-      // has a transient slug/index problem, the city response gives us a fast
-      // second chance without doubling the wait time.
-      const [districtRows,cityRows]=await Promise.all([
-        dutyPharmacies(undefined,undefined,province,district),
-        dutyPharmacies(undefined,undefined,province,''),
-      ]);
-      duty=districtRows;
-      if(!duty.length&&cityRows.length){
-        const wanted=slug(district);
-        duty=cityRows.filter(p=>slug(p.address||'').includes(wanted));
+      const r=await fetch(endpoint,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded','User-Agent':OSM_UA},body:'data='+encodeURIComponent(query),signal:AbortSignal.timeout(10000)});
+      if(!r.ok)continue;
+      const data=await r.json() as {elements?:OsmEl[]};
+      if(Array.isArray(data.elements)){
+        return data.elements.map(x=>osmPlace(x,category,lat,lon)).filter((x):x is Place=>Boolean(x)).sort((a,b)=>(a.distance??999)-(b.distance??999));
       }
-    }
-    // If the duty-pharmacy source has no data, do not stop here.
-    // Fall through to the general nearby-place search so the user still gets
-    // real nearby pharmacies from OpenStreetMap instead of a misleading 0.
-    // These fallback results are intentionally not marked as duty pharmacies.
-    duty=duty.filter(p=>typeof p.distance!=='number'||p.distance<=8).sort((a,b)=>(a.distance??999)-(b.distance??999));
-    if(duty.length)return Response.json(duty.slice(0,30),{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
-  }
-  const key=`places:v8:${category}:${lat.toFixed(3)}:${lon.toFixed(3)}:${province}:${district}`;
-  if(env.DB){
-    try{
-      const cached=await env.DB.prepare('SELECT payload,expires_at FROM api_cache WHERE cache_key=? AND expires_at>? LIMIT 1').bind(key,new Date().toISOString()).first<{payload:string;expires_at:string}>();
-      if(cached){const parsed=JSON.parse(cached.payload);if(Array.isArray(parsed)&&parsed.length){const named=parsed.filter((p:unknown)=>{const n=typeof (p as {name?:unknown})?.name==='string'?String((p as {name:string}).name).trim():'';return n.length>=2&&!/^isimsiz( açık veri kaydı)?$/i.test(n);});if(named.length)return Response.json(named,{headers:{'X-Data-Source':'cache','X-Places-Version':'v8'}});}}
     }catch{}
   }
-  try{
-    const f=filters[category];
-    const query=category==='government'
-      ? `[out:json][timeout:20];(node["office"="government"](around:5000,${lat},${lon});way["office"="government"](around:5000,${lat},${lon});relation["office"="government"](around:5000,${lat},${lon});node["amenity"~"townhall|courthouse|public_building"](around:5000,${lat},${lon});way["amenity"~"townhall|courthouse|public_building"](around:5000,${lat},${lon});relation["amenity"~"townhall|courthouse|public_building"](around:5000,${lat},${lon}););out center tags 60;`
-      : `[out:json][timeout:18];(node${f}(around:5000,${lat},${lon});way${f}(around:5000,${lat},${lon});relation${f}(around:5000,${lat},${lon}););out center tags 40;`;
-    let body:{elements:OsmEl[]}|null=null;
-    const endpoints=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
-    // Use GET for the first Overpass attempt. It is the simplest and most
-    // portable form for a small read-only query and avoids request-body
-    // handling differences on some edge/network paths.
-    const responses=await Promise.all(endpoints.map(async endpoint=>{
-      // Try POST first (the canonical Overpass form), then GET as a transport
-      // fallback. This protects the search from edge/proxy differences.
-      try{
-        const response=await fetch(endpoint,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded','User-Agent':'YanimdaTurkiye/1.0'},body:`data=${encodeURIComponent(query)}`,signal:AbortSignal.timeout(9000)});
-        if(response.ok){
-          const candidate=await response.json() as {elements?:OsmEl[]};
-          if(Array.isArray(candidate.elements))return {elements:candidate.elements};
-        }
-      }catch{}
-      try{
-        const u=new URL(endpoint);
-        u.searchParams.set('data',query);
-        const response=await fetch(u.toString(),{method:'GET',headers:{Accept:'application/json','User-Agent':'YanimdaTurkiye/1.0'},signal:AbortSignal.timeout(9000),cache:'no-store'});
-        if(!response.ok)return null;
-        const candidate=await response.json() as {elements?:OsmEl[]};
-        return Array.isArray(candidate.elements)?{elements:candidate.elements}:null;
-      }catch{return null}
-    }));
-    body=responses.find(Boolean)||null;
-    const elements=body?.elements||[];
-    let places=elements.filter(x=>{const tags=x.tags||{};if(category==='pharmacy')return tags.amenity==='pharmacy';if(category==='hospital')return tags.amenity==='hospital'||tags.amenity==='clinic';if(category==='market')return tags.shop==='supermarket'||tags.shop==='convenience';if(category==='restaurant')return tags.amenity==='restaurant'||tags.amenity==='fast_food';if(category==='hotel')return tags.tourism==='hotel'||tags.tourism==='hostel'||tags.tourism==='guest_house';if(category==='government')return tags.office==='government'||['townhall','courthouse','public_building'].includes(tags.amenity||'');return Boolean(filters[category])}).map(x=>{const p=x.center||{lat:x.lat!,lon:x.lon!},tags=x.tags||{};const name=clean(tags.name||tags['name:tr']||tags.brand||tags.operator||tags.display_name);if(!name)return null;return{id:`osm-${x.type}-${x.id}`,name,category,lat:p.lat,lon:p.lon,address:clean([tags['addr:street'],tags['addr:housenumber'],tags['addr:district'],tags['addr:city']].filter(Boolean).join(' ')||tags.display_name),phone:clean(tags.phone||tags['contact:phone']),openingHours:clean(tags.opening_hours),website:clean(tags.website),operator:clean(tags.operator||tags.brand),source:'OpenStreetMap',distance:distance(lat,lon,p.lat,p.lon)}}).filter(p=>p!==null&&Number.isFinite(p.lat)&&Number.isFinite(p.lon)).sort((a,b)=>(a?.distance??0)-(b?.distance??0));
+  return [];
+}
 
-    // Overpass can occasionally return an empty/timeout response from a
-    // Cloudflare Worker. Use Nominatim as a second public OpenStreetMap source.
-    // For manual province/district searches we explicitly include the selected
-    // area in the query and use Nominatim's category filter. This prevents a
-    // valid selection such as "Muş / Merkez" from becoming a false zero.
-    if(!places.length){
-      const nominatim:Record<string,{terms:string[];includes?:string[]}>= {
-        pharmacy:{terms:['eczane','pharmacy'],includes:['osm.amenity.pharmacy']},
-        hospital:{terms:['hastane','hospital','clinic'],includes:['osm.amenity.hospital','osm.amenity.clinic']},
-        atm:{terms:['ATM','bank'],includes:['osm.amenity.atm']},
-        fuel:{terms:['akaryakıt','fuel station','gas station'],includes:['osm.amenity.fuel']},
-        market:{terms:['market','supermarket'],includes:['osm.shop.supermarket','osm.shop.convenience']},
-        restaurant:{terms:['restoran','restaurant'],includes:['osm.amenity.restaurant','osm.amenity.fast_food']},
-        taxi:{terms:['taksi','taxi'],includes:['osm.amenity.taxi']},
-        hotel:{terms:['otel','hotel'],includes:['osm.tourism.hotel','osm.tourism.hostel','osm.tourism.guest_house']},
-        police:{terms:['polis','police'],includes:['osm.amenity.police']},
-        fire_station:{terms:['itfaiye','fire station'],includes:['osm.amenity.fire_station']},
-        cargo:{terms:['kargo','post office'],includes:['osm.amenity.post_office']},
-        government:{terms:['resmi kurum','government'],includes:['osm.office.government','osm.amenity.townhall','osm.amenity.courthouse']},
-        electrician:{terms:['elektrikçi','electrician'],includes:['osm.craft.electrician']},
-        plumber:{terms:['tesisatçı','plumber'],includes:['osm.craft.plumber']},
-        locksmith:{terms:['çilingir','locksmith'],includes:['osm.craft.locksmith']},
-        cleaning:{terms:['temizlik','cleaning'],includes:['osm.craft.cleaning']},
-        moving:{terms:['nakliye','moving'],includes:['osm.craft.moving_company']},
-        hvac:{terms:['klima','kombi','HVAC'],includes:['osm.craft.hvac','osm.craft.heating_engineer']},
-        painter:{terms:['boya badana','painter'],includes:['osm.craft.painter']},
-        car_repair:{terms:['oto servis','car repair'],includes:['osm.shop.car_repair']},
-        tyres:{terms:['lastikçi','tyres'],includes:['osm.shop.tyres']},
-        phone_repair:{terms:['telefon tamiri','phone repair'],includes:['osm.shop.mobile_phone']},
-        computer_repair:{terms:['bilgisayar tamiri','computer repair'],includes:['osm.shop.computer']},
-        furniture:{terms:['mobilya','carpenter'],includes:['osm.craft.carpenter']},
-        gardener:{terms:['bahçe','gardener'],includes:['osm.craft.gardener']},
-        other:{terms:['hizmet'],includes:['osm.craft']},
-        service:{terms:['hizmet'],includes:['osm.craft']},
-        towing:{terms:['çekici','towing'],includes:['osm.service.vehicle.recovery']},
+const nomTerms:Record<string,string>={
+  pharmacy:'eczane',hospital:'hastane',atm:'ATM',fuel:'akaryakıt istasyonu',market:'market',restaurant:'restoran',
+  taxi:'taksi',hotel:'otel',police:'polis',fire_station:'itfaiye',cargo:'kargo',government:'resmi kurum',
+  electrician:'elektrikçi',plumber:'tesisatçı',locksmith:'çilingir',cleaning:'temizlik',moving:'nakliye',
+  hvac:'klima kombi',painter:'boya badana',car_repair:'oto servis',tyres:'lastikçi',phone_repair:'telefon tamiri',
+  computer_repair:'bilgisayar tamiri',furniture:'mobilya',gardener:'bahçe',other:'hizmet',service:'hizmet',towing:'oto çekici'
+};
+
+async function nominatimFallback(env:Env,category:string,area:string,lat:number,lon:number,radiusKm:number):Promise<Place[]>{
+  const term=nomTerms[category];if(!term)return [];
+  const box=Math.max(0.018,Math.min(0.18,radiusKm/80));
+  const key='nompoi:v3:'+slug([category,area,lat.toFixed(3),lon.toFixed(3),String(radiusKm)].join('|'));
+  const cached=await dbCacheGet(env,key);
+  if(Array.isArray(cached))return cached as Place[];
+  try{
+    const u=new URL('https://nominatim.openstreetmap.org/search');
+    u.searchParams.set('format','jsonv2');u.searchParams.set('q',term+', '+area);
+    u.searchParams.set('limit','20');u.searchParams.set('countrycodes','tr');u.searchParams.set('layer','poi');
+    u.searchParams.set('viewbox',`${(lon-box).toFixed(5)},${(lat+box).toFixed(5)},${(lon+box).toFixed(5)},${(lat-box).toFixed(5)}`);
+    u.searchParams.set('bounded','1');u.searchParams.set('addressdetails','1');u.searchParams.set('accept-language','tr');
+    const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':env.OSM_CONTACT_EMAIL?OSM_UA+' contact='+env.OSM_CONTACT_EMAIL:OSM_UA},signal:AbortSignal.timeout(7000)});
+    if(!r.ok)return [];
+    const rows=await r.json() as Array<Record<string,unknown>>;
+    const result=rows.map((x,i)=>{
+      const la=Number(x.lat),lo=Number(x.lon),a=(x.address||{}) as Record<string,unknown>,extra=(x.extratags||{}) as Record<string,unknown>;
+      const name=clean(x.name)||clean(x.namedetails&&typeof x.namedetails==='object'?(x.namedetails as Record<string,unknown>).name:undefined)||clean(x.display_name)?.split(',')[0];
+      if(!name||!Number.isFinite(la)||!Number.isFinite(lo))return null;
+      const p:Place={
+        id:'nominatim-'+category+'-'+String(x.osm_type||'x')+'-'+String(x.osm_id??i),name,category,lat:la,lon:lo,
+        address:clean([a.road,a.house_number,a.neighbourhood||a.suburb,a.district,a.city||a.town].filter(Boolean).join(' ')),
+        phone:clean(extra.phone||extra['contact:phone'],60),openingHours:clean(extra.opening_hours,180),
+        website:clean(extra.website,300),operator:clean(extra.operator||extra.brand,160),
+        source:'OpenStreetMap / Nominatim',distance:distance(lat,lon,la,lo),district:clean(a.district||a.suburb||a.town||a.city)
       };
-      const cfg=nominatim[category];
-      if(cfg){
-        const area=[district,province,'Türkiye'].filter(Boolean).join(', ');
-        const box=0.045;
-        const left=(lon-box).toFixed(5),right=(lon+box).toFixed(5);
-        const top=(lat+box).toFixed(5),bottom=(lat-box).toFixed(5);
-        const headers={Accept:'application/json','User-Agent':`YanimdaTurkiye/1.0 (${env.OSM_CONTACT_EMAIL||'public-web-app'})`};
-        const rows:Record<string,unknown>[]=[];
-        const term=cfg.terms[0];
-        try{
-          const nu=new URL('https://nominatim.openstreetmap.org/search');
-          nu.searchParams.set('format','jsonv2');
-          nu.searchParams.set('q',term+', '+area);
-          nu.searchParams.set('limit','20');
-          nu.searchParams.set('countrycodes','tr');
-          nu.searchParams.set('layer','poi');
-          nu.searchParams.set('viewbox',left+','+top+','+right+','+bottom);
-          nu.searchParams.set('bounded','1');
-          nu.searchParams.set('addressdetails','1');
-          nu.searchParams.set('accept-language','tr');
-          const nr=await fetch(nu,{headers,signal:AbortSignal.timeout(6500)});
-          if(nr.ok){const data=await nr.json() as unknown;if(Array.isArray(data))rows.push(...data as Record<string,unknown>[]);}
-        }catch{}
-        places=rows.map((x,i)=>{
-          const la=Number(x.lat),lo=Number(x.lon),a=(x.address||{}) as Record<string,unknown>;
-          const display=clean(x.display_name);
-          const name=clean(x.name)||clean(x.namedetails&&typeof x.namedetails==='object'?(x.namedetails as Record<string,unknown>).name:undefined)||display?.split(',')[0];
-          return {id:`nominatim-${category}-${String(x.osm_type||'x')}-${String(x.osm_id??i)}`,name:name||'',category,lat:la,lon:lo,
-            address:display||clean([a.road,a.house_number,a.suburb,a.city,a.town,a.state].filter(Boolean).join(' ')),
-            phone:clean((x.extratags as Record<string,unknown>|undefined)?.phone),
-            openingHours:clean((x.extratags as Record<string,unknown>|undefined)?.opening_hours),
-            website:clean((x.extratags as Record<string,unknown>|undefined)?.website),
-            operator:clean((x.extratags as Record<string,unknown>|undefined)?.operator),source:'OpenStreetMap / Nominatim',
-            distance:distance(lat,lon,la,lo)};
-        }).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&p.name.trim().length>=2)
-          .filter(p=>p.distance<=8)
-          .sort((a,b)=>a.distance-b.distance);
-      }
-    }
-    let approved:Place[]=[];
-    if(env.DB){
-      try{
-        const q=province&&district?'SELECT id,name,category,latitude,longitude,address,phone,hours FROM submissions WHERE status=\'approved\' AND category=? AND province=? AND district=?':'SELECT id,name,category,latitude,longitude,address,phone,hours FROM submissions WHERE status=\'approved\' AND category=?';
-        const rows=await env.DB.prepare(q).bind(...(province&&district?[category,province,district]:[category])).all<Record<string,unknown>>();
-        approved=rows.results.filter(x=>x.latitude!=null&&x.longitude!=null).map(x=>({id:`approved-${x.id}`,name:String(x.name),category:String(x.category),lat:Number(x.latitude),lon:Number(x.longitude),address:clean(x.address),phone:clean(x.phone),openingHours:clean(x.hours),source:'Yanımda Türkiye — onaylı kayıt',distance:distance(lat,lon,Number(x.latitude),Number(x.longitude))}));
-      }catch{}
-    }
-    const named=[...approved,...places].filter((p):p is NonNullable<typeof p>=>p!==null&&typeof p.name==='string'&&p.name.trim().length>0);
-    // Never expose records without a real human-readable business name.
-    // Some public OSM/open-data records contain coordinates but no name; those
-    // are useful internally but must not appear as "İsimsiz" cards to users.
-    const result=named
-      .filter(p=>{
-        const n=typeof p.name==='string'?p.name.trim():'';
-        return n.length>=2 && !/^isimsiz( açık veri kaydı)?$/i.test(n);
-      })
-      .filter(p=>typeof p.distance!=='number'||p.distance<=8)
-      .sort((a,b)=>(a.distance??999)-(b.distance??999))
-      .slice(0,30);
-    if(env.DB&&result.length){try{await env.DB.prepare('INSERT INTO api_cache(cache_key,payload,expires_at) VALUES(?,?,?) ON CONFLICT(cache_key) DO UPDATE SET payload=excluded.payload,expires_at=excluded.expires_at').bind(key,JSON.stringify(result),new Date(Date.now()+30*60*1000).toISOString()).run()}catch{}}
-    return Response.json(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'OpenStreetMap'}});
-  }catch{return Response.json([],{headers:{'Cache-Control':'no-store'}})}
+      return p.distance!<=radiusKm?p:null;
+    }).filter((x):x is Place=>Boolean(x)).sort((a,b)=>(a.distance??999)-(b.distance??999));
+    await dbCachePut(env,key,result,15*60*1000);
+    return result;
+  }catch{return []}
+}
+
+export async function onRequestGet({request,env}:{request:Request;env:Env}){
+  const u=new URL(request.url);
+  const category=clean(u.searchParams.get('category')||'pharmacy')||'pharmacy';
+  const province=clean(u.searchParams.get('province')||'')||'';
+  const district=clean(u.searchParams.get('district')||'')||'';
+  const radiusRequested=Number(u.searchParams.get('radius')||'5');
+  const radiusKm=Math.max(2,Math.min(20,Number.isFinite(radiusRequested)?radiusRequested:5));
+  const nearbyDistricts=u.searchParams.get('nearbyDistricts')==='1';
+
+  if(!filters[category])return Response.json([]);
+
+  let lat=Number(u.searchParams.get('lat')),lon=Number(u.searchParams.get('lon'));
+  const hasPosition=Number.isFinite(lat)&&Number.isFinite(lon);
+  if(!hasPosition){
+    if(!province)return Response.json([]);
+    const area=[district,province,'Türkiye'].filter(Boolean).join(', ');
+    const point=await geocode(env,area);
+    if(!point)return Response.json([]);
+    lat=point.lat;lon=point.lon;
+  }
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<35||lat>43||lon<25||lon>46)return Response.json([]);
+
+  // A manual province search is broader; a selected district is centered on that district.
+  // The explicit nearby-district toggle controls the radius used around the selected point.
+  const effectiveRadius=hasPosition?radiusKm:(district?(nearbyDistricts?radiusKm:2):(nearbyDistricts?radiusKm:20));
+
+  // Never label an OSM pharmacy as "nöbetçi". Official duty integration is deliberately
+  // disabled until a structured, current official feed is available.
+  if(category==='pharmacy'){
+    const key=cacheKey(category,lat.toFixed(3),lon.toFixed(3),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
+    const cached=await dbCacheGet(env,key);
+    if(Array.isArray(cached))return Response.json(cached,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'OpenStreetMap cache'}});
+  }
+
+  const key=cacheKey(category,lat.toFixed(3),lon.toFixed(3),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
+  const cached=await dbCacheGet(env,key);
+  if(Array.isArray(cached)&&cached.length)return Response.json(cached,{headers:{'Cache-Control':'public,max-age=900','X-Data-Source':'cache'}});
+
+  let places=await overpass(category,lat,lon,effectiveRadius);
+  if(!places.length)places=await nominatimFallback(env,category,[district,province,'Türkiye'].filter(Boolean).join(', '),lat,lon,effectiveRadius);
+
+  let approved:Place[]=[];
+  if(env.DB){
+    try{
+      const sql=province&&district
+        ? "SELECT id,name,category,latitude,longitude,address,phone,hours FROM submissions WHERE status='approved' AND category=? AND province=? AND district=?"
+        : "SELECT id,name,category,latitude,longitude,address,phone,hours FROM submissions WHERE status='approved' AND category=?";
+      const rows=await env.DB.prepare(sql).bind(...(province&&district?[category,province,district]:[category])).all<Record<string,unknown>>();
+      approved=rows.results.map(x=>({
+        id:'approved-'+x.id,name:String(x.name),category:String(x.category),lat:Number(x.latitude),lon:Number(x.longitude),
+        address:clean(x.address),phone:clean(x.phone,60),openingHours:clean(x.hours,180),
+        source:'Yanımda Türkiye — onaylı kayıt',distance:distance(lat,lon,Number(x.latitude),Number(x.longitude)),
+        district:district||undefined
+      })).filter(p=>Number.isFinite(p.lat)&&Number.isFinite(p.lon)&&p.distance!>effectiveRadius);
+      approved=approved.filter(p=>p.name.trim().length>=2);
+    }catch{}
+  }
+
+  const result=[...approved,...places]
+    .filter(p=>p.name.trim().length>=2&&!/^isimsiz( açık veri kaydı)?$/i.test(p.name.trim()))
+    .filter(p=>typeof p.distance!=='number'||p.distance<=effectiveRadius)
+    .sort((a,b)=>(a.distance??999)-(b.distance??999))
+    .slice(0,40);
+
+  await dbCachePut(env,key,result,15*60*1000);
+  return Response.json(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'OpenStreetMap'}});
 }
