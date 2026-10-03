@@ -8,7 +8,7 @@ import L from 'leaflet';
 import {categories,provinces,services} from './data';
 import {districtsFor} from './turkeyDistricts';
 import {findPlaces} from './api';
-import {getCurrentLocation,LocationError} from './location';
+import {getCurrentLocation,getLocationPermissionState,LocationError} from './location';
 import type {Place,Position} from './types';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
