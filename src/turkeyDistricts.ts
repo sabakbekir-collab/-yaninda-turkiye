@@ -3,6 +3,8 @@
  * İlçe adları, 81 il / 973 ilçe yapısını temsil eden açık veri listesinden alınmıştır.
  * Uygulama bunları tamamen offline kullanır; ilçe seçimi için API çağrısı gerekmez.
  */
+import { trSlug } from './text';
+
 export const districtMap: Record<string, string[]> = {
 Adana:['Seyhan','Ceyhan','Feke','Karaisalı','Karataş','Kozan','Pozantı','Saimbeyli','Tufanbeyli','Yumurtalık','Yüreğir','Aladağ','İmamoğlu','Sarıçam','Çukurova'],
 Adıyaman:['Merkez','Besni','Çelikhan','Gerger','Gölbaşı','Kahta','Samsat','Sincik','Tut'],
@@ -91,5 +93,10 @@ Zonguldak:['Çaycuma','Devrek','Ereğli','Merkez','Alaplı','Gökçebey','Kiliml
 districtMap['Bingöl'][2] = 'Karlıova';
 districtMap['Karaman'][5] = 'Sarıveliler';
 
-export const districtsFor = (province: string) => districtMap[province] ?? [];
+export const districtsFor = (province: string): string[] => {
+  if (districtMap[province]) return districtMap[province];
+  const key = trSlug(province);
+  const match = key ? Object.keys(districtMap).find((name) => trSlug(name) === key) : undefined;
+  return match ? districtMap[match] : [];
+};
 export const districtCount = Object.values(districtMap).reduce((sum, list) => sum + list.length, 0);
