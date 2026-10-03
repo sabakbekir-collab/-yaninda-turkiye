@@ -189,7 +189,9 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   // Manual district searches are centered on the district and always honor the selected
   // radius. If nearby districts are enabled, broaden that radius by at least 1.5x.
   const districtScoped=Boolean(district)&&!isCentralDistrict(district);
-  const effectiveRadius=hasPosition?radiusKm:(districtScoped?(nearbyDistricts?radiusKm:2):(nearbyDistricts?radiusKm:20));
+  // Kullanıcının seçtiği yarıçap her aramada korunur. Yakın ilçeler açılırsa yalnızca kontrollü şekilde genişletilir.
+  const effectiveRadius=nearbyDistricts?Math.min(30,radiusKm*1.5):radiusKm;
+  void districtScoped;
 
   // Never label an OSM pharmacy as "nöbetçi". Official duty integration is deliberately
   // disabled until a structured, current official feed is available.
