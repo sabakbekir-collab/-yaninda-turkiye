@@ -42,7 +42,7 @@ const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').replace
 const slug=trSlug;
 const areaQuery=(district:string,province:string)=>[district&&!isCentralDistrict(district)?district:'',province,'Türkiye'].filter(Boolean).join(', ');
 const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
-const cacheKey=(...parts:string[])=>'places:v11:'+parts.join(':');
+const cacheKey=(...parts:string[])=>'places:v12:'+parts.join(':');
 
 function tidyAddress(tags:Record<string,string>,fallback?:string){
   const full=tags['addr:full']||tags['contact:address'];
@@ -156,27 +156,37 @@ async function dutyPharmacies(env:Env,province:string,district:string,lat:number
     }catch{}
   }
 
-  // Reliable fallback: fetch the province/district duty feed and calculate
-  // distance locally. This is also used when the coordinate feed returns [].
+  // Reliable fallback: fetch the province feed and calculate distance locally.
+  // If the district feed is empty or unavailable, retry the province feed so a
+  // temporary district-level gap can never become a false zero result.
   if(!province)return {places:[],ok:false};
   try{
-    const u=new URL('https://eczaneadresi.com/api/public/v1/duty-pharmacies');
-    u.searchParams.set('city',slug(province||'istanbul'));
-    if(district)u.searchParams.set('district',slug(district));
-    u.searchParams.set('limit','200');
-    const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(10000)});
-    if(!r.ok)return {places:[],ok:false};
-    const data=await r.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
-    const all=buildPlaces(data,'duty-pharmacy-fallback-');
-    if(!all.length)return {places:[],ok:true,date:data.date};
+    const fetchFeed=async (withDistrict:boolean)=>{
+      const u=new URL('https://eczaneadresi.com/api/public/v1/duty-pharmacies');
+      u.searchParams.set('city',slug(province));
+      if(withDistrict&&district)u.searchParams.set('district',slug(district));
+      u.searchParams.set('limit','200');
+      const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(10000)});
+      if(!r.ok)return null;
+      return await r.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
+    };
+    let data=await fetchFeed(Boolean(district));
+    let all=data?buildPlaces(data,'duty-pharmacy-fallback-'):[];
+
+    // District feed can temporarily publish an empty list. Retry the province
+    // feed and use our own coordinates to determine the nearest pharmacies.
+    if(!all.length&&district){
+      data=await fetchFeed(false);
+      all=data?buildPlaces(data,'duty-pharmacy-province-'):[];
+    }
+
+    if(!all.length)return {places:[],ok:Boolean(data),date:data?.date};
     const within=all.filter(p=>(p.distance??999)<=radiusKm);
-    // If the requested radius has no result, progressively widen to 10 km and
-    // 20 km before falling back to the nearest 10 records from the province.
-    const widened=within.length?within:
-      all.filter(p=>(p.distance??999)<=Math.min(10,Math.max(10,radiusKm))).length?
-      all.filter(p=>(p.distance??999)<=10):
-      all.filter(p=>(p.distance??999)<=20);
-    return {places:(widened.length?widened:all).slice(0,10),ok:true,date:data.date,stale:Boolean(data.date&&data.date.slice(0,10)!==new Date().toISOString().slice(0,10))};
+    const within10=all.filter(p=>(p.distance??999)<=10);
+    const within20=all.filter(p=>(p.distance??999)<=20);
+    const widened=within.length?within:(within10.length?within10:(within20.length?within20:all));
+    const stale=Boolean(data?.date&&data.date.slice(0,10)!==new Date().toISOString().slice(0,10));
+    return {places:widened.slice(0,10),ok:true,date:data?.date,stale};
   }catch{
     return {places:[],ok:false};
   }
