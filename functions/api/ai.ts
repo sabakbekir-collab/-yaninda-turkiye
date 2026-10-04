@@ -52,7 +52,8 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
      if(res.ok&&Array.isArray(data)){places.push(...(data as Place[]).slice(0,5));context="Gerçek yakınlık sonuçları:\n"+places.map(p=>`${p.name} — ${p.address||"adres yok"}${p.phone?" — "+p.phone:""}`).join("\n")}
    }
    if(asksRoute){
-     const targetMatch=last.content.match(/(?:beyoğlu|taksim|kadıköy|eminönü|şişli|beşiktaş|fatih|üsküdar|sarıyer|levent|maslak|ayazağa|istanbul|ankara|izmir)/i);\n     const target=targetMatch?.[0]||last.content.replace(/.*?(nasıl gider|nasıl gidilir|nasıl gidebilirim|nasıl gidiyor|nasıl gidiliyor|yol tarifi|ulaşım)/i,"").replace(/^(?:de|da|mi|mı|mu|mü)?\s*/i,"").trim()||"Beyoğlu";
+     const targetMatch=last.content.match(/(?:beyoğlu|taksim|kadıköy|eminönü|şişli|beşiktaş|fatih|üsküdar|sarıyer|levent|maslak|ayazağa|istanbul|ankara|izmir)/i);
+     const target=targetMatch?.[0]||last.content.replace(/.*?(nasıl gider|nasıl gidilir|nasıl gidebilirim|nasıl gidiyor|nasıl gidiliyor|yol tarifi|ulaşım)/i,"").replace(/^(?:de|da|mi|mı|mu|mü)?\s*/i,"").trim()||"Beyoğlu";
      const destination=encodeURIComponent(target+", İstanbul");
      const origin=loc&&Number.isFinite(loc.lat)&&Number.isFinite(loc.lon)?`&origin=${loc.lat},${loc.lon}`:"";
      context+=`\nYOL TARİFİ İSTEĞİ: Hedef=${target}. Google Maps bağlantısı: https://www.google.com/maps/dir/?api=1${origin}&destination=${destination}. Toplu taşıma için resmi İETT "Nasıl Giderim?" sayfası: https://iett.istanbul/ .`;
