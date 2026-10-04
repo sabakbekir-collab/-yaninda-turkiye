@@ -118,92 +118,68 @@ async function reverseArea(lat:number,lon:number):Promise<{province:string;distr
   }catch{return null}
 }
 
-async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,radiusKm:number,preferNearest=false):Promise<{places:Place[];ok:boolean}>{
-  const useNearest=preferNearest;
-  const u=new URL('https://eczaneadresi.com/api/public/v1/'+(useNearest?'nearest-pharmacies':'duty-pharmacies'));
-  if(useNearest){
-    u.searchParams.set('lat',String(lat));
-    u.searchParams.set('lng',String(lon));
-    u.searchParams.set('radius',String(Math.round(radiusKm*1000)));
-    u.searchParams.set('limit','25');
-  }else{
-    u.searchParams.set('city',slug(province||'istanbul'));
-    if(district)u.searchParams.set('district',slug(district));
-    u.searchParams.set('limit','200');
-  }
-  try{
-    const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(10000)});
-    if(!r.ok)return {places:[],ok:false};
-    const data=await r.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
-    if(!Array.isArray(data.pharmacies))return {places:[],ok:false};
-    const places: Place[] = [];
+async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,radiusKm:number,preferNearest=false):Promise<{places:Place[];ok:boolean;date?:string;stale?:boolean}>{
+  const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string,limitRadius?:number)=>{
+    if(!Array.isArray(data.pharmacies))return [];
+    const out:Place[]=[];
     for(const [i,x] of data.pharmacies.entries()){
-      const la=Number(x.lat??x.latitude),lo=Number(x.lng??x.lon??x.longitude);
-      const name=clean(x.name);
+      const la=Number(x.lat??x.latitude),lo=Number(x.lng??x.lon??x.longitude),name=clean(x.name);
       if(!name||!Number.isFinite(la)||!Number.isFinite(lo))continue;
       const d=distance(lat,lon,la,lo);
-      places.push({
-        id:'duty-pharmacy-'+String(x.id??i),
-        name,category:'pharmacy',lat:la,lon:lo,
+      if(limitRadius!==undefined&&d>limitRadius)continue;
+      out.push({
+        id:idPrefix+String(x.id??i),name,category:'pharmacy',lat:la,lon:lo,
         address:clean(x.address),phone:clean(x.phone,60),
         openingHours:clean(x.hours||x.opening_hours||x.duty_hours,180),
-        source:'Eczane Adresi — nöbet verisi',
-        distance:d,
-        district:clean(x.district)||district||undefined,
-        isDuty:true,
+        source:'Eczane Adresi — nöbet verisi',distance:d,
+        district:clean(x.district)||district||undefined,isDuty:true,
         officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
-        verifiedAt:data.date||new Date().toISOString(),
-        dutyUpdatedAt:new Date().toISOString()
+        verifiedAt:data.date||new Date().toISOString(),dutyUpdatedAt:new Date().toISOString()
       });
     }
-    places.sort((a,b)=>(a.distance??999)-(b.distance??999));
-    // GPS endpoint can legitimately return an empty list even when the
-    // district has duty pharmacies. In that case the city/district feed is
-    // the reliable fallback; never turn a temporary nearest-search miss
-    // into a false "0 pharmacies" result.
-    if(places.length>0)return {places,ok:true};
-  }catch{}
+    out.sort((a,b)=>(a.distance??999)-(b.distance??999));
+    return out;
+  };
 
-  // Fallback: use the province/district duty feed and calculate distance
-  // ourselves from the returned coordinates.
-  if(province){
-    const fallbackUrl=new URL('https://eczaneadresi.com/api/public/v1/duty-pharmacies');
-    fallbackUrl.searchParams.set('city',slug(province));
-    if(district)fallbackUrl.searchParams.set('district',slug(district));
-    fallbackUrl.searchParams.set('limit','200');
+  // First try the coordinate endpoint only for true GPS searches.
+  if(preferNearest){
     try{
-      const r=await fetch(fallbackUrl,{headers:{Accept:'application/json',User-Agent:OSM_UA},signal:AbortSignal.timeout(10000)});
+      const u=new URL('https://eczaneadresi.com/api/public/v1/nearest-pharmacies');
+      u.searchParams.set('lat',String(lat));u.searchParams.set('lng',String(lon));
+      u.searchParams.set('radius',String(Math.round(radiusKm*1000)));u.searchParams.set('limit','25');
+      const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(10000)});
       if(r.ok){
         const data=await r.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
-        if(Array.isArray(data.pharmacies)){
-          const fallbackPlaces:Place[]=[];
-          for(const [i,x] of data.pharmacies.entries()){
-            const la=Number(x.lat??x.latitude),lo=Number(x.lng??x.lon??x.longitude);
-            const name=clean(x.name);
-            if(!name||!Number.isFinite(la)||!Number.isFinite(lo))continue;
-            const d=distance(lat,lon,la,lo);
-            if(d>radiusKm)continue;
-            fallbackPlaces.push({
-              id:'duty-pharmacy-fallback-'+String(x.id??i),
-              name,category:'pharmacy',lat:la,lon:lo,
-              address:clean(x.address),phone:clean(x.phone,60),
-              openingHours:clean(x.hours||x.opening_hours||x.duty_hours,180),
-              source:'Eczane Adresi — nöbet verisi',
-              distance:d,
-              district:clean(x.district)||district||undefined,
-              isDuty:true,
-              officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
-              verifiedAt:data.date||new Date().toISOString(),
-              dutyUpdatedAt:new Date().toISOString()
-            });
-          }
-          fallbackPlaces.sort((a,b)=>(a.distance??999)-(b.distance??999));
-          return {places:fallbackPlaces,ok:true};
-        }
+        const places=buildPlaces(data,'duty-pharmacy-');
+        if(places.length)return {places,ok:true,date:data.date};
       }
     }catch{}
   }
-  return {places:[],ok:true}
+
+  // Reliable fallback: fetch the province/district duty feed and calculate
+  // distance locally. This is also used when the coordinate feed returns [].
+  if(!province)return {places:[],ok:false};
+  try{
+    const u=new URL('https://eczaneadresi.com/api/public/v1/duty-pharmacies');
+    u.searchParams.set('city',slug(province||'istanbul'));
+    if(district)u.searchParams.set('district',slug(district));
+    u.searchParams.set('limit','200');
+    const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(10000)});
+    if(!r.ok)return {places:[],ok:false};
+    const data=await r.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
+    const all=buildPlaces(data,'duty-pharmacy-fallback-');
+    if(!all.length)return {places:[],ok:true,date:data.date};
+    const within=all.filter(p=>(p.distance??999)<=radiusKm);
+    // If the requested radius has no result, progressively widen to 10 km and
+    // 20 km before falling back to the nearest 10 records from the province.
+    const widened=within.length?within:
+      all.filter(p=>(p.distance??999)<=Math.min(10,Math.max(10,radiusKm))).length?
+      all.filter(p=>(p.distance??999)<=10):
+      all.filter(p=>(p.distance??999)<=20);
+    return {places:(widened.length?widened:all).slice(0,10),ok:true,date:data.date,stale:Boolean(data.date&&data.date.slice(0,10)!==new Date().toISOString().slice(0,10))};
+  }catch{
+    return {places:[],ok:false};
+  }
 }
 
 async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean}>{
@@ -324,8 +300,13 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     const duty=await dutyPharmacies(env,dutyProvince,dutyDistrict,lat,lon,effectiveRadius,hasPosition&&!province&&!district);
     if(!duty.ok)return Response.json({error:'duty_pharmacy_unavailable'},{status:503,headers:{'Cache-Control':'no-store'}});
     const dutyResult=duty.places.slice(0,40);
-    await dbCachePut(env,key,dutyResult,5*60*1000);
-    return Response.json(dutyResult,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'Eczane Adresi'}});
+    // Never cache an empty duty result: an upstream "today" miss must not
+    // become a persistent false zero.
+    if(dutyResult.length)await dbCachePut(env,key,dutyResult,5*60*1000);
+    const headers=new Headers({'Cache-Control':dutyResult.length?'public,max-age=300':'no-store','X-Data-Source':'Eczane Adresi'});
+    if(duty.date)headers.set('X-Duty-Date',duty.date);
+    if(duty.stale)headers.set('X-Duty-Stale','true');
+    return Response.json(dutyResult,{headers});
   }
 
   const primary=await overpass(category,lat,lon,effectiveRadius);
