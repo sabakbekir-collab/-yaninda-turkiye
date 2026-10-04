@@ -34,7 +34,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
  let body:ChatBody;
  try{body=await request.json() as ChatBody}catch{return json({success:false,error:"bad_request"},400)}
  const raw=Array.isArray(body.messages)?body.messages:typeof body.message==="string"?[{role:"user",content:body.message}]:[];
- const messages:Turn[]=raw.slice(-12).map((x:unknown)=>{const v=x as {role?:unknown;content?:unknown};return {role:v.role==="assistant"?"assistant":"user",content:clean(v.content,MAX)}}).filter(x=>x.content);
+ const messages:Turn[]=raw.slice(-12).map((x:unknown)=>{const v=x as {role?:unknown;content?:unknown};return {role:(v.role==="assistant"?"assistant":"user") as "assistant"|"user",content:clean(v.content,MAX)}}).filter(x=>x.content);
  if(!messages.length)return json({success:false,error:"bad_request"},400);
  const last=messages[messages.length-1];
  if(last.role!=="user"||last.content.length>MAX)return json({success:false,error:"message_too_long",reply:"Mesajınız en fazla 500 karakter olabilir."},400);
