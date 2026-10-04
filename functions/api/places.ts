@@ -245,7 +245,7 @@ async function nominatimFallback(env:Env,category:string,area:string,lat:number,
     for (const [i, x] of rows.entries()) {
       const la=Number(x.lat),lo=Number(x.lon),a=(x.address||{}) as Record<string,unknown>,extra=(x.extratags||{}) as Record<string,unknown>;
       const name=clean(x.name)||clean(x.namedetails&&typeof x.namedetails==='object'?(x.namedetails as Record<string,unknown>).name:undefined)||clean(x.display_name)?.split(',')[0];
-      if(!name||!Number.isFinite(la)||!Number.isFinite(lo))return null;
+      if(!name||!Number.isFinite(la)||!Number.isFinite(lo))continue;
       const p:Place={
         id:'nominatim-'+category+'-'+String(x.osm_type||'x')+'-'+String(x.osm_id??i),name,category,lat:la,lon:lo,
         address:clean([a.road,a.house_number,a.neighbourhood||a.suburb,a.district,a.city||a.town].filter(Boolean).join(' ')),
