@@ -4,6 +4,7 @@ import { onRequestPost as postEvents } from "../functions/api/events";
 import { onRequestGet as getAdmin, onRequestPost as postAdmin } from "../functions/api/admin";
 import { onRequestPost as postSubmissions } from "../functions/api/submissions";
 import { onRequestPost as postReports } from "../functions/api/reports";
+import { onRequestPost as postAiChat } from "../functions/api/ai";
 import type { Env } from "../functions/lib/types";
 import { ensureSchema } from "../functions/lib/schema";
 
@@ -31,6 +32,10 @@ export default {
         } catch {
           return Response.json({ ok: false, database: false, version: "2026.10.03" }, { status: 503 });
         }
+      }
+
+      if ((path === "/api/ai/chat" || path === "/api/ai") && request.method === "POST") {
+        return await postAiChat({ request, env });
       }
 
       if (path.startsWith("/api/") && env.DB) {
