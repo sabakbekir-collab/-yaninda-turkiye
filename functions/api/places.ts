@@ -210,7 +210,8 @@ async function nominatimFallback(env:Env,category:string,area:string,lat:number,
     const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':env.OSM_CONTACT_EMAIL?OSM_UA+' contact='+env.OSM_CONTACT_EMAIL:OSM_UA},signal:AbortSignal.timeout(7000)});
     if(!r.ok)return {places:[],ok:false};
     const rows=await r.json() as Array<Record<string,unknown>>;
-    const mapped:Array<Place|null>=rows.map((x,i)=>{
+    const mapped: Place[] = [];
+    for (const [i, x] of rows.entries()) {
       const la=Number(x.lat),lo=Number(x.lon),a=(x.address||{}) as Record<string,unknown>,extra=(x.extratags||{}) as Record<string,unknown>;
       const name=clean(x.name)||clean(x.namedetails&&typeof x.namedetails==='object'?(x.namedetails as Record<string,unknown>).name:undefined)||clean(x.display_name)?.split(',')[0];
       if(!name||!Number.isFinite(la)||!Number.isFinite(lo))return null;
@@ -221,12 +222,9 @@ async function nominatimFallback(env:Env,category:string,area:string,lat:number,
         website:clean(extra.website,300),operator:clean(extra.operator||extra.brand,160),
         source:'OpenStreetMap / Nominatim',distance:distance(lat,lon,la,lo),district:clean(a.district||a.suburb||a.town||a.city)
       };
-      return p.distance!<=radiusKm?p:null;
-    });
-    const result: Place[] = [];
-    for (const item of mapped) {
-      if (item !== null) result.push(item);
+      if (p.distance!<=radiusKm) mapped.push(p);
     }
+    const result: Place[] = mapped;
     result.sort((a,b)=>(a.distance??999)-(b.distance??999));
     if(result.length)await dbCachePut(env,key,result,15*60*1000);
     return {places:result,ok:true};
