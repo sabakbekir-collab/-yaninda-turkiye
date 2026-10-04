@@ -3,3 +3,5 @@
 .yai-launcher{z-index:20000!important;bottom:94px!important;background:#e52b32!important;border:2px solid #fff!important;color:#fff!important}
 .yai-overlay{z-index:20001!important}
 @media(max-width:760px){.yai-launcher{right:14px!important;bottom:94px!important}.yai-launcher span{display:inline!important}}
+
+.yai-results{display:flex;flex-direction:column;gap:8px;margin:8px 0}.yai-place{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:10px;display:flex;flex-direction:column;gap:4px}.yai-place>b{font-size:14px}.yai-place>em{font-style:normal;font-size:10px;font-weight:900;color:#e52b32}.yai-place>small{color:#687386}.yai-place a,.yai-route{display:inline-block;text-decoration:none;border:1px solid #ddd;border-radius:8px;padding:5px 8px;color:#17202d;background:#fff;font-size:12px;font-weight:800;margin-right:5px}.yai-route{display:block;text-align:center;background:#e52b32;color:#fff;border-color:#e52b32;margin:8px 0}
