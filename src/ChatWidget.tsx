@@ -4,11 +4,14 @@ import "./chat.css";
 
 type Msg={role:"user"|"assistant";content:string};
 type Place={name:string;address?:string;phone?:string;lat?:number;lon?:number;distance?:number;isDuty?:boolean};
-type Reply={reply?:string;places?:Place[];route?:{url:string;label:string}};\nconst distanceText=(km?:number)=>typeof km==="number"&&Number.isFinite(km)?(km<1?Math.round(km*1000)+" m":new Intl.NumberFormat("tr-TR",{maximumFractionDigits:1}).format(km)+" km"):"";
+type Reply={reply?:string;places?:Place[];route?:{url:string;label:string}};
+const distanceText=(km?:number)=>typeof km==="number"&&Number.isFinite(km)?(km<1?Math.round(km*1000)+" m":new Intl.NumberFormat("tr-TR",{maximumFractionDigits:1}).format(km)+" km"):"";
 
 export default function ChatWidget(){
  const [open,setOpen]=useState(false),[input,setInput]=useState(""),[loading,setLoading]=useState(false),[location,setLocation]=useState<{lat:number;lon:number}>();
- const [messages,setMessages]=useState<Msg[]>([{role:"assistant",content:"Merhaba 👋 Ben Yanımda AI. Yakınındaki hizmetleri bulabilir, yol tarifi konusunda yardımcı olabilir ve site içinde seni doğru yere yönlendirebilirim. Örneğin “Beyoğlu'na nasıl gidilir?” veya “yakınımdaki nöbetçi eczaneyi bul” diyebilirsin."}]);\n const [results,setResults]=useState<Place[]>([]);\n const [route,setRoute]=useState<Reply["route"]>();
+ const [messages,setMessages]=useState<Msg[]>([{role:"assistant",content:"Merhaba 👋 Ben Yanımda AI. Yakınındaki hizmetleri bulabilir, yol tarifi konusunda yardımcı olabilir ve site içinde seni doğru yere yönlendirebilirim. Örneğin “Beyoğlu'na nasıl gidilir?” veya “yakınımdaki nöbetçi eczaneyi bul” diyebilirsin."}]);
+ const [results,setResults]=useState<Place[]>([]);
+ const [route,setRoute]=useState<Reply["route"]>();
  const end=useRef<HTMLDivElement>(null);
  useEffect(()=>{end.current?.scrollIntoView({behavior:"smooth"})},[messages,loading]);
  useEffect(()=>{
@@ -23,7 +26,9 @@ export default function ChatWidget(){
   try{
    const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({messages:next,location})});
    const d=await r.json().catch(()=>({})) as Reply;
-   setMessages(m=>[...m,{role:"assistant",content:typeof d.reply==="string"?d.reply:"Şu anda cevap veremiyorum. Lütfen tekrar deneyin."}]);\n   if(Array.isArray(d.places))setResults(d.places);\n   if(d.route)setRoute(d.route);
+   setMessages(m=>[...m,{role:"assistant",content:typeof d.reply==="string"?d.reply:"Şu anda cevap veremiyorum. Lütfen tekrar deneyin."}]);
+   if(Array.isArray(d.places))setResults(d.places);
+   if(d.route)setRoute(d.route);
   }catch{setMessages(m=>[...m,{role:"assistant",content:"Bağlantı kurulamadı. Lütfen tekrar deneyin."}])}
   finally{setLoading(false)}
  }
