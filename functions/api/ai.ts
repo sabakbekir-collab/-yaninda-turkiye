@@ -30,7 +30,7 @@ async function openai(env:Env,messages:unknown[]){
 
 export async function onRequestPost({request,env}:{request:Request;env:Env}){
  if(!sameOrigin(request))return json({success:false,error:"forbidden"},403);
- if(!env.OPENAI_API_KEY)return json({success:false,error:"ai_not_configured",reply:"Şu anda AI yardımcımıza ulaşılamıyor. Lütfen biraz sonra tekrar deneyin."},503);
+ 
  let body:ChatBody;
  try{body=await request.json() as ChatBody}catch{return json({success:false,error:"bad_request"},400)}
  const raw=Array.isArray(body.messages)?body.messages:typeof body.message==="string"?[{role:"user",content:body.message}]:[];
@@ -43,9 +43,9 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
  try{
    const text=last.content.toLocaleLowerCase("tr-TR");
    const asksNearby=/yakınım|yakınımdaki|en yakın|yakında|eczane|hastane|market|restoran|atm|akaryakıt|fırın|taksi|otel|polis|itfaiye|kargo/.test(text);
-   const asksRoute=/nasıl gider|nasıl gidilir|nasıl gidebilirim|yol tarifi|ulaşım|hangi otobüs|hangi metro|hangi tramvay/.test(text);
+   const asksRoute=/nasıl gider|nasıl gidilir|nasıl gidebilirim|nasıl gidiyor|nasıl gidiliyor|yol tarifi|ulaşım|hangi otobüs|hangi metro|hangi tramvay/.test(text);
    const loc=body.location as {lat?:number;lon?:number}|undefined;
-   if(asksNearby&&env.DB&&loc&&Number.isFinite(loc.lat)&&Number.isFinite(loc.lon)){
+   if(asksNearby&&loc&&Number.isFinite(loc.lat)&&Number.isFinite(loc.lon)){
      const category=/eczane/.test(text)?"pharmacy":/hastane/.test(text)?"hospital":/market/.test(text)?"market":/restoran/.test(text)?"restaurant":/atm/.test(text)?"atm":/akaryakıt/.test(text)?"fuel":/fırın/.test(text)?"bakery":/taksi/.test(text)?"taxi":/otel/.test(text)?"hotel":/polis/.test(text)?"police":/itfaiye/.test(text)?"fire_station":/kargo/.test(text)?"cargo":"service";
      const u=new URL("/api/places",request.url);u.searchParams.set("category",category);u.searchParams.set("lat",String(loc.lat));u.searchParams.set("lon",String(loc.lon));u.searchParams.set("radius","5");
      const res=await getPlaces({request:new Request(u.toString(),{method:"GET"}),env});const data=await res.json() as unknown;
@@ -57,7 +57,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
      const origin=loc&&Number.isFinite(loc.lat)&&Number.isFinite(loc.lon)?`&origin=${loc.lat},${loc.lon}`:"";
      context+=`\nYOL TARİFİ İSTEĞİ: Hedef=${target}. Google Maps bağlantısı: https://www.google.com/maps/dir/?api=1${origin}&destination=${destination}. Toplu taşıma için resmi İETT "Nasıl Giderim?" sayfası: https://iett.istanbul/ .`;
    }
-   const reply=await openai(env,[{role:"system",content:SYSTEM+(context?"\n\n"+context:"")},...messages]);
+   const reply=env.OPENAI_API_KEY?await openai(env,[{role:"system",content:SYSTEM+(context?"\n\n"+context:"")},...messages]):(asksRoute?"Yol tarifini hazırladım. Aşağıdaki butona dokunarak haritada açabilirsin.":places.length?"Konumuna göre sonuçları buldum. Aşağıdaki kayıtlardan istediğini seçebilirsin.":"Konumunu kullanırsan sana en yakın hizmetleri bulabilirim.");
    const route=asksRoute?{url:"https://www.google.com/maps/dir/?api=1"+(loc&&Number.isFinite(loc.lat)&&Number.isFinite(loc.lon)?`&origin=${loc.lat},${loc.lon}`:"")+"&destination="+encodeURIComponent((last.content.match(/(?:Beyoğlu|Taksim|Kadıköy|Eminönü|Şişli|Beşiktaş)/i)?.[0]||"Beyoğlu")+", İstanbul"),label:"Yol tarifini aç"}:undefined;
    return json({success:true,reply,places,route});
  }catch(e){console.error("Yanımda AI error",e instanceof Error?e.message:"unknown");return json({success:false,error:"ai_unavailable",reply:"Şu anda AI yardımcımıza ulaşılamıyor. Lütfen tekrar deneyin."},503)}
