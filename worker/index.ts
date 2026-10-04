@@ -5,6 +5,7 @@ import { onRequestGet as getAdmin, onRequestPost as postAdmin } from "../functio
 import { onRequestPost as postSubmissions } from "../functions/api/submissions";
 import { onRequestPost as postReports } from "../functions/api/reports";
 import { onRequestPost as postAiChat } from "../functions/api/ai";
+import { onRequestPost as postAdminAi } from "../functions/api/admin-ai";
 import type { Env } from "../functions/lib/types";
 import { ensureSchema } from "../functions/lib/schema";
 
@@ -32,6 +33,10 @@ export default {
         } catch {
           return Response.json({ ok: false, database: false, version: "2026.10.03" }, { status: 503 });
         }
+      }
+
+      if (path === "/api/admin/ai" && request.method === "POST") {
+        return await postAdminAi({ request, env });
       }
 
       if ((path === "/api/ai/chat" || path === "/api/ai") && request.method === "POST") {
