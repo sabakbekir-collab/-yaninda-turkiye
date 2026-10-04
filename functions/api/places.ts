@@ -157,8 +157,53 @@ async function dutyPharmacies(env:Env,province:string,district:string,lat:number
       });
     }
     places.sort((a,b)=>(a.distance??999)-(b.distance??999));
-    return {places,ok:true};
-  }catch{return {places:[],ok:false}}
+    // GPS endpoint can legitimately return an empty list even when the
+    // district has duty pharmacies. In that case the city/district feed is
+    // the reliable fallback; never turn a temporary nearest-search miss
+    // into a false "0 pharmacies" result.
+    if(places.length>0)return {places,ok:true};
+  }catch{}
+
+  // Fallback: use the province/district duty feed and calculate distance
+  // ourselves from the returned coordinates.
+  if(province){
+    const fallbackUrl=new URL('https://eczaneadresi.com/api/public/v1/duty-pharmacies');
+    fallbackUrl.searchParams.set('city',slug(province));
+    if(district)fallbackUrl.searchParams.set('district',slug(district));
+    fallbackUrl.searchParams.set('limit','200');
+    try{
+      const r=await fetch(fallbackUrl,{headers:{Accept:'application/json',User-Agent:OSM_UA},signal:AbortSignal.timeout(10000)});
+      if(r.ok){
+        const data=await r.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
+        if(Array.isArray(data.pharmacies)){
+          const fallbackPlaces:Place[]=[];
+          for(const [i,x] of data.pharmacies.entries()){
+            const la=Number(x.lat??x.latitude),lo=Number(x.lng??x.lon??x.longitude);
+            const name=clean(x.name);
+            if(!name||!Number.isFinite(la)||!Number.isFinite(lo))continue;
+            const d=distance(lat,lon,la,lo);
+            if(d>radiusKm)continue;
+            fallbackPlaces.push({
+              id:'duty-pharmacy-fallback-'+String(x.id??i),
+              name,category:'pharmacy',lat:la,lon:lo,
+              address:clean(x.address),phone:clean(x.phone,60),
+              openingHours:clean(x.hours||x.opening_hours||x.duty_hours,180),
+              source:'Eczane Adresi — nöbet verisi',
+              distance:d,
+              district:clean(x.district)||district||undefined,
+              isDuty:true,
+              officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
+              verifiedAt:data.date||new Date().toISOString(),
+              dutyUpdatedAt:new Date().toISOString()
+            });
+          }
+          fallbackPlaces.sort((a,b)=>(a.distance??999)-(b.distance??999));
+          return {places:fallbackPlaces,ok:true};
+        }
+      }
+    }catch{}
+  }
+  return {places:[],ok:true}
 }
 
 async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean}>{
