@@ -1,3 +1,4 @@
+// Yanımda Türkiye places.ts — strict-null-safe production build
 import type {Env,Place} from '../lib/types';
 import {isCentralDistrict,trSlug} from '../../src/text';
 
