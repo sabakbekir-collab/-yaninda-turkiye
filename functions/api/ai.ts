@@ -52,13 +52,13 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
      if(res.ok&&Array.isArray(data)){places.push(...(data as Place[]).slice(0,5));context="Gerçek yakınlık sonuçları:\n"+places.map(p=>`${p.name} — ${p.address||"adres yok"}${p.phone?" — "+p.phone:""}`).join("\n")}
    }
    if(asksRoute){
-     const target=last.content.replace(/.*?(nasıl gider|nasıl gidilir|nasıl gidebilirim|yol tarifi|ulaşım)/i,"").replace(/^(?:de|da|mi|mı|mu|mü)?\s*/i,"").trim()||"Beyoğlu, İstanbul";
+     const targetMatch=last.content.match(/(?:beyoğlu|taksim|kadıköy|eminönü|şişli|beşiktaş|fatih|üsküdar|sarıyer|levent|maslak|ayazağa|istanbul|ankara|izmir)/i);\n     const target=targetMatch?.[0]||last.content.replace(/.*?(nasıl gider|nasıl gidilir|nasıl gidebilirim|nasıl gidiyor|nasıl gidiliyor|yol tarifi|ulaşım)/i,"").replace(/^(?:de|da|mi|mı|mu|mü)?\s*/i,"").trim()||"Beyoğlu";
      const destination=encodeURIComponent(target+", İstanbul");
      const origin=loc&&Number.isFinite(loc.lat)&&Number.isFinite(loc.lon)?`&origin=${loc.lat},${loc.lon}`:"";
      context+=`\nYOL TARİFİ İSTEĞİ: Hedef=${target}. Google Maps bağlantısı: https://www.google.com/maps/dir/?api=1${origin}&destination=${destination}. Toplu taşıma için resmi İETT "Nasıl Giderim?" sayfası: https://iett.istanbul/ .`;
    }
    const reply=env.OPENAI_API_KEY?await openai(env,[{role:"system",content:SYSTEM+(context?"\n\n"+context:"")},...messages]):(asksRoute?"Yol tarifini hazırladım. Aşağıdaki butona dokunarak haritada açabilirsin.":places.length?"Konumuna göre sonuçları buldum. Aşağıdaki kayıtlardan istediğini seçebilirsin.":"Konumunu kullanırsan sana en yakın hizmetleri bulabilirim.");
-   const route=asksRoute?{url:"https://www.google.com/maps/dir/?api=1"+(loc&&Number.isFinite(loc.lat)&&Number.isFinite(loc.lon)?`&origin=${loc.lat},${loc.lon}`:"")+"&destination="+encodeURIComponent((last.content.match(/(?:Beyoğlu|Taksim|Kadıköy|Eminönü|Şişli|Beşiktaş)/i)?.[0]||"Beyoğlu")+", İstanbul"),label:"Yol tarifini aç"}:undefined;
+   const route=asksRoute?{url:"https://www.google.com/maps/dir/?api=1"+(loc&&Number.isFinite(loc.lat)&&Number.isFinite(loc.lon)?`&origin=${loc.lat},${loc.lon}`:"")+"&destination="+encodeURIComponent((last.content.match(/(?:Beyoğlu|Taksim|Kadıköy|Eminönü|Şişli|Beşiktaş|Fatih|Üsküdar|Sarıyer|Levent|Maslak|Ayazağa|İstanbul|Ankara|İzmir)/i)?.[0]||"Beyoğlu")+", İstanbul"),label:"Yol tarifini aç"}:undefined;
    return json({success:true,reply,places,route});
  }catch(e){console.error("Yanımda AI error",e instanceof Error?e.message:"unknown");return json({success:false,error:"ai_unavailable",reply:"Şu anda AI yardımcımıza ulaşılamıyor. Lütfen tekrar deneyin."},503)}
 }
