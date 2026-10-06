@@ -7,14 +7,14 @@ export type LocationPermissionState = 'granted' | 'denied' | 'prompt' | 'unsuppo
 
 export class LocationError extends Error {
   code: LocationErrorCode;
-  constructor(code: LocationErrorCode, message: string = code) {
+  constructor(code: LocationErrorCode, message = code) {
     super(message);
     this.name = 'LocationError';
     this.code = code;
   }
 }
 
-const CACHE_KEY = 'yt-location-v4';
+const CACHE_KEY = 'yt-location-v5';
 const CACHE_MAX_AGE = 10 * 60 * 1000;
 
 function isValidPosition(position?: Position): position is Position {
@@ -23,7 +23,7 @@ function isValidPosition(position?: Position): position is Position {
     Number.isFinite(position.lat) &&
     Number.isFinite(position.lon) &&
     Math.abs(position.lat) <= 90 &&
-    Math.abs(position.lon) <= 180
+    Math.abs(position.lon) <= 180,
   );
 }
 
@@ -64,17 +64,116 @@ export async function getLocationPermissionState(): Promise<LocationPermissionSt
     }
   }
 
-  if (typeof navigator === 'undefined' || !('geolocation' in navigator)) return 'unsupported';
-  if (!('permissions' in navigator)) return 'prompt';
+  if (typeof navigator === 'undefined' || !navigator.geolocation) return 'unsupported';
+  if (!navigator.permissions?.query) return 'prompt';
 
   try {
     const p = await navigator.permissions.query({ name: 'geolocation' });
     return p.state;
   } catch {
-    // Safari may expose geolocation while not exposing Permissions API
-    // consistently. Treat that as "prompt" and let the actual GPS request
-    // decide whether permission is granted.
+    // Safari can expose geolocation while its Permissions API behaves differently.
     return 'prompt';
+  }
+}
+
+function browserGpsPosition(enableHighAccuracy: boolean, timeout: number): Promise<Position> {
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const position = { lat: coords.latitude, lon: coords.longitude };
+        if (!isValidPosition(position)) {
+          reject(new LocationError('unavailable'));
+          return;
+        }
+        cacheLocation(position);
+        resolve(position);
+      },
+      error => reject(mapError(error.code)),
+      {
+        enableHighAccuracy,
+        timeout,
+        // The explicit button must request a fresh device position.
+        maximumAge: 0,
+      },
+    );
+  });
+}
+
+/**
+ * Cloudflare's request geolocation is an approximate IP/Wi-Fi edge location.
+ * It is only a recovery path after GPS/network positioning fails. We never
+ * silently bypass an explicit browser permission denial.
+ */
+async function cloudflareLocation(): Promise<Position> {
+  const response = await fetch('/api/location?t=' + Date.now(), {
+    method: 'GET',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+
+  if (!response.ok) throw new LocationError('unavailable');
+
+  const data = await response.json() as { latitude?: unknown; longitude?: unknown };
+  const position = { lat: Number(data.latitude), lon: Number(data.longitude) };
+
+  if (!isValidPosition(position)) throw new LocationError('unavailable');
+  cacheLocation(position);
+  return position;
+}
+
+async function browserLocation(forceFresh = false): Promise<Position> {
+  if (!window.isSecureContext) {
+    throw new LocationError('unsupported', 'Konum için HTTPS bağlantısı gerekir.');
+  }
+  if (!navigator.geolocation) {
+    throw new LocationError('unsupported', 'Bu tarayıcı konum özelliğini desteklemiyor.');
+  }
+
+  if (!forceFresh) {
+    const cached = readCachedLocation();
+    if (cached) return cached;
+  }
+
+  const permission = await getLocationPermissionState();
+  if (permission === 'denied') {
+    throw new LocationError(
+      'permission_denied',
+      'Konum izni kapalı. Safari için Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri bölümünü kontrol edin.',
+    );
+  }
+
+  let lastError: unknown;
+  try {
+    // Fast first attempt: iPhone can return Wi-Fi/cell location without waiting
+    // for a full GPS fix.
+    return await browserGpsPosition(false, 10000);
+  } catch (error) {
+    lastError = error;
+  }
+
+  if (lastError instanceof LocationError && lastError.code === 'permission_denied') {
+    throw lastError;
+  }
+
+  try {
+    // One short high-accuracy retry, then fall back instead of making the user
+    // wait 45 seconds.
+    return await browserGpsPosition(true, 12000);
+  } catch (error) {
+    lastError = error;
+  }
+
+  if (lastError instanceof LocationError && lastError.code === 'permission_denied') {
+    throw lastError;
+  }
+
+  try {
+    // This makes "Konumumu Kullan" useful even when Safari/iOS reports
+    // POSITION_UNAVAILABLE or TIMEOUT despite permission being enabled.
+    return await cloudflareLocation();
+  } catch {
+    if (lastError instanceof LocationError) throw lastError;
+    throw new LocationError('unavailable');
   }
 }
 
@@ -84,11 +183,9 @@ async function nativeLocation(): Promise<Position> {
   if (permissions.location === 'denied') {
     throw new LocationError('permission_denied');
   }
-
   if (permissions.location !== 'granted') {
     permissions = await Geolocation.requestPermissions();
   }
-
   if (permissions.location !== 'granted') {
     throw new LocationError('permission_denied');
   }
@@ -96,7 +193,7 @@ async function nativeLocation(): Promise<Position> {
   try {
     const result = await Geolocation.getCurrentPosition({
       enableHighAccuracy: false,
-      timeout: 15000,
+      timeout: 12000,
       maximumAge: 0,
     });
     const position = { lat: result.coords.latitude, lon: result.coords.longitude };
@@ -104,14 +201,11 @@ async function nativeLocation(): Promise<Position> {
     cacheLocation(position);
     return position;
   } catch (firstError) {
-    if (firstError instanceof LocationError && firstError.code === 'permission_denied') {
-      throw firstError;
-    }
-
+    if (firstError instanceof LocationError && firstError.code === 'permission_denied') throw firstError;
     try {
       const result = await Geolocation.getCurrentPosition({
         enableHighAccuracy: true,
-        timeout: 25000,
+        timeout: 15000,
         maximumAge: 0,
       });
       const position = { lat: result.coords.latitude, lon: result.coords.longitude };
@@ -127,115 +221,6 @@ async function nativeLocation(): Promise<Position> {
   }
 }
 
-function browserGpsPosition(
-  enableHighAccuracy: boolean,
-  timeout: number,
-): Promise<Position> {
-  return new Promise<Position>((resolve, reject) => {
-    navigator.geolocation.getCurrentPosition(
-      ({ coords }) => {
-        const position = { lat: coords.latitude, lon: coords.longitude };
-        if (!isValidPosition(position)) {
-          reject(new LocationError('unavailable'));
-          return;
-        }
-        cacheLocation(position);
-        resolve(position);
-      },
-      error => reject(mapError(error.code)),
-      {
-        enableHighAccuracy,
-        timeout,
-        // A "Konumumu Kullan" click must request a fresh position.
-        maximumAge: 0,
-      },
-    );
-  });
-}
-
-/**
- * Last-resort location from Cloudflare's request geolocation.
- *
- * This is deliberately NOT used when the user explicitly denied browser
- * location permission. It is only a recovery path for Safari/OS GPS failures
- * such as POSITION_UNAVAILABLE or TIMEOUT. It is approximate (IP based), but
- * prevents the whole nearby feature from becoming unusable.
- */
-async function cloudflareLocation(): Promise<Position> {
-  const response = await fetch('/api/location', {
-    method: 'GET',
-    cache: 'no-store',
-    headers: { Accept: 'application/json' },
-  });
-
-  if (!response.ok) throw new LocationError('unavailable');
-
-  const data = (await response.json()) as {
-    latitude?: unknown;
-    longitude?: unknown;
-  };
-
-  const position = {
-    lat: Number(data.latitude),
-    lon: Number(data.longitude),
-  };
-
-  if (!isValidPosition(position)) throw new LocationError('unavailable');
-
-  cacheLocation(position);
-  return position;
-}
-
-async function browserLocation(forceFresh = false): Promise<Position> {
-  if (!window.isSecureContext) {
-    throw new LocationError('unsupported', 'Konum için güvenli (HTTPS) bağlantı gerekir.');
-  }
-
-  if (!('geolocation' in navigator)) {
-    throw new LocationError('unsupported', 'Bu tarayıcı konum özelliğini desteklemiyor.');
-  }
-
-  // Only the automatic page-start lookup may use the short-lived cache.
-  // The button always forces a fresh GPS reading.
-  if (!forceFresh) {
-    const cached = readCachedLocation();
-    if (cached) return cached;
-  }
-
-  const permission = await getLocationPermissionState();
-  if (permission === 'denied') {
-    throw new LocationError('permission_denied', 'Konum izni kapalı.');
-  }
-
-  try {
-    // First ask for a normal GPS/network location. This is more reliable on
-    // iPhone than forcing high accuracy immediately.
-    return await browserGpsPosition(false, 15000);
-  } catch (firstError) {
-    if (firstError instanceof LocationError && firstError.code === 'permission_denied') {
-      throw firstError;
-    }
-
-    try {
-      // Retry once with GPS hardware enabled and a longer timeout.
-      return await browserGpsPosition(true, 30000);
-    } catch (secondError) {
-      if (secondError instanceof LocationError && secondError.code === 'permission_denied') {
-        throw secondError;
-      }
-
-      // Safari sometimes reports TIMEOUT/POSITION_UNAVAILABLE even though the
-      // site has permission. Recover with Cloudflare's approximate location.
-      try {
-        return await cloudflareLocation();
-      } catch {
-        if (secondError instanceof LocationError) throw secondError;
-        throw new LocationError('unavailable');
-      }
-    }
-  }
-}
-
 export async function getCurrentLocation(options: { forceFresh?: boolean } = {}): Promise<Position> {
   if (Capacitor.isNativePlatform()) {
     if (!options.forceFresh) {
@@ -244,15 +229,13 @@ export async function getCurrentLocation(options: { forceFresh?: boolean } = {})
     }
     return nativeLocation();
   }
-
   return browserLocation(Boolean(options.forceFresh));
 }
 
 export function clearCachedLocation() {
   try {
     localStorage.removeItem(CACHE_KEY);
-    // Remove the previous cache version too, so an old location can never be
-    // reused after this fix is deployed.
+    localStorage.removeItem('yt-location-v4');
     localStorage.removeItem('yt-location-v3');
   } catch {}
 }
