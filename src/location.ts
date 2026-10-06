@@ -7,7 +7,7 @@ export type LocationPermissionState = 'granted' | 'denied' | 'prompt' | 'unsuppo
 
 export class LocationError extends Error {
   code: LocationErrorCode;
-  constructor(code: LocationErrorCode, message = code) {
+  constructor(code: LocationErrorCode, message: string = code) {
     super(message);
     this.name = 'LocationError';
     this.code = code;
