@@ -86,11 +86,45 @@ const quick:[string,string,LucideIcon,string][]=[
 
 function Home(){
  const nav=useNavigate(); const[q,setQ]=useState('');
- const go=(id:string)=>id==='emergency'?nav('/emergency'):id==='service'?nav('/services'):nav('/nearby',{state:{category:id}});
- const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();nav('/nearby',{state:{query,category:resolveSearchCategory(query)}})};
- return <main className="yt-home"><section className="yt-hero"><div className="yt-hero-bg" style={{backgroundImage:`url(${imgs.hero})`}}><div className="yt-hero-overlay"><div><h1>Türkiye'de<br/>İhtiyacın Olan<br/><b>Her Şey Şimdi Yanında.</b></h1><p>Sağlık, güvenlik, ulaşım, günlük ihtiyaçlar ve daha fazlası.<br/>Bul, doğrula, yolunu kolaylaştır.</p></div><form className="yt-hero-search" onSubmit={search}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Ne arıyorsunuz? (Eczane, ATM, Hastane...)"/><button>Ara</button></form></div><div className="hero-ad"><Ad kind="top"/></div></div></section><section className="quick-grid">{quick.map(([id,label,Icon,c])=><button key={id} onClick={()=>go(id)} className={c}><span><Icon/></span><b>{label}</b></button>)}<button onClick={()=>go('service')} className="more"><span>•••</span><b>Tüm Hizmetler</b></button></section><section className="yt-section"><div className="yt-section-head"><h2>Yakınındaki Popüler Hizmetler</h2><button onClick={()=>go('service')}>Tümünü Gör <ArrowRight/></button></div><div className="popular-grid">{[['Eczaneler','Yakınındaki eczaneler','pharmacy'],['Hastaneler','En Yakın Hastaneler','hospital'],["ATM'ler",'Tüm Bankalar','atm'],['Akaryakıt İstasyonları','En Yakın Benzinciler','fuel'],['Marketler','Zincir Marketler','market'],['Fırınlar','Taze ve Yakın','bakery'],['Ulaşım','Otobüs, Metro, Taksi','transport']].map(([a,b,k])=><button key={a} onClick={()=>go(k)}><img src={imgs[k as keyof typeof imgs]} alt=""/><strong>{a}</strong><small>{b}</small></button>)}</div></section><Ad kind="mid"/><section className="yt-section live-cta"><div><span>CANLI VERİ</span><h2>Nöbetçi eczaneleri konumuna göre bul</h2><p>Sonuçları mesafeye göre sıralarız. Nöbetçi verisi güncel kaynaktan alınır; eczaneye gitmeden önce telefonla teyit et.</p></div><button onClick={()=>go('pharmacy')}><LocateFixed/> Eczaneleri Bul</button></section><Ad kind="bottom"/></main>
+ const go=(id:string)=>id==='emergency'?nav('/emergency'):nav('/nearby',{state:{category:id}});
+ const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query)nav('/nearby',{state:{query,category:resolveSearchCategory(query)}})};
+ const cards=[
+  ['pharmacy','Nöbetçi Eczaneler','Yakınınızdaki nöbetçi eczaneleri görüntüleyin','red',Pill,imgs.pharmacy],
+  ['hospital','Hastaneler','En yakın hastaneler, poliklinikler ve aciller','blue',Hospital,imgs.hospital],
+  ['atm','ATM','En yakın ATM’leri bul','navy',Banknote,undefined],
+  ['fuel','Akaryakıt','En yakın istasyonlar','red',Fuel,imgs.fuel],
+  ['transport','Ulaşım','Otobüs, metro, durak ve hat bilgileri','navy',Bus,imgs.transport],
+  ['market','Marketler','Yakındaki market ve süpermarketler','red',Store,imgs.market],
+  ['restaurant','Restoranlar','Lezzet duraklarını keşfedin','orange',Utensils,undefined],
+  ['service','Usta Hizmetleri','Güvenilir ustalar yanınızda','red',Wrench,undefined]
+ ] as const;
+ return <main className="yt-home yt-modern-home">
+   <section className="modern-home-head">
+    <div className="modern-brand-block"><div className="modern-brand-mark"><MapPin fill="currentColor"/></div><div><strong>YANINDA <i>TÜRKİYE</i></strong><small>Yaşamını kolaylaştıran hizmetler tek yerde</small></div></div>
+    <button className="modern-location-chip" onClick={()=>nav('/nearby')}><MapPin/><span>{readHeaderLocation()}</span><ChevronRight/></button>
+    <button className="modern-notify" aria-label="Bildirimler"><Bell/></button>
+   </section>
+   <form className="modern-search" onSubmit={search}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Eczane, hastane, restoran, usta..."/><button type="button" aria-label="Sesli arama">●</button></form>
+   <button className="modern-use-location" onClick={()=>nav('/nearby')}><span><MapPin fill="currentColor"/></span><div><b>Konumumu Kullan</b><small>Yakınımdaki tüm hizmetleri hemen göster</small></div><Navigation/></button>
+   <section className="modern-section">
+    <div className="modern-section-title"><h2>Hızlı işlemler</h2><button onClick={()=>nav('/services')}>Tümünü Gör <ChevronRight/></button></div>
+    <div className="modern-quick">
+      <button onClick={()=>nav('/emergency')}><Siren/><b>Acil</b></button>
+      <button onClick={()=>nav('/nearby',{state:{query:"Beyoğlu'na nasıl gidilir?"}})}><Navigation/><b>Yol Tarifi</b></button>
+      <button onClick={()=>nav('/favorites')}><Heart/><b>Favorilerim</b></button>
+      <button onClick={()=>{if(navigator.share)navigator.share({title:'Yanımda Türkiye',text:'Yanımda Türkiye'});else void navigator.clipboard?.writeText(location.href)}}><ExternalLink/><b>Paylaş</b></button>
+    </div>
+   </section>
+   <section className="modern-service-list">
+    {cards.map(([id,title,text,tone,Icon,img])=><button key={id} className={"modern-service-card "+tone} onClick={()=>go(id)}>
+      <span className="modern-service-icon"><Icon/></span><div><strong>{title}</strong><small>{text}</small></div>{img&&<img src={img} alt=""/>}<span className="modern-card-arrow"><ChevronRight/></span>
+    </button>)}
+   </section>
+   <button className="modern-map-promo" onClick={()=>nav('/nearby?view=map')}>
+     <span className="modern-map-art"><MapIcon/><MapPin/></span><div><em>DAHA FAZLASI</em><strong>Yakınındaki tüm hizmetleri haritada gör</strong></div><ChevronRight/>
+   </button>
+ </main>
 }
-
 type NearbyMemory={category?:string;province?:string;district?:string;radius?:number;nearbyDistricts?:boolean};
 function readNearbyMemory():NearbyMemory{
   try{const raw=localStorage.getItem('yt-nearby-selection-v5');if(!raw)return {};const value=JSON.parse(raw) as NearbyMemory;return value&&typeof value==='object'?value:{};}catch{return {}}
