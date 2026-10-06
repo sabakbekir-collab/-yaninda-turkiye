@@ -232,18 +232,33 @@ function Nearby(){
  };
 
  const locate=async()=>{
+   if(loading)return;
    try{
      setErr('');
-     const current=await getCurrentLocation();
+     setLoading(true);
+     // The button must always request a fresh device position. Never reuse
+     // an old cached coordinate when the user explicitly taps "Konumumu Kullan".
+     const current=await getCurrentLocation({forceFresh:true});
      setLocationState('granted');
      setPos(current);
+     setProvince('');
+     setDistrict('');
      setHasSearched(true);
-     // IMPORTANT: location search no longer clears the user's manual province/district.
-     setSubmitted({category:cat,province:canonProvince,district:canonDistrict,radius,nearbyDistricts,pos:current});
+     setSubmitted({category:cat,province:'',district:'',radius,nearbyDistricts,pos:current});
    }catch(e){
      const denied=e instanceof LocationError&&e.code==='permission_denied';
+     const unsupported=e instanceof LocationError&&e.code==='unsupported';
      if(denied)setLocationState('denied');
-     setErr(denied?'Konum izni kapalı. İl / ilçe seçerek arama yapabilirsin; tekrar izin istemeyeceğiz.':'Konum alınamadı. İl / ilçe seçerek arama yapabilirsin.');
+     if(unsupported)setLocationState('unsupported');
+     setErr(
+       denied
+         ? 'Konum izni kapalı. iPhone Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri → Safari yolundan izin verip tekrar deneyin.'
+         : unsupported
+           ? 'Bu tarayıcı konum özelliğini kullanamıyor. HTTPS bağlantısını ve Safari konum iznini kontrol edin.'
+           : 'GPS konumu alınamadı. Tekrar deneyin; gerekirse il / ilçe seçerek devam edebilirsiniz.'
+     );
+   }finally{
+     setLoading(false);
    }
  };
 
