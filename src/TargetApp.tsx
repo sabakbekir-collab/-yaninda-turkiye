@@ -13,6 +13,10 @@ import {getCurrentLocation,getLocationPermissionState,LocationError} from './loc
 import type {Place,Position} from './types';
 import ChatWidget from './ChatWidget';
 import AdminAI from './AdminAI';
+import FavoritesPage from './FavoritesPage';
+import EnhancedPlaceCard from './PlaceCard';
+import {getTheme,applyTheme,saveTheme} from './theme';
+import {shareText,mapsLink} from './share';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
@@ -55,12 +59,13 @@ trend:'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit
 
 
 function Header(){
- const nav=useNavigate(); const location=useLocation(); const[q,setQ]=useState(''); const[selection,setSelection]=useState(readHeaderLocation());
+ const nav=useNavigate(); const location=useLocation(); const[q,setQ]=useState(''); const[selection,setSelection]=useState(readHeaderLocation()); const[theme,setTheme]=useState(getTheme);
+ useEffect(()=>{applyTheme(theme)},[theme]);
  useEffect(()=>{const refresh=()=>setSelection(readHeaderLocation()); window.addEventListener('storage',refresh); window.addEventListener('yt-nearby-memory',refresh); refresh(); return()=>{window.removeEventListener('storage',refresh);window.removeEventListener('yt-nearby-memory',refresh)}},[]);
  const nearbyActive=location.pathname==='/nearby'&&new URLSearchParams(location.search).get('view')!=='map';
  const mapActive=location.pathname==='/nearby'&&new URLSearchParams(location.search).get('view')==='map';
  const submitSearch=(e:FormEvent)=>{e.preventDefault();const query=q.trim();if(query)nav('/nearby',{state:{query}})};
- return <header className="yt-header"><div className="yt-head"><NavLink to="/" className="yt-logo"><span><MapPin fill="currentColor"/></span><b>YANINDA <i>TÜRKİYE</i></b></NavLink><form className="yt-search" onSubmit={submitSearch}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Ne arıyorsunuz? (Eczane, ATM, Hastane...)"/><span><MapPin/> {selection}</span><button type="submit">Ara</button></form><div className="yt-actions"><button type="button" aria-label="Tema"><span aria-hidden="true">☀</span></button><NavLink to="/admin">Giriş Yap</NavLink><button type="button" onClick={()=>nav('/menu')} aria-label="Menüyü aç"><Menu/></button></div></div><nav className="yt-nav"><NavLink to="/">⌂ Ana Sayfa</NavLink><NavLink className={nearbyActive?'active':''} to="/nearby"><Compass/>Yakınımda</NavLink><NavLink className={mapActive?'active':''} to="/nearby?view=map"><MapIcon/>Harita</NavLink><NavLink className="danger" to="/emergency"><Siren/>Acil</NavLink><NavLink to="/favorites"><Heart/>Favoriler</NavLink><NavLink to="/news"><Landmark/>Haberler</NavLink><NavLink to="/contact"><Phone/>İletişim</NavLink></nav></header>
+ return <header className="yt-header"><div className="yt-head"><NavLink to="/" className="yt-logo"><span><MapPin fill="currentColor"/></span><b>YANINDA <i>TÜRKİYE</i></b></NavLink><form className="yt-search" onSubmit={submitSearch}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Ne arıyorsunuz? (Eczane, ATM, Hastane...)"/><span><MapPin/> {selection}</span><button type="submit">Ara</button></form><div className="yt-actions"><button type="button" aria-label="Tema" onClick={()=>{const next=theme==="dark"?"light":"dark";setTheme(next);saveTheme(next)}}><span aria-hidden="true">{theme==="dark"?"☀":"🌙"}</span></button><NavLink to="/admin">Giriş Yap</NavLink><button type="button" onClick={()=>nav('/menu')} aria-label="Menüyü aç"><Menu/></button></div></div><nav className="yt-nav"><NavLink to="/">⌂ Ana Sayfa</NavLink><NavLink className={nearbyActive?'active':''} to="/nearby"><Compass/>Yakınımda</NavLink><NavLink className={mapActive?'active':''} to="/nearby?view=map"><MapIcon/>Harita</NavLink><NavLink className="danger" to="/emergency"><Siren/>Acil</NavLink><NavLink to="/favorites"><Heart/>Favoriler</NavLink><NavLink to="/news"><Landmark/>Haberler</NavLink><NavLink to="/contact"><Phone/>İletişim</NavLink></nav></header>
 }
 
 function MobileNav(){
@@ -318,10 +323,10 @@ function Nearby(){
 
    {loading?<div className="results skeleton-results">{[1,2,3].map(i=><div className="nearby-skeleton" key={i}/>)}</div>:
     view==='map'&&places[0]?<div className="map"><MapContainer center={[places[0].lat,places[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{places.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:
-    <div className="results">{places.length?places.map(p=><PlaceCard key={p.id} p={p}/>):<div className="empty nearby-empty"><MapPin/><h3>{hasSearched?'Bu bölgede kayıt bulunamadı':'Arama yapmaya hazır'}</h3><p>{hasSearched?'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.':'İl / ilçe seçip Yakınımdakileri Bul’a bas veya konumunu kullan.'}</p><button onClick={hasSearched?search:locate}>{hasSearched?<Search/>:<LocateFixed/>}{hasSearched?'Tekrar Ara':'Konumumu Kullan'}</button></div>}</div>}
+    <div className="results">{places.length?places.map(p=><EnhancedPlaceCard key={p.id} p={p}/>):<div className="empty nearby-empty"><MapPin/><h3>{hasSearched?'Bu bölgede kayıt bulunamadı':'Arama yapmaya hazır'}</h3><p>{hasSearched?'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.':'İl / ilçe seçip Yakınımdakileri Bul’a bas veya konumunu kullan.'}</p><button onClick={hasSearched?search:locate}>{hasSearched?<Search/>:<LocateFixed/>}{hasSearched?'Tekrar Ara':'Konumumu Kullan'}</button></div>}</div>}
  </main>
 }
-function PlaceCard({p}:{p:Place}){
+function LegacyPlaceCard({p}:{p:Place}){
  const Icon=categoryIcon(p.category);
  return <article className={'place nearby-place-card'+(p.isDuty?' duty-place':'')}>
    <div className="place-icon category-place-icon"><Icon/></div>
@@ -353,7 +358,13 @@ function Emergency(){
      {items.map(([n,t,s])=><a key={n} href={'tel:'+(n==='156'||n==='177'?'112':n)}><strong>{n}</strong><span>{t}<small>{s}</small></span><Phone/></a>)}
    </div>
    <div className="emergency-note"><Info/> 156 Jandarma ve 177 Orman Yangını acil çağrıları 112 sistemi altında karşılanıyor. 114 UZEM zehirlenme danışmanlığı için kullanılabilir.</div>
-   <a className="call112" href="tel:112"><Phone/>112 Acil Çağrı</a>
+   <button className="share-location" onClick={async()=>{
+     try{
+       const current=await getCurrentLocation({forceFresh:true});
+       const url=mapsLink(current.lat,current.lon);
+       await shareText('Yanımda Türkiye — Acil Konum','Konumum: '+url,url);
+     }catch{window.alert('Konum alınamadı. Lütfen konum iznini kontrol edip tekrar deneyin.')}
+   }}><LocateFixed/> Konumumu Yakınıma Gönder</button><small className="share-location-hint">Konum bağlantısını WhatsApp, SMS veya desteklenen başka bir uygulamayla paylaşabilirsin.</small><a className="call112" href="tel:112"><Phone/>112 Acil Çağrı</a>
  </main>
 }
 function AddBusiness(){const[ok,setOk]=useState(false);const[f,setF]=useState({name:'',category:'',phone:'',whatsapp:'',address:'',province:'İstanbul',district:'Beyoğlu',description:'',hours:''});const ds=districtsFor(f.province);const set=(k:string,v:string)=>setF(x=>({...x,[k]:v}));const submit=async(e:FormEvent)=>{e.preventDefault();const r=await fetch('/api/submissions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(f)});if(r.ok)setOk(true)};return <main className="form-page"><h1>İşletmeni / Hizmetini Ekle</h1><p>Bilgilerini bırak, inceleme sonrası ücretsiz yayınlayalım.</p>{ok?<div className="success"><ShieldCheck/><h2>Başvurun alındı.</h2></div>:<form onSubmit={submit}><label>İşletme / hizmet adı<input required value={f.name} onChange={e=>set('name',e.target.value)}/></label><label>Kategori<select required value={f.category} onChange={e=>set('category',e.target.value)}><option value="">Seçin</option>{services.map(s=><option key={s[0]} value={s[0]}>{s[1]}</option>)}</select></label><label>Telefon<input required value={f.phone} onChange={e=>set('phone',e.target.value)}/></label><label>WhatsApp<input value={f.whatsapp} onChange={e=>set('whatsapp',e.target.value)}/></label><label>Açık adres<input required value={f.address} onChange={e=>set('address',e.target.value)}/></label><div className="two"><label>İl<select value={f.province} onChange={e=>{set('province',e.target.value);set('district','')}}>{provinces.map(p=><option key={p}>{p}</option>)}</select></label><label>İlçe<select value={f.district} onChange={e=>set('district',e.target.value)}>{ds.map(d=><option key={d}>{d}</option>)}</select></label></div><label>Açıklama<textarea value={f.description} onChange={e=>set('description',e.target.value)}/></label><button>Başvuruyu Gönder <ArrowRight/></button></form>}</main>}
@@ -389,5 +400,5 @@ function Legal({type}:{type:'kvkk'|'privacy'}){
 function Simple({title}:{title:string}){return <main className="simple"><h1>{title}</h1><p>Yanında Türkiye.</p></main>}
 
 export default function TargetApp(){
- return <div><Header/><Routes><Route path="/" element={<Home/>}/><Route path="/nearby" element={<Nearby/>}/><Route path="/services" element={<Services/>}/><Route path="/emergency" element={<Emergency/>}/><Route path="/add-business" element={<AddBusiness/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/admin" element={<Admin/>}/><Route path="/favorites" element={<Simple title="Favoriler"/>}/><Route path="/news" element={<Simple title="Haberler"/>}/><Route path="/contact" element={<Simple title="İletişim"/>}/><Route path="/kvkk" element={<Legal type="kvkk"/>}/><Route path="/gizlilik" element={<Legal type="privacy"/>}/><Route path="*" element={<Home/>}/></Routes><MobileNav/><ChatWidget/></div>
+ return <div><Header/><Routes><Route path="/" element={<Home/>}/><Route path="/nearby" element={<Nearby/>}/><Route path="/services" element={<Services/>}/><Route path="/emergency" element={<Emergency/>}/><Route path="/add-business" element={<AddBusiness/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/admin" element={<Admin/>}/><Route path="/favorites" element={<FavoritesPage/>}/><Route path="/news" element={<Simple title="Haberler"/>}/><Route path="/contact" element={<Simple title="İletişim"/>}/><Route path="/kvkk" element={<Legal type="kvkk"/>}/><Route path="/gizlilik" element={<Legal type="privacy"/>}/><Route path="*" element={<Home/>}/></Routes><MobileNav/><ChatWidget/></div>
 }
