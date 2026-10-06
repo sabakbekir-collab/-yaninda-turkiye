@@ -17,3 +17,106 @@
 .ad-admin{overflow:hidden}.admin-panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.admin-panel-head h2{margin:5px 0;font:800 25px Manrope}.admin-panel-head p{margin:0;color:var(--muted)}
 .ad-form{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;background:#f5f7f6;padding:14px;border-radius:16px;margin-bottom:16px}.ad-form input,.ad-form select{border:1px solid var(--line);background:white;border-radius:10px;padding:11px;min-width:0}.ad-form button{min-height:44px;border:0}.ad-list{display:grid;gap:8px}.ad-row{display:grid;grid-template-columns:80px 1fr auto auto;align-items:center;gap:12px;border:1px solid var(--line);padding:9px;border-radius:14px}.ad-thumb{width:80px;height:46px;border-radius:9px;overflow:hidden;background:#e8edf0;display:grid;place-items:center;color:var(--blue);font-size:9px;font-weight:800}.ad-thumb img{width:100%;height:100%;object-fit:cover}.ad-row>div:nth-child(2){display:grid;gap:3px}.ad-row small{color:var(--muted)}.ad-row button{border:1px solid var(--line);background:white;border-radius:9px;padding:8px 10px;font-weight:700}.ad-row button:last-child{color:var(--red)}
 @media(max-width:850px){.promo-ad{margin:12px 14px;grid-template-columns:100px 1fr auto;min-height:82px;padding:7px;gap:10px}.promo-ad img{width:100px;height:66px}.promo-ad strong{font-size:15px}.promo-ad small{font-size:11px}.promo-ad>svg{margin-right:5px;width:18px}.ad-form{grid-template-columns:1fr}.ad-row{grid-template-columns:65px 1fr auto}.ad-row button:last-child{grid-column:2/-1}.ad-thumb{width:65px;height:40px}}
+
+
+/* === Yanımda Türkiye — modern home redesign v3 === */
+.yt-modern-home{max-width:720px;margin:0 auto!important;padding:18px 18px 115px!important;background:#f7f9fc}
+.yt-modern-home *{box-sizing:border-box}
+.modern-home-head{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:12px;margin:0 0 18px}
+.modern-brand-block{display:flex;align-items:center;gap:10px;min-width:0}
+.modern-brand-mark{width:54px;height:54px;border-radius:19px 19px 19px 6px;background:#ed1c2e;color:#fff;display:grid;place-items:center;box-shadow:0 8px 20px rgba(237,28,46,.2)}
+.modern-brand-mark svg{width:31px;height:31px}
+.modern-brand-block>div:last-child{display:grid;min-width:0}
+.modern-brand-block strong{font:800 21px/1 Manrope;letter-spacing:-.04em;color:#10233d}
+.modern-brand-block strong i{font-style:normal;color:#ed1c2e}
+.modern-brand-block small{font-size:10px;color:#758294;margin-top:5px}
+.modern-location-chip{height:48px;max-width:190px;border:1px solid #e5eaf1;background:#fff;border-radius:24px;padding:0 12px;display:flex;align-items:center;gap:7px;color:#17243a;font-weight:800;box-shadow:0 4px 16px rgba(24,45,73,.06)}
+.modern-location-chip svg:first-child{width:18px;color:#ed1c2e;flex:none}
+.modern-location-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.modern-location-chip svg:last-child{width:15px;flex:none;color:#64748b}
+.modern-notify{width:48px;height:48px;border:0;background:#fff;border-radius:50%;display:grid;place-items:center;color:#10233d;box-shadow:0 4px 16px rgba(24,45,73,.06)}
+.modern-notify svg{width:23px}
+.modern-search{height:58px;background:#fff;border:1px solid #e8edf3;border-radius:29px;padding:0 10px 0 18px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(24,45,73,.07);margin-bottom:14px}
+.modern-search>svg{width:23px;color:#19304e}
+.modern-search input{border:0;outline:0;min-width:0;flex:1;font-size:14px;color:#17243a}
+.modern-search input::placeholder{color:#8995a5}
+.modern-search button{width:38px;height:38px;border:0;border-radius:50%;background:#eff3f8;color:#19304e;font-size:0}
+.modern-search button:after{content:'🎙';font-size:17px}
+.modern-use-location{width:100%;min-height:72px;border:0;border-radius:19px;background:linear-gradient(100deg,#f3192d,#e92735);color:#fff;display:flex;align-items:center;gap:12px;text-align:left;padding:10px 16px;box-shadow:0 12px 28px rgba(237,28,46,.23);position:relative;overflow:hidden}
+.modern-use-location:after{content:'';position:absolute;right:-40px;top:-55px;width:180px;height:180px;border:18px solid rgba(255,255,255,.07);border-radius:50%;box-shadow:0 0 0 18px rgba(255,255,255,.035),0 0 0 36px rgba(255,255,255,.025)}
+.modern-use-location>span{width:43px;height:43px;border-radius:14px;background:rgba(255,255,255,.15);display:grid;place-items:center;z-index:1}
+.modern-use-location>span svg{width:26px}
+.modern-use-location>div{display:grid;gap:3px;flex:1;z-index:1}
+.modern-use-location b{font:800 17px Manrope}
+.modern-use-location small{font-size:11px;opacity:.92}
+.modern-use-location>svg{width:25px;z-index:1}
+.modern-section{padding:23px 0 12px}
+.modern-section-title{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.modern-section-title h2{font:800 23px Manrope;margin:0;color:#13233a;letter-spacing:-.03em}
+.modern-section-title button{border:0;background:transparent;color:#1676d2;font-weight:800;font-size:11px;display:flex;align-items:center;gap:3px}
+.modern-section-title svg{width:16px}
+.modern-quick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.modern-quick button{height:54px;border:1px solid #e7ebf0;background:#fff;border-radius:27px;display:flex;align-items:center;justify-content:center;gap:7px;color:#17243a;box-shadow:0 4px 14px rgba(24,45,73,.045);font-size:11px}
+.modern-quick svg{width:20px;height:20px;color:#ed1c2e}
+.modern-quick button:nth-child(2) svg{color:#1676d2}.modern-quick button:nth-child(3) svg{color:#ed1c2e}.modern-quick button:nth-child(4) svg{color:#17243a}
+.modern-service-list{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modern-service-card{min-height:126px;border:1px solid #e8edf2;border-radius:21px;background:#fff;padding:13px;display:grid;grid-template-columns:42px 1fr 56px 30px;align-items:center;gap:9px;text-align:left;overflow:hidden;position:relative;box-shadow:0 6px 20px rgba(24,45,73,.055)}
+.modern-service-card:nth-child(1),.modern-service-card:nth-child(2){grid-column:1/-1}
+.modern-service-card>div{display:grid;gap:5px;min-width:0;z-index:2}
+.modern-service-card strong{font:800 16px/1.15 Manrope;color:#14243b}
+.modern-service-card small{font-size:10px;line-height:1.35;color:#667587;max-width:190px}
+.modern-service-icon{width:42px;height:42px;border-radius:14px;background:#eef5ff;color:#176ed0;display:grid;place-items:center;z-index:2}
+.modern-service-icon svg{width:23px}
+.modern-service-card.red .modern-service-icon{background:#fff0f2;color:#ed1c2e}
+.modern-service-card.navy .modern-service-icon{background:#edf2f6;color:#132b46}
+.modern-service-card.orange .modern-service-icon{background:#fff1e5;color:#e56b16}
+.modern-service-card>img{width:100%;height:100%;min-height:100px;object-fit:cover;border-radius:17px;grid-column:3;grid-row:1;opacity:.92}
+.modern-card-arrow{width:31px;height:31px;border-radius:50%;background:rgba(255,255,255,.92);display:grid;place-items:center;color:#ed1c2e;z-index:3;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.modern-card-arrow svg{width:17px}
+.modern-service-card.blue .modern-card-arrow{color:#176ed0}
+.modern-service-card.navy .modern-card-arrow{color:#132b46}
+.modern-map-promo{width:100%;min-height:88px;margin-top:12px;border:1px solid #e8edf2;background:#fff;border-radius:21px;padding:10px 13px;display:flex;align-items:center;gap:12px;text-align:left;box-shadow:0 6px 20px rgba(24,45,73,.055)}
+.modern-map-art{width:100px;height:66px;border-radius:15px;background:linear-gradient(135deg,#dcecff,#f5f9ff);display:grid;place-items:center;position:relative;overflow:hidden;color:#1775d2}
+.modern-map-art svg:first-child{width:48px;height:48px;opacity:.25}
+.modern-map-art svg:last-child{position:absolute;width:25px;color:#ed1c2e;top:20px;left:40px}
+.modern-map-promo div{display:grid;gap:4px;flex:1}
+.modern-map-promo em{font-style:normal;color:#ed1c2e;font-size:8px;font-weight:900;letter-spacing:.1em}
+.modern-map-promo strong{font:800 14px/1.25 Manrope;color:#14243b}
+.modern-map-promo>svg{width:20px;color:#ed1c2e}
+.modern-ai-space{height:0}
+.yt-modern-home~.mobile-nav{background:rgba(255,255,255,.97)}
+@media(min-width:761px){
+ .yt-modern-home{max-width:1120px!important;padding:30px 28px 90px!important}
+ .modern-home-head{grid-template-columns:1fr auto auto}
+ .modern-brand-mark{width:58px;height:58px}
+ .modern-brand-block strong{font-size:24px}
+ .modern-search{height:64px}
+ .modern-use-location{min-height:82px}
+ .modern-service-list{grid-template-columns:repeat(2,1fr);gap:14px}
+ .modern-service-card:nth-child(1),.modern-service-card:nth-child(2){grid-column:auto}
+ .modern-service-card{min-height:145px;grid-template-columns:48px 1fr 120px 32px}
+ .modern-service-card>img{min-height:120px}
+}
+@media(max-width:600px){
+ .yt-modern-home{padding-left:12px!important;padding-right:12px!important}
+ .modern-home-head{grid-template-columns:1fr auto;gap:8px}
+ .modern-brand-mark{width:48px;height:48px;border-radius:17px 17px 17px 5px}
+ .modern-brand-mark svg{width:27px}
+ .modern-brand-block strong{font-size:18px}
+ .modern-brand-block small{font-size:9px}
+ .modern-location-chip{grid-column:1/-1;grid-row:2;justify-self:start;max-width:100%;width:auto;height:42px;padding:0 14px}
+ .modern-notify{width:44px;height:44px}
+ .modern-quick button{padding:0 4px;gap:5px;font-size:10px}
+ .modern-service-card{grid-template-columns:40px 1fr 58px 26px;min-height:120px;padding:10px;gap:7px}
+ .modern-service-card strong{font-size:13px}
+ .modern-service-card small{font-size:9px}
+ .modern-service-icon{width:40px;height:40px}
+ .modern-service-card>img{min-height:100px}
+ .modern-card-arrow{width:28px;height:28px}
+}
+@media(max-width:390px){
+ .modern-quick{grid-template-columns:repeat(2,1fr)}
+ .modern-quick button{height:48px}
+ .modern-service-list{grid-template-columns:1fr}
+ .modern-service-card:nth-child(1),.modern-service-card:nth-child(2){grid-column:auto}
+}
