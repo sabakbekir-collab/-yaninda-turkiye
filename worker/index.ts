@@ -72,6 +72,36 @@ export default {
         });
       }
 
+      if (path === "/api/duty-check" && request.method === "GET") {
+        const city = (url.searchParams.get("city") || "istanbul").trim();
+        const provider = new URL("https://eczaneadresi.com/api/public/v1/duty-pharmacies");
+        provider.searchParams.set("city", city);
+        provider.searchParams.set("limit", "5");
+        try {
+          const response = await fetch(provider, {
+            headers: { Accept: "application/json", "User-Agent": "YanindaTurkiye/1.0" },
+            signal: AbortSignal.timeout(10000),
+          });
+          const body = await response.text();
+          return new Response(JSON.stringify({
+            ok: response.ok,
+            status: response.status,
+            city,
+            provider: provider.toString(),
+            body: body.slice(0, 20000),
+          }), {
+            status: response.ok ? 200 : 502,
+            headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+          });
+        } catch (error) {
+          return Response.json({
+            ok: false,
+            city,
+            error: error instanceof Error ? error.message : "provider_error",
+          }, { status: 502, headers: { "Cache-Control": "no-store" } });
+        }
+      }
+
       if (path === "/api/admin/ai" && request.method === "POST") {
         return await postAdminAi({ request, env });
       }
