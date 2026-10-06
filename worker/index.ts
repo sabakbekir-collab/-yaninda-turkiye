@@ -13,6 +13,14 @@ type RuntimeEnv = Env & {
   ASSETS: { fetch(request: Request): Promise<Response> };
 };
 
+type CfLocation = {
+  latitude?: string | null;
+  longitude?: string | null;
+  city?: string | null;
+  region?: string | null;
+  country?: string | null;
+};
+
 const json404 = () => Response.json({ error: "not_found" }, { status: 404 });
 
 export default {
@@ -33,6 +41,34 @@ export default {
         } catch {
           return Response.json({ ok: false, database: false, version: "2026.10.03" }, { status: 503 });
         }
+      }
+
+      // Browser GPS can fail on iPhone/Safari with TIMEOUT or POSITION_UNAVAILABLE
+      // even when the site has permission. Expose Cloudflare's approximate
+      // request geolocation as a recovery path. The frontend only uses this
+      // after a real GPS attempt fails; explicit permission denial never bypasses
+      // the user's choice.
+      if (path === "/api/location" && request.method === "GET") {
+        const cf = (request as Request & { cf?: CfLocation }).cf;
+        const latitude = cf?.latitude ?? null;
+        const longitude = cf?.longitude ?? null;
+
+        if (latitude == null || longitude == null) {
+          return Response.json({ error: "location_unavailable" }, { status: 503 });
+        }
+
+        return Response.json({
+          latitude,
+          longitude,
+          city: cf?.city ?? null,
+          region: cf?.region ?? null,
+          country: cf?.country ?? null,
+          approximate: true,
+        }, {
+          headers: {
+            "Cache-Control": "no-store",
+          },
+        });
       }
 
       if (path === "/api/admin/ai" && request.method === "POST") {
@@ -75,9 +111,7 @@ export default {
         return await postReports({ request, env });
       }
 
-      // All non-API requests must be served by the Vite build. Without this
-      // fallback the Worker returns 404 for the homepage and Safari reports
-      // that the page cannot be opened even though the deployment succeeds.
+      // All non-API requests must be served by the Vite build.
       return await env.ASSETS.fetch(request);
     } catch (error) {
       console.error("Yanımda Türkiye Worker request error", {
