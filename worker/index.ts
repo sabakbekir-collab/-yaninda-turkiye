@@ -67,6 +67,7 @@ export default {
         }, {
           headers: {
             "Cache-Control": "no-store",
+            "Permissions-Policy": "geolocation=(self)",
           },
         });
       }
@@ -112,7 +113,17 @@ export default {
       }
 
       // All non-API requests must be served by the Vite build.
-      return await env.ASSETS.fetch(request);
+      // Explicitly allow this top-level site to use browser geolocation on
+      // Safari/iPhone. This also makes the policy visible in production
+      // instead of relying on the browser default.
+      const assetResponse = await env.ASSETS.fetch(request);
+      const headers = new Headers(assetResponse.headers);
+      headers.set("Permissions-Policy", "geolocation=(self)");
+      return new Response(assetResponse.body, {
+        status: assetResponse.status,
+        statusText: assetResponse.statusText,
+        headers,
+      });
     } catch (error) {
       console.error("Yanımda Türkiye Worker request error", {
         path,
