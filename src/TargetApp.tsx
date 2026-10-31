@@ -1,4 +1,4 @@
-import {useEffect,useMemo,useState} from 'react';
+import {useEffect,useMemo,useRef,useState} from 'react';
 import type {FormEvent} from 'react';
 import {NavLink,useLocation,useNavigate,useSearchParams,Routes,Route} from 'react-router-dom';
 import {Activity,ArrowRight,Banknote,Bell,Building2,Bus,ChevronRight,Compass,Fuel,Heart,Hospital,Landmark,List,LocateFixed,LockKeyhole,Map as MapIcon,MapPin,Menu,Navigation,Phone,Search,ShieldCheck,Siren,Store,Pill,UserCircle,Wrench,ExternalLink,Info,Paintbrush,Zap,KeyRound,Truck,Snowflake,Car,Smartphone,Laptop,Armchair,TreePine,ShoppingBasket,Utensils,Hotel,Package} from 'lucide-react';
@@ -166,6 +166,7 @@ function Nearby(){
  const[province,setProvince]=useState(params.get('province')||state?.province||memory.province||'');
  const[district,setDistrict]=useState(params.get('district')||state?.district||memory.district||'');
  const[provinceOpen,setProvinceOpen]=useState(false);
+ const locateRef=useRef<()=>void>(()=>{});
  const[districtOpen,setDistrictOpen]=useState(false);
  const[radius,setRadius]=useState(Number(params.get('radius')||memory.radius||5));
  const[nearbyDistricts,setNearbyDistricts]=useState(params.get('nearbyDistricts')==='1'||Boolean(memory.nearbyDistricts));
@@ -226,7 +227,7 @@ function Nearby(){
  useEffect(()=>{
    const incoming=location.state as NearbyNavigationState|null;
    if(!incoming)return;
-   if(incoming.autoLocate){void locate();}
+   if(incoming.autoLocate){locateRef.current();}
    if(incoming.province!==undefined)setProvince(incoming.province);
    if(incoming.district!==undefined)setDistrict(incoming.district);
    if(incoming.category!==undefined)setCat(incoming.category);
@@ -305,6 +306,8 @@ function Nearby(){
      setLoading(false);
    }
  };
+
+ locateRef.current=()=>{void locate()};
 
  const categoryList=categories.filter(c=>!['service','emergency'].includes(c.id));
  const activeLabel=pharmacyMode?'Nöbetçi Eczaneler':(categoryList.find(c=>c.id===cat)?.label||services.find(s=>s[0]===cat)?.[1]||'Hizmet');
