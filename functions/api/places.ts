@@ -137,7 +137,7 @@ function isActiveDutyDate(value?:string){
   return activeDutyDates().includes(normalized);
 }
 
-async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string}>{
+async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,_radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string}>{
   const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string)=>{
     if(!isActiveDutyDate(data.date)||!Array.isArray(data.pharmacies))return [];
     const out:Place[]=[];
@@ -147,7 +147,6 @@ async function dutyPharmacies(env:Env,province:string,district:string,lat:number
       const recordDistrict=clean(x.district);
       if(district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
       const d=distance(lat,lon,la,lo);
-      if(d>radiusKm)continue;
       out.push({
         id:idPrefix+String(x.id??i),name,category:'pharmacy',lat:la,lon:lo,
         address:clean(x.address),phone:clean(x.phone,60),
@@ -161,24 +160,10 @@ async function dutyPharmacies(env:Env,province:string,district:string,lat:number
     out.sort((a,b)=>(a.distance??999)-(b.distance??999));
     return out;
   };
-  // Both provider endpoints are documented as duty-pharmacy feeds. The
-  // coordinate endpoint is used first, but every result is independently
-  // date-checked and radius-filtered before it can be shown.
+  // Duty pharmacies are selected by province/district, never by a GPS radius.
+  // GPS is used only to sort results by distance for convenience.
   if(!province)return {places:[],ok:false};
   try{
-    try{
-      const nearest=new URL('https://eczaneadresi.com/api/public/v1/nearest-pharmacies');
-      nearest.searchParams.set('lat',String(lat));
-      nearest.searchParams.set('lng',String(lon));
-      nearest.searchParams.set('radius',String(Math.max(500,Math.min(25000,Math.round(radiusKm*1000)))));
-      nearest.searchParams.set('limit','25');
-      const response=await fetch(nearest,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(10000)});
-      if(response.ok){
-        const data=await response.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
-        const nearby=data?buildPlaces(data,'duty-pharmacy-gps-'):[];
-        if(isActiveDutyDate(data.date)&&nearby.length)return {places:nearby.slice(0,25),ok:true,date:data.date};
-      }
-    }catch{}
     const fetchFeed=async(withDistrict:boolean)=>{
       const u=new URL('https://eczaneadresi.com/api/public/v1/duty-pharmacies');
       u.searchParams.set('city',slug(province));
