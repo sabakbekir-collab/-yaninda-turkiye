@@ -134,25 +134,20 @@ async function browserLocation(forceFresh = false): Promise<Position> {
     if (cached) return cached;
   }
 
-  const permission = await getLocationPermissionState();
-  if (permission === 'denied') {
-    throw new LocationError(
-      'permission_denied',
-      'Konum izni kapalı. Safari için Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri bölümünü kontrol edin.',
-    );
-  }
-
   let lastError: unknown;
   try {
-    // Fast first attempt: iPhone can return Wi-Fi/cell location without waiting
-    // for a full GPS fix.
-    return await browserGpsPosition(false, 10000);
+    // Invoke geolocation immediately from the user's tap. Awaiting the
+    // Permissions API first can lose iOS Safari's transient user activation.
+    return await browserGpsPosition(false, 12000);
   } catch (error) {
     lastError = error;
   }
 
   if (lastError instanceof LocationError && lastError.code === 'permission_denied') {
-    throw lastError;
+    throw new LocationError(
+      'permission_denied',
+      'Konum izni kapalı. iPhone Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri → Safari Web Siteleri bölümünü kontrol edin.',
+    );
   }
 
   try {
