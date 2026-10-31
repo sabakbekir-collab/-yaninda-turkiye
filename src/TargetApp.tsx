@@ -395,7 +395,7 @@ function Nearby(){
      <span>Seçimler otomatik kaydedilir</span>
    </div>
 
-   {err&&<div className="error nearby-error">{err}</div>}
+   {err&&<div className="error nearby-error">{err} {pharmacyMode&&<a href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">Resmî e-Devlet nöbetçi eczane sorgusunu aç</a>}</div>}
 
    <div className="result-head">
      <b>{activeLabel} <span>{loading?'…':places.length}</span></b>
@@ -404,7 +404,7 @@ function Nearby(){
 
    {loading?<div className="results skeleton-results">{[1,2,3].map(i=><div className="nearby-skeleton" key={i}/>)}</div>:
     view==='map'&&places[0]?<div className="map"><MapContainer center={[places[0].lat,places[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{places.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:
-    <div className="results">{places.length?places.map(p=><EnhancedPlaceCard key={p.id} p={p}/>):<div className="empty nearby-empty"><MapPin/><h3>{hasSearched?(pharmacyMode?'Bu konumda güncel nöbetçi eczane kaydı bulunamadı':'Bu bölgede kayıt bulunamadı'):'Arama yapmaya hazır'}</h3><p>{hasSearched?(pharmacyMode?'Nöbet verisi sağlayıcısında bu arama için kayıt gelmedi. Konumu yeniden alıp tekrar deneyebilir veya resmî e-Devlet sorgusunu kontrol edebilirsin.':'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.'):'İl / ilçe seçip Yakınımdakileri Bul’a bas veya konumunu kullan.'}</p><button onClick={hasSearched?search:locate}>{hasSearched?<Search/>:<LocateFixed/>}{hasSearched?'Tekrar Ara':'Konumumu Kullan'}</button></div>}</div>}
+    <div className="results">{places.length?places.map(p=><EnhancedPlaceCard key={p.id} p={p}/>):<div className="empty nearby-empty"><MapPin/><h3>{hasSearched?(pharmacyMode?'Bu konumda güncel nöbetçi eczane kaydı bulunamadı':'Bu bölgede kayıt bulunamadı'):'Arama yapmaya hazır'}</h3><p>{hasSearched?(pharmacyMode?'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.':'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.'):'İl / ilçe seçip Yakınımdakileri Bul’a bas veya konumunu kullan.'}</p><button onClick={hasSearched?search:locate}>{hasSearched?<Search/>:<LocateFixed/>}{hasSearched?'Tekrar Ara':'Konumumu Kullan'}</button>{hasSearched&&pharmacyMode&&<a className="official-duty-link" href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">e-Devlet’te resmî sorgula <ExternalLink/></a>}</div>}</div>}
  </main>
 }
 function LegacyPlaceCard({p}:{p:Place}){
