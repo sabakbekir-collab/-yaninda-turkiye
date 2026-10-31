@@ -118,13 +118,15 @@ async function reverseArea(lat:number,lon:number):Promise<{province:string;distr
   }catch{return null}
 }
 
-function activeDutyDate(){
+function activeDutyDates(){
   const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
   const value=(type:string)=>parts.find(p=>p.type===type)?.value||'';
   const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Istanbul',hour:'2-digit',hourCycle:'h23'}).format(new Date()));
-  const date=new Date(Date.UTC(Number(value('year')),Number(value('month'))-1,Number(value('day'))));
-  if(hour<9)date.setUTCDate(date.getUTCDate()-1);
-  return date.toISOString().slice(0,10);
+  const today=new Date(Date.UTC(Number(value('year')),Number(value('month'))-1,Number(value('day'))));
+  const dates=[today.toISOString().slice(0,10)];
+  // Night shifts from the previous day can remain active until 09:00 TR.
+  if(hour<9){today.setUTCDate(today.getUTCDate()-1);dates.push(today.toISOString().slice(0,10));}
+  return dates;
 }
 function isActiveDutyDate(value?:string){
   if(!value)return false;
@@ -132,7 +134,7 @@ function isActiveDutyDate(value?:string){
   let normalized=raw.slice(0,10);
   const dmy=raw.match(/^(\d{2})[./-](\d{2})[./-](\d{4})/);
   if(dmy)normalized=dmy[3]+'-'+dmy[2]+'-'+dmy[1];
-  return normalized===activeDutyDate();
+  return activeDutyDates().includes(normalized);
 }
 
 async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string}>{
@@ -159,10 +161,24 @@ async function dutyPharmacies(env:Env,province:string,district:string,lat:number
     out.sort((a,b)=>(a.distance??999)-(b.distance??999));
     return out;
   };
-  // Use only the date-scoped duty feed; never treat generic nearest-pharmacy
-  // records as on-duty pharmacies.
+  // Both provider endpoints are documented as duty-pharmacy feeds. The
+  // coordinate endpoint is used first, but every result is independently
+  // date-checked and radius-filtered before it can be shown.
   if(!province)return {places:[],ok:false};
   try{
+    try{
+      const nearest=new URL('https://eczaneadresi.com/api/public/v1/nearest-pharmacies');
+      nearest.searchParams.set('lat',String(lat));
+      nearest.searchParams.set('lng',String(lon));
+      nearest.searchParams.set('radius',String(Math.max(500,Math.min(25000,Math.round(radiusKm*1000)))));
+      nearest.searchParams.set('limit','25');
+      const response=await fetch(nearest,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(10000)});
+      if(response.ok){
+        const data=await response.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
+        const nearby=data?buildPlaces(data,'duty-pharmacy-gps-'):[];
+        if(isActiveDutyDate(data.date)&&nearby.length)return {places:nearby.slice(0,25),ok:true,date:data.date};
+      }
+    }catch{}
     const fetchFeed=async(withDistrict:boolean)=>{
       const u=new URL('https://eczaneadresi.com/api/public/v1/duty-pharmacies');
       u.searchParams.set('city',slug(province));
