@@ -86,6 +86,16 @@ const quick:[string,string,LucideIcon,string][]=[
 
 function Home(){
  const nav=useNavigate(); const[q,setQ]=useState('');
+ const useDeviceLocation=async()=>{
+   // Request GPS directly inside the tap handler so iOS Safari keeps the
+   // transient user activation required to show its location permission prompt.
+   try{
+     const current=await getCurrentLocation({forceFresh:true});
+     nav('/nearby',{state:{position:current}});
+   }catch(error){
+     nav('/nearby',{state:{locationError:error instanceof Error?error.message:'Cihaz konumu alınamadı. Konum iznini kontrol edip tekrar deneyin.'}});
+   }
+ };
  const go=(id:string)=>id==='emergency'?nav('/emergency'):nav('/nearby',{state:{category:id}});
  const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query)nav('/nearby',{state:{query,category:resolveSearchCategory(query)}})};
  const cards=[
@@ -105,7 +115,7 @@ function Home(){
     <button className="modern-notify" aria-label="Bildirimler"><Bell/></button>
    </section>
    <form className="modern-search" onSubmit={search}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Eczane, hastane, restoran, usta..."/><button type="button" aria-label="Sesli arama">●</button></form>
-   <button className="modern-use-location" onClick={()=>nav('/nearby',{state:{autoLocate:true}})}><span><MapPin fill="currentColor"/></span><div><b>Konumumu Kullan</b><small>Yakınımdaki tüm hizmetleri hemen göster</small></div><Navigation/></button>
+   <button className="modern-use-location" onClick={useDeviceLocation}><span><MapPin fill="currentColor"/></span><div><b>Konumumu Kullan</b><small>Yakınımdaki tüm hizmetleri hemen göster</small></div><Navigation/></button>
    <section className="modern-section">
     <div className="modern-section-title"><h2>Hızlı işlemler</h2><button onClick={()=>nav('/services')}>Tümünü Gör <ChevronRight/></button></div>
     <div className="modern-quick">
@@ -153,7 +163,7 @@ function categoryIcon(id:string){
   };
   return map[id]||Wrench;
 }
-type NearbyNavigationState={category?:string;province?:string;district?:string;query?:string;autoLocate?:boolean};
+type NearbyNavigationState={category?:string;province?:string;district?:string;query?:string;autoLocate?:boolean;position?:Position;locationError?:string};
 
 function Nearby(){
  const location=useLocation();
@@ -228,6 +238,13 @@ function Nearby(){
    const incoming=location.state as NearbyNavigationState|null;
    if(!incoming)return;
    if(incoming.autoLocate){locateRef.current();}
+   if(incoming.position){
+     setPos(incoming.position);
+     setLocationState('granted');
+     setHasSearched(true);
+     setSubmitted({category:incoming.category||cat,province:'',district:'',radius,nearbyDistricts,pos:incoming.position});
+   }
+   if(incoming.locationError)setErr(incoming.locationError);
    if(incoming.province!==undefined)setProvince(incoming.province);
    if(incoming.district!==undefined)setDistrict(incoming.district);
    if(incoming.category!==undefined)setCat(incoming.category);
@@ -374,7 +391,7 @@ function Nearby(){
    </div>
 
    <div className="selection-note">
-     <span>{province?(district?province+' / '+district:province+' — tüm ilçeler'): 'Konum veya il / ilçe seçebilirsin'} · {effectiveRadius} km kullanılan yarıçap</span>
+     <span>{province?(district?province+' / '+district:province+' — tüm ilçeler'):pos?'GPS konumu alındı':'Konum veya il / ilçe seçebilirsin'} · {effectiveRadius} km kullanılan yarıçap</span>
      <span>Seçimler otomatik kaydedilir</span>
    </div>
 
