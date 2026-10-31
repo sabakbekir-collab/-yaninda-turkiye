@@ -44,7 +44,8 @@ export async function findPlaces(
   if(!Array.isArray(data))throw new Error('invalid places response');
   return data.filter((p):p is Place=>Boolean(
     p&&typeof p.name==='string'&&p.name.trim().length>=2&&
-    !/^isimsiz( açık veri kaydı)?$/i.test(p.name.trim())
+    !/^isimsiz( açık veri kaydı)?$/i.test(p.name.trim())&&
+    (category!=='pharmacy'||p.isDuty===true)
   ));
 }
 
