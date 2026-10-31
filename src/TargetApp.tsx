@@ -300,7 +300,9 @@ function Nearby(){
          ? 'Konum izni kapalı. iPhone Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri → Safari yolundan izin verip tekrar deneyin.'
          : unsupported
            ? 'Bu tarayıcı konum özelliğini kullanamıyor. HTTPS bağlantısını ve Safari konum iznini kontrol edin.'
-           : 'GPS konumu alınamadı. Tekrar deneyin; gerekirse il / ilçe seçerek devam edebilirsiniz.'
+           : e instanceof LocationError && e.code === 'timeout'
+             ? 'Konum isteği zaman aşımına uğradı. Açık alanda tekrar deneyin veya iPhone konum iznini kontrol edin.'
+             : 'Cihaz konumu alınamadı. Konum iznini kontrol edip tekrar deneyin; isterseniz il / ilçe seçerek arama yapabilirsiniz.'
      );
    }finally{
      setLoading(false);
@@ -367,7 +369,7 @@ function Nearby(){
 
      <div className="action-row">
        <button className="search-filter primary-search" onClick={search} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
-       <button className="location-search" onClick={locate}><LocateFixed/> Konumumu Kullan</button>
+       <button className="location-search" onClick={locate} disabled={loading}><LocateFixed/> {loading?'Konum alınıyor…':'Konumumu Kullan'}</button>
      </div>
    </div>
 
