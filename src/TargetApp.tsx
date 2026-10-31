@@ -379,10 +379,10 @@ function Nearby(){
        {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>setCat(id)}><Icon/><span>{label}</span></button>})}
      </div>
 
-     <div className="search-options">
+     {!pharmacyMode&&<div className="search-options">
        <label className="toggle"><input type="checkbox" checked={nearbyDistricts} onChange={e=>setNearbyDistricts(e.target.checked)}/><span>Yakın ilçeleri de göster</span></label>
        <label className="radius-select"><span>Yarıçap</span><select value={radius} onChange={e=>setRadius(Number(e.target.value))}><option value={2}>2 km</option><option value={5}>5 km</option><option value={10}>10 km</option><option value={20}>20 km</option></select></label>
-     </div>
+     </div>}
 
      <div className="action-row">
        <button className="search-filter primary-search" onClick={search} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
@@ -391,7 +391,7 @@ function Nearby(){
    </div>
 
    <div className="selection-note">
-     <span>{province?(district?province+' / '+district:province+' — tüm ilçeler'):pos?'GPS konumu alındı':'Konum veya il / ilçe seçebilirsin'} · {effectiveRadius} km kullanılan yarıçap</span>
+     <span>{province?(district?province+' / '+district:province+' — tüm ilçeler'):pos?'GPS konumu alındı':'Konum veya il / ilçe seçebilirsin'}{pharmacyMode?' · İlçe kapsamındaki tüm nöbetçi eczaneler': ' · '+effectiveRadius+' km yarıçap'}</span>
      <span>Seçimler otomatik kaydedilir</span>
    </div>
 
