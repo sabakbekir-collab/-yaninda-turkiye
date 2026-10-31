@@ -130,7 +130,7 @@ function isActiveDutyDate(value?:string){
   if(!value)return false;
   const raw=value.trim();
   let normalized=raw.slice(0,10);
-  const dmy=raw.match(/^(\\d{2})[./-](\\d{2})[./-](\\d{4})/);
+  const dmy=raw.match(/^(\d{2})[./-](\d{2})[./-](\d{4})/);
   if(dmy)normalized=dmy[3]+'-'+dmy[2]+'-'+dmy[1];
   return normalized===activeDutyDate();
 }
