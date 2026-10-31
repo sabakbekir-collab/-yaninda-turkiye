@@ -104,23 +104,6 @@ function browserGpsPosition(enableHighAccuracy: boolean, timeout: number): Promi
  * It is only a recovery path after GPS/network positioning fails. We never
  * silently bypass an explicit browser permission denial.
  */
-async function cloudflareLocation(): Promise<Position> {
-  const response = await fetch('/api/location?t=' + Date.now(), {
-    method: 'GET',
-    cache: 'no-store',
-    headers: { Accept: 'application/json' },
-  });
-
-  if (!response.ok) throw new LocationError('unavailable');
-
-  const data = await response.json() as { latitude?: unknown; longitude?: unknown };
-  const position = { lat: Number(data.latitude), lon: Number(data.longitude) };
-
-  if (!isValidPosition(position)) throw new LocationError('unavailable');
-  cacheLocation(position);
-  return position;
-}
-
 async function browserLocation(forceFresh = false): Promise<Position> {
   if (!window.isSecureContext) {
     throw new LocationError('unsupported', 'Konum için HTTPS bağlantısı gerekir.');
@@ -162,14 +145,11 @@ async function browserLocation(forceFresh = false): Promise<Position> {
     throw lastError;
   }
 
-  try {
-    // This makes "Konumumu Kullan" useful even when Safari/iOS reports
-    // POSITION_UNAVAILABLE or TIMEOUT despite permission being enabled.
-    return await cloudflareLocation();
-  } catch {
-    if (lastError instanceof LocationError) throw lastError;
-    throw new LocationError('unavailable');
-  }
+  // Do not silently substitute Cloudflare's approximate IP location for
+  // device GPS. That can place a user tens of kilometres away and corrupt
+  // nearby results. A failed GPS request must be shown as a real error.
+  if (lastError instanceof LocationError) throw lastError;
+  throw new LocationError('unavailable');
 }
 
 async function nativeLocation(): Promise<Position> {
