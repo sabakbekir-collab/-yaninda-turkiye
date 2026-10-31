@@ -42,7 +42,7 @@ const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').replace
 const slug=trSlug;
 const areaQuery=(district:string,province:string)=>[district&&!isCentralDistrict(district)?district:'',province,'Türkiye'].filter(Boolean).join(', ');
 const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
-const cacheKey=(...parts:string[])=>'places:v12:'+parts.join(':');
+const cacheKey=(...parts:string[])=>'places:v13:'+parts.join(':');
 
 function tidyAddress(tags:Record<string,string>,fallback?:string){
   const full=tags['addr:full']||tags['contact:address'];
@@ -118,50 +118,52 @@ async function reverseArea(lat:number,lon:number):Promise<{province:string;distr
   }catch{return null}
 }
 
-async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,radiusKm:number,preferNearest=false):Promise<{places:Place[];ok:boolean;date?:string;stale?:boolean}>{
-  const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string,limitRadius?:number)=>{
-    if(!Array.isArray(data.pharmacies))return [];
+function activeDutyDate(){
+  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+  const value=(type:string)=>parts.find(p=>p.type===type)?.value||'';
+  const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Istanbul',hour:'2-digit',hourCycle:'h23'}).format(new Date()));
+  const date=new Date(Date.UTC(Number(value('year')),Number(value('month'))-1,Number(value('day'))));
+  if(hour<9)date.setUTCDate(date.getUTCDate()-1);
+  return date.toISOString().slice(0,10);
+}
+function isActiveDutyDate(value?:string){
+  if(!value)return false;
+  const raw=value.trim();
+  let normalized=raw.slice(0,10);
+  const dmy=raw.match(/^(\\d{2})[./-](\\d{2})[./-](\\d{4})/);
+  if(dmy)normalized=dmy[3]+'-'+dmy[2]+'-'+dmy[1];
+  return normalized===activeDutyDate();
+}
+
+async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string}>{
+  const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string)=>{
+    if(!isActiveDutyDate(data.date)||!Array.isArray(data.pharmacies))return [];
     const out:Place[]=[];
     for(const [i,x] of data.pharmacies.entries()){
       const la=Number(x.lat??x.latitude),lo=Number(x.lng??x.lon??x.longitude),name=clean(x.name);
       if(!name||!Number.isFinite(la)||!Number.isFinite(lo))continue;
+      const recordDistrict=clean(x.district);
+      if(district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
       const d=distance(lat,lon,la,lo);
-      if(limitRadius!==undefined&&d>limitRadius)continue;
+      if(d>radiusKm)continue;
       out.push({
         id:idPrefix+String(x.id??i),name,category:'pharmacy',lat:la,lon:lo,
         address:clean(x.address),phone:clean(x.phone,60),
         openingHours:clean(x.hours||x.opening_hours||x.duty_hours,180),
-        source:'Eczane Adresi — nöbet verisi',distance:d,
-        district:clean(x.district)||district||undefined,isDuty:true,
+        source:'Eczane Adresi — tarihli nöbet verisi',distance:d,
+        district:recordDistrict||district||undefined,isDuty:true,
         officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
-        verifiedAt:data.date||new Date().toISOString(),dutyUpdatedAt:new Date().toISOString()
+        verifiedAt:data.date,dutyUpdatedAt:new Date().toISOString()
       });
     }
     out.sort((a,b)=>(a.distance??999)-(b.distance??999));
     return out;
   };
-
-  // First try the coordinate endpoint only for true GPS searches.
-  if(preferNearest){
-    try{
-      const u=new URL('https://eczaneadresi.com/api/public/v1/nearest-pharmacies');
-      u.searchParams.set('lat',String(lat));u.searchParams.set('lng',String(lon));
-      u.searchParams.set('radius',String(Math.round(radiusKm*1000)));u.searchParams.set('limit','25');
-      const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(10000)});
-      if(r.ok){
-        const data=await r.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
-        const places=buildPlaces(data,'duty-pharmacy-');
-        if(places.length)return {places,ok:true,date:data.date};
-      }
-    }catch{}
-  }
-
-  // Reliable fallback: fetch the province feed and calculate distance locally.
-  // If the district feed is empty or unavailable, retry the province feed so a
-  // temporary district-level gap can never become a false zero result.
+  // Use only the date-scoped duty feed; never treat generic nearest-pharmacy
+  // records as on-duty pharmacies.
   if(!province)return {places:[],ok:false};
   try{
-    const fetchFeed=async (withDistrict:boolean)=>{
+    const fetchFeed=async(withDistrict:boolean)=>{
       const u=new URL('https://eczaneadresi.com/api/public/v1/duty-pharmacies');
       u.searchParams.set('city',slug(province));
       if(withDistrict&&district)u.searchParams.set('district',slug(district));
@@ -171,22 +173,13 @@ async function dutyPharmacies(env:Env,province:string,district:string,lat:number
       return await r.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
     };
     let data=await fetchFeed(Boolean(district));
-    let all=data?buildPlaces(data,'duty-pharmacy-fallback-'):[];
-
-    // District feed can temporarily publish an empty list. Retry the province
-    // feed and use our own coordinates to determine the nearest pharmacies.
+    let all=data?buildPlaces(data,'duty-pharmacy-district-'):[];
     if(!all.length&&district){
       data=await fetchFeed(false);
       all=data?buildPlaces(data,'duty-pharmacy-province-'):[];
     }
-
-    if(!all.length)return {places:[],ok:Boolean(data),date:data?.date};
-    const within=all.filter(p=>(p.distance??999)<=radiusKm);
-    const within10=all.filter(p=>(p.distance??999)<=10);
-    const within20=all.filter(p=>(p.distance??999)<=20);
-    const widened=within.length?within:(within10.length?within10:(within20.length?within20:all));
-    const stale=Boolean(data?.date&&data.date.slice(0,10)!==new Date().toISOString().slice(0,10));
-    return {places:widened.slice(0,10),ok:true,date:data?.date,stale};
+    if(!data||!isActiveDutyDate(data.date))return {places:[],ok:false,date:data?.date};
+    return {places:all.slice(0,25),ok:true,date:data.date};
   }catch{
     return {places:[],ok:false};
   }
@@ -307,7 +300,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       dutyDistrict=area?.district||'';
     }
     if(!dutyProvince)return Response.json({error:'duty_pharmacy_location_unknown'},{status:400,headers:{'Cache-Control':'no-store'}});
-    const duty=await dutyPharmacies(env,dutyProvince,dutyDistrict,lat,lon,effectiveRadius,hasPosition&&!province&&!district);
+    const duty=await dutyPharmacies(env,dutyProvince,dutyDistrict,lat,lon,effectiveRadius);
     if(!duty.ok)return Response.json({error:'duty_pharmacy_unavailable'},{status:503,headers:{'Cache-Control':'no-store'}});
     const dutyResult=duty.places.slice(0,40);
     // Never cache an empty duty result: an upstream "today" miss must not
