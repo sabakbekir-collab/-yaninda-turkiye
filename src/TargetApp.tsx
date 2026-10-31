@@ -105,7 +105,7 @@ function Home(){
     <button className="modern-notify" aria-label="Bildirimler"><Bell/></button>
    </section>
    <form className="modern-search" onSubmit={search}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Eczane, hastane, restoran, usta..."/><button type="button" aria-label="Sesli arama">●</button></form>
-   <button className="modern-use-location" onClick={()=>nav('/nearby')}><span><MapPin fill="currentColor"/></span><div><b>Konumumu Kullan</b><small>Yakınımdaki tüm hizmetleri hemen göster</small></div><Navigation/></button>
+   <button className="modern-use-location" onClick={()=>nav('/nearby',{state:{autoLocate:true}})}><span><MapPin fill="currentColor"/></span><div><b>Konumumu Kullan</b><small>Yakınımdaki tüm hizmetleri hemen göster</small></div><Navigation/></button>
    <section className="modern-section">
     <div className="modern-section-title"><h2>Hızlı işlemler</h2><button onClick={()=>nav('/services')}>Tümünü Gör <ChevronRight/></button></div>
     <div className="modern-quick">
@@ -153,7 +153,7 @@ function categoryIcon(id:string){
   };
   return map[id]||Wrench;
 }
-type NearbyNavigationState={category?:string;province?:string;district?:string;query?:string};
+type NearbyNavigationState={category?:string;province?:string;district?:string;query?:string;autoLocate?:boolean};
 
 function Nearby(){
  const location=useLocation();
@@ -165,6 +165,8 @@ function Nearby(){
  const[cat,setCat]=useState(params.get('category')||state?.category||memory.category||'pharmacy');
  const[province,setProvince]=useState(params.get('province')||state?.province||memory.province||'');
  const[district,setDistrict]=useState(params.get('district')||state?.district||memory.district||'');
+ const[provinceOpen,setProvinceOpen]=useState(false);
+ const[districtOpen,setDistrictOpen]=useState(false);
  const[radius,setRadius]=useState(Number(params.get('radius')||memory.radius||5));
  const[nearbyDistricts,setNearbyDistricts]=useState(params.get('nearbyDistricts')==='1'||Boolean(memory.nearbyDistricts));
  const[places,setPlaces]=useState<Place[]>([]);
@@ -178,6 +180,8 @@ function Nearby(){
 
  const canonProvince=useMemo(()=>resolveName(province,provinces)??province,[province]);
  const ds=useMemo(()=>districtsFor(canonProvince),[canonProvince]);
+ const provinceOptions=useMemo(()=>{const q=normalizeSearchText(province);return provinces.filter(p=>!q||normalizeSearchText(p).includes(q)).slice(0,8)},[province]);
+ const districtOptions=useMemo(()=>{const q=normalizeSearchText(district);return ds.filter(d=>!q||normalizeSearchText(d).includes(q)).slice(0,8)},[district,ds]);
  const canonDistrict=useMemo(()=>district?(resolveName(district,ds)??district):'', [district,ds]);
  const validProvince=useMemo(()=>provinces.includes(canonProvince),[canonProvince]);
  const validDistrict=useMemo(()=>!district||ds.includes(canonDistrict),[district,ds,canonDistrict]);
@@ -206,7 +210,7 @@ function Nearby(){
      // If the user already granted location permission, Yakınımda starts
      // with the real device position. We never open a permission prompt
      // automatically when the browser is still in "prompt" state.
-     if(s==='granted' && !province && !district && !submitted){
+     if(s==='granted' && !state?.autoLocate && !province && !district && !submitted){
        try{
          const current=await getCurrentLocation();
          if(cancelled)return;
@@ -222,6 +226,7 @@ function Nearby(){
  useEffect(()=>{
    const incoming=location.state as NearbyNavigationState|null;
    if(!incoming)return;
+   if(incoming.autoLocate){void locate();}
    if(incoming.province!==undefined)setProvince(incoming.province);
    if(incoming.district!==undefined)setDistrict(incoming.district);
    if(incoming.category!==undefined)setCat(incoming.category);
@@ -321,11 +326,31 @@ function Nearby(){
 
    <div className="nearby-filters">
      <div className="filter-line">
-       <label><span>İl</span><input list="yt-provinces" value={province} onChange={e=>{setProvince(e.target.value);setDistrict('')}} placeholder="İl seçin" inputMode="text"/></label>
-       <label><span>İlçe</span><input list="yt-districts" value={district} onChange={e=>setDistrict(e.target.value)} placeholder={province?'Tüm ilçeler':'Önce il seçin'} disabled={!province}/></label>
+       <label className="location-autocomplete">
+         <span>İl</span>
+         <input role="combobox" aria-autocomplete="list" aria-expanded={provinceOpen&&provinceOptions.length>0} autoComplete="off" value={province}
+           onFocus={()=>setProvinceOpen(true)}
+           onChange={e=>{setProvince(e.target.value);setDistrict('');setProvinceOpen(true);setDistrictOpen(false)}}
+           onBlur={()=>window.setTimeout(()=>setProvinceOpen(false),120)}
+           placeholder="İl yazın (ör. Muş)" inputMode="text"/>
+         {provinceOpen&&provinceOptions.length>0&&<div className="autocomplete-options" role="listbox">
+           {provinceOptions.map(p=><button type="button" role="option" aria-selected={province===p} className="autocomplete-option" key={p}
+             onMouseDown={e=>e.preventDefault()} onClick={()=>{setProvince(p);setDistrict('');setProvinceOpen(false)}}>{p}</button>)}
+         </div>}
+       </label>
+       <label className="location-autocomplete">
+         <span>İlçe</span>
+         <input role="combobox" aria-autocomplete="list" aria-expanded={districtOpen&&districtOptions.length>0} autoComplete="off"
+           value={district} onFocus={()=>{if(province)setDistrictOpen(true)}}
+           onChange={e=>{setDistrict(e.target.value);setDistrictOpen(true)}}
+           onBlur={()=>window.setTimeout(()=>setDistrictOpen(false),120)}
+           placeholder={province?'İlçe yazın veya tüm ilçeler':'Önce il seçin'} disabled={!province}/>
+         {districtOpen&&province&&districtOptions.length>0&&<div className="autocomplete-options" role="listbox">
+           {districtOptions.map(d=><button type="button" role="option" aria-selected={district===d} className="autocomplete-option" key={d}
+             onMouseDown={e=>e.preventDefault()} onClick={()=>{setDistrict(d);setDistrictOpen(false)}}>{d}</button>)}
+         </div>}
+       </label>
      </div>
-     <datalist id="yt-provinces">{provinces.map(p=><option key={p} value={p}/>)}</datalist>
-     <datalist id="yt-districts">{ds.map(d=><option key={d} value={d}/>)}</datalist>
 
      <div className="category-chips" aria-label="Kategori">
        {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>setCat(c.id)}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
