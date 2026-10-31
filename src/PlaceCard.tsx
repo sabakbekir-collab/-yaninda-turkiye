@@ -42,7 +42,7 @@ export default function PlaceCard({p}:{p:Place}){
       <p>{cleanCardAddress(p.address)}</p>
       <small className="place-meta-line">{typeof p.distance==='number'&&<><Navigation/> <b>{formatDistance(p.distance)}</b> · Kuş uçuşu · </>}<ShieldCheck/> {p.source}</small>
       {p.district&&<small className="place-district">İlçe: {p.district}</small>}
-      {p.isDuty&&<small className="place-source-note">Veri: Eczane Adresi · Gitmeden telefonla teyit et</small>}
+      {p.isDuty&&<small className="place-source-note">Üçüncü taraf kaynağından alınmıştır; resmî kurum doğrulaması değildir. Gitmeden telefonla teyit et. {p.verifiedAt&&'Veri tarihi: '+p.verifiedAt} {p.officialUrl&&<a href={p.officialUrl} target="_blank" rel="noreferrer">Resmî e-Devlet sorgusu</a>}</small>}
       {p.openingHours&&<small className="place-district">Saatler: {p.openingHours}</small>}
       <footer>
         {p.phone?<a href={'tel:'+p.phone} onClick={()=>track('phone_click',{category:p.category})}><Phone/>Ara</a>:<span className="no-phone">Telefon bilgisi yok</span>}
