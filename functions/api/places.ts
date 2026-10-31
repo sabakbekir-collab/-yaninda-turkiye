@@ -137,22 +137,22 @@ function isActiveDutyDate(value?:string){
   return activeDutyDates().includes(normalized);
 }
 
-async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,_radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string}>{
-  const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string)=>{
+export async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,_radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string}>{
+  const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string,applyDistrictFilter:boolean)=>{
     if(!isActiveDutyDate(data.date)||!Array.isArray(data.pharmacies))return [];
     const out:Place[]=[];
     for(const [i,x] of data.pharmacies.entries()){
       const la=Number(x.lat??x.latitude),lo=Number(x.lng??x.lon??x.longitude),name=clean(x.name);
-      if(!name||!Number.isFinite(la)||!Number.isFinite(lo))continue;
+      if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < -90||la > 90||lo < -180||lo > 180)continue;
       const recordDistrict=clean(x.district);
-      if(district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
+      if(applyDistrictFilter&&district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
       const d=distance(lat,lon,la,lo);
       out.push({
         id:idPrefix+String(x.id??i),name,category:'pharmacy',lat:la,lon:lo,
         address:clean(x.address),phone:clean(x.phone,60),
         openingHours:clean(x.hours||x.opening_hours||x.duty_hours,180),
         source:'Üçüncü taraf nöbet verisi — resmî doğrulama değil',distance:d,
-        district:recordDistrict||district||undefined,isDuty:true,
+        district:recordDistrict||undefined,isDuty:true,
         officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
         verifiedAt:data.date,dutyUpdatedAt:new Date().toISOString()
       });
@@ -174,10 +174,10 @@ async function dutyPharmacies(env:Env,province:string,district:string,lat:number
       return await r.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
     };
     let data=await fetchFeed(Boolean(district));
-    let all=data?buildPlaces(data,'duty-pharmacy-district-'):[];
+    let all=data?buildPlaces(data,'duty-pharmacy-district-',true):[];
     if(!all.length&&district){
       data=await fetchFeed(false);
-      all=data?buildPlaces(data,'duty-pharmacy-province-'):[];
+      all=data?buildPlaces(data,'duty-pharmacy-province-',false):[];
     }
     if(!data||!isActiveDutyDate(data.date))return {places:[],ok:false,date:data?.date};
     return {places:all.slice(0,25),ok:true,date:data.date};
