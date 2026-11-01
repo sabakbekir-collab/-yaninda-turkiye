@@ -159,7 +159,7 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
         id:idPrefix+String(x.id??i),name,category:'pharmacy',lat:la,lon:lo,
         address:clean(x.address),phone:clean(x.phone,60),
         openingHours:clean(x.hours||x.opening_hours||x.duty_hours,180),
-        source:'Üçüncü taraf nöbet verisi — resmî doğrulama değil',distance:d,
+        source:'Veri: Eczane Adresi (CC BY 4.0) — resmî doğrulama değildir',distance:d,
         district:recordDistrict||undefined,isDuty:true,
         officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
         verifiedAt:data.date,dutyUpdatedAt:new Date().toISOString()
