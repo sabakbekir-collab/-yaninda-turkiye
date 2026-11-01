@@ -37,7 +37,8 @@ const filters:Record<string,string>={
   service:'["craft"]'
 };
 
-const OSM_UA='YanımdaTürkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)';
+// HTTP header values must be ASCII; Turkish dotless ı makes fetch() reject the request before sending it.
+const OSM_UA='YanimdaTurkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)';
 const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').replace(/\s+/g,' ').trim().slice(0,n):undefined;
 const slug=trSlug;
 const areaQuery=(district:string,province:string)=>[district&&!isCentralDistrict(district)?district:'',province,'Türkiye'].filter(Boolean).join(', ');
