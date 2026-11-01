@@ -143,7 +143,14 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
     if(!isActiveDutyDate(data.date)||!Array.isArray(data.pharmacies))return [];
     const out:Place[]=[];
     for(const [i,x] of data.pharmacies.entries()){
-      const la=Number(x.lat??x.latitude),lo=Number(x.lng??x.lon??x.longitude),name=clean(x.name);
+      // Provider JSON is untrusted: malformed null/primitive rows must not crash the whole response.
+      if(!x||typeof x!=='object'||Array.isArray(x))continue;
+      const coordinate=(...values:unknown[])=>{
+        const value=values.find(v=>v!==null&&v!==undefined);
+        if(typeof value==='string'&&!value.trim())return NaN;
+        return Number(value);
+      };
+      const la=coordinate(x.lat,x.latitude),lo=coordinate(x.lng,x.lon,x.longitude),name=clean(x.name);
       if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < -90||la > 90||lo < -180||lo > 180)continue;
       const recordDistrict=clean(x.district);
       if(applyDistrictFilter&&district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
