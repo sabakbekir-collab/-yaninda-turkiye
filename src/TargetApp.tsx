@@ -8,7 +8,7 @@ import L from 'leaflet';
 import {categories,keywordMap,provinces,services} from './data';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName} from './text';
-import {findPlaces} from './api';
+import {findPlaces,resolveLocationArea} from './api';
 import {getCurrentLocation,getLocationPermissionState,LocationError} from './location';
 import type {Place,Position} from './types';
 import ChatWidget from './ChatWidget';
@@ -99,7 +99,8 @@ function Home(){
    // transient user activation required to show its location permission prompt.
    try{
      const current=await getCurrentLocation({forceFresh:true});
-     nav('/nearby',{state:{position:current}});
+     const area=await resolveLocationArea(current);
+     nav('/nearby',{state:{position:current,province:area.province,district:area.district}});
    }catch(error){
      nav('/nearby',{state:{locationError:error instanceof Error?error.message:'Cihaz konumu alınamadı. Konum iznini kontrol edip tekrar deneyin.'}});
    }
@@ -251,7 +252,21 @@ function Nearby(){
      setPos(incoming.position);
      setLocationState('granted');
      setHasSearched(true);
-     setSubmitted({category:incoming.category||cat,province:'',district:'',radius,nearbyDistricts,pos:incoming.position});
+     // Home-screen GPS navigation includes the reverse-geocoded area. If an
+     // older caller only supplies coordinates, resolve the area here as well.
+     if(incoming.province){
+       setProvince(incoming.province);
+       setDistrict(incoming.district||'');
+       setSubmitted({category:incoming.category||cat,province:incoming.province,district:incoming.district||'',radius,nearbyDistricts,pos:incoming.position});
+     }else{
+       void resolveLocationArea(incoming.position).then(area=>{
+         setProvince(area.province);
+         setDistrict(area.district);
+         setSubmitted({category:incoming.category||cat,province:area.province,district:area.district,radius,nearbyDistricts,pos:incoming.position});
+       }).catch(()=>{
+         setSubmitted({category:incoming.category||cat,province:'',district:'',radius,nearbyDistricts,pos:incoming.position});
+       });
+     }
    }
    if(incoming.locationError)setErr(incoming.locationError);
    if(incoming.province!==undefined)setProvince(incoming.province);
@@ -315,12 +330,15 @@ function Nearby(){
      // The button must always request a fresh device position. Never reuse
      // an old cached coordinate when the user explicitly taps "Konumumu Kullan".
      const current=await getCurrentLocation({forceFresh:true});
+     // Resolve GPS coordinates to the same province/district fields used by
+     // manual selection, so the same live duty-pharmacy widget is selected.
+     const area=await resolveLocationArea(current);
      setLocationState('granted');
      setPos(current);
-     setProvince('');
-     setDistrict('');
+     setProvince(area.province);
+     setDistrict(area.district);
      setHasSearched(true);
-     setSubmitted({category:cat,province:'',district:'',radius,nearbyDistricts,pos:current});
+     setSubmitted({category:cat,province:area.province,district:area.district,radius,nearbyDistricts,pos:current});
    }catch(e){
      const denied=e instanceof LocationError&&e.code==='permission_denied';
      const unsupported=e instanceof LocationError&&e.code==='unsupported';
