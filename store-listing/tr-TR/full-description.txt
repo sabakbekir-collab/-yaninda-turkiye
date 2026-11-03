@@ -1,7 +1,13 @@
-Yanımda Türkiye; eczane, hastane, ATM, polis, itfaiye, akaryakıt, taksi ve günlük ihtiyaç hizmetlerini yakınınızda bulmanıza yardımcı olan ücretsiz bir çözüm merkezidir.
+Yanımda Türkiye, Türkiye genelinde yakınınızdaki önemli yerleri ve günlük hizmetleri bulmanıza yardımcı olan ücretsiz bir yerel hizmet uygulamasıdır.
 
-Konumunuzu kullanabilir veya 81 il arasından il ve ilçe seçebilirsiniz. Sonuçlar mümkün olduğunda OpenStreetMap gibi açık veri kaynaklarından alınır. Bir yeri arayabilir, yol tarifi alabilir, haritada açabilir ve cihazınıza favori olarak kaydedebilirsiniz.
+Yakınınızdaki eczaneleri, hastaneleri, ATM'leri, polis ve itfaiye birimlerini, akaryakıt istasyonlarını, marketleri, ulaşım noktalarını ve farklı usta hizmetlerini arayabilirsiniz. Konumunuzu kullanabilir veya 81 il arasından il ve ilçe seçebilirsiniz.
 
-Acil ekranından Türkiye Acil Çağrı Merkezi 112’ye tek dokunuşla ulaşabilirsiniz. Uygulama satış, ödeme, reklam veya premium üyelik içermez.
+Harita ve liste görünümünde sonuçları inceleyebilir, telefon edebilir, yol tarifi alabilir, yerleri paylaşabilir ve favorilerinize kaydedebilirsiniz. Acil durumda 112 Acil Çağrı Merkezi'ni tek dokunuşla arayabilirsiniz.
 
-Konum geçmişiniz tutulmaz. Açık veri kaynağında sonuç yoksa uygulama bunu açıkça bildirir ve sahte kayıt göstermez.
+Sonuçlar mümkün olduğunda OpenStreetMap ve ilgili hizmetler için yapılandırılmış veri sağlayıcılarından alınır. İşletme bilgilerinin güncelliği kaynağa bağlıdır. Nöbetçi eczane kayıtlarında veri tarihi ve doğrulama uyarılarını kontrol edin; yola çıkmadan önce eczaneyi telefonla arayın veya resmî e-Devlet sorgusunu kullanın.
+
+Uygulamada açıkça REKLAM veya SPONSORLU olarak işaretlenmiş işletme tanıtımları bulunabilir. Sponsorlu içerikler organik sonuçlardan ayrıdır; nöbetçi eczane sonuçlarında reklam gösterilmez.
+
+Konumunuz yakınınızdaki hizmetleri bulmak için kullanılır. Uygulama konum geçmişi tutmayı amaçlamaz. Ayrıntılar için uygulamadaki Gizlilik ve KVKK sayfalarını ve gizlilik politikamızı inceleyin.
+
+Yanımda Türkiye, acil hizmetlerin veya resmî kurumların yerine geçmez. Acil durumda 112'yi arayın.
