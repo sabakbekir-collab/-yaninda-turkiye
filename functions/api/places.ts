@@ -303,6 +303,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   const radiusRequested=Number(u.searchParams.get('radius')||'5');
   const radiusKm=Math.max(2,Math.min(20,Number.isFinite(radiusRequested)?radiusRequested:5));
   const nearbyDistricts=u.searchParams.get('nearbyDistricts')==='1';
+  const debug=u.searchParams.get('debug')==='1';
 
   if(!filters[category])return Response.json([]);
 
@@ -326,7 +327,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   // Never label an OSM pharmacy as "nöbetçi". Official duty integration is deliberately
   // disabled until a structured, current official feed is available.
   const key=cacheKey(category,lat.toFixed(3),lon.toFixed(3),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
-  const cached=await dbCacheGet(env,key);
+  const cached=debug?null:await dbCacheGet(env,key);
   if(Array.isArray(cached))return Response.json(cached,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'cache'}});
 
   // Eczane kategorisi yalnızca güncel nöbet verisini kullanır.
@@ -339,10 +340,15 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       dutyProvince=area?.province||'';
       dutyDistrict=area?.district||'';
     }
-    if(!dutyProvince)return Response.json({error:'duty_pharmacy_location_unknown'},{status:400,headers:{'Cache-Control':'no-store'}});
+    if(!dutyProvince)return Response.json(debug?{ok:false,error:'duty_pharmacy_location_unknown',input:{province,district},coordinates:{lat,lon},geocodedArea:null,activeDutyDates:activeDutyDates()}:{error:'duty_pharmacy_location_unknown'},{status:400,headers:{'Cache-Control':'no-store'}});
     const duty=await dutyPharmacies(env,dutyProvince,dutyDistrict,lat,lon,effectiveRadius);
-    if(!duty.ok)return Response.json({error:'duty_pharmacy_unavailable',reason:duty.reason||'provider_error',providerStatus:duty.providerStatus,date:duty.date},{status:duty.reason==='provider_rate_limited'?429:503,headers:{'Cache-Control':'no-store'}});
+    if(!duty.ok){
+      const status=duty.reason==='provider_rate_limited'?429:503;
+      const body=debug?{ok:false,error:'duty_pharmacy_unavailable',reason:duty.reason||'provider_error',providerStatus:duty.providerStatus,feedDate:duty.date||null,query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},activeDutyDates:activeDutyDates(),resultCount:0}: {error:'duty_pharmacy_unavailable',reason:duty.reason||'provider_error',providerStatus:duty.providerStatus,date:duty.date};
+      return Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
+    }
     const dutyResult=duty.places.slice(0,40);
+    if(debug)return Response.json({ok:true,source:'Eczane Adresi',query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},feedDate:duty.date||null,activeDutyDates:activeDutyDates(),resultCount:dutyResult.length,reason:dutyResult.length?null:'no_current_duty_records',sample:dutyResult.slice(0,5)}, {headers:{'Cache-Control':'no-store','X-Data-Source':'Eczane Adresi'}});
     // Never cache an empty duty result: an upstream "today" miss must not
     // become a persistent false zero.
     if(dutyResult.length)await dbCachePut(env,key,dutyResult,5*60*1000);
