@@ -262,3 +262,13 @@ body{background:linear-gradient(180deg,#fff7fb,#fff 60%,#fff2f8);color:#24152f}
 html[data-theme="dark"]{color-scheme:light;filter:none;background:#fff7fb}
 @media(max-width:760px){.modern-home-head{padding:14px 12px 10px}.modern-brand-block strong{font-size:16px}.modern-location-chip{max-width:90px}.modern-search,.modern-use-location{margin-left:12px;margin-right:12px;width:calc(100% - 24px)}.modern-section,.modern-service-list{padding-inline:12px}.modern-service-list{gap:8px}.modern-service-card{min-height:108px;padding:10px}.campaign-page{padding:14px 12px 105px}.campaign-feature{min-height:165px;padding:14px}.campaign-feature h2{font-size:18px}.campaign-feature-art{width:75px;height:75px}.campaign-tabs button{font-size:9px;padding:9px 1px}}
 @media(max-width:390px){.modern-brand-block strong{font-size:15px}.modern-location-chip{max-width:78px;font-size:8px}.modern-quick{gap:6px}.modern-quick button{min-height:68px}.modern-service-card{min-height:104px}.campaign-ad-card img{width:76px;height:80px}}
+
+/* Automatic current-location status; no manual GPS button */
+.modern-location-status{margin:0 14px 17px;width:calc(100% - 28px);min-height:58px;padding:10px 13px;border:1px solid #ead7ef;border-radius:15px;background:linear-gradient(100deg,#fff,#fff1f7);display:flex;align-items:center;gap:10px;color:#713a9b}
+.modern-location-status>svg{width:21px;color:#df2d69;flex:none}
+.modern-location-status>span:nth-child(2){flex:1;display:grid;gap:3px}
+.modern-location-status b{font-size:11px;color:#442254}
+.modern-location-status small{font-size:10px;color:#88738f}
+.location-live-dot{width:9px;height:9px;border-radius:50%;background:#20b878;box-shadow:0 0 0 4px #20b87820}
+.action-row{grid-template-columns:minmax(0,1fr)}
+@media(max-width:760px){.modern-location-status{margin-left:12px;margin-right:12px;width:calc(100% - 24px)}}
