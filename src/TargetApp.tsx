@@ -441,13 +441,13 @@ function Nearby(){
    </div>
 
    <div className="selection-note">
-     <span>{pharmacyLiveWidget?'Muş / Merkez · Eczaneler.gen.tr canlı listesi':province?(district?province+' / '+district:province+' — tüm ilçeler'):pos?'GPS konumu alındı':'Konum veya il / ilçe seçebilirsin'}{pharmacyMode&&!mushMerkezLiveWidget?' · İlçe kapsamındaki tüm nöbetçi eczaneler':!pharmacyMode?' · '+effectiveRadius+' km yarıçap':''}</span>
+     <span>{pharmacyLiveWidget?(canonProvince+' · Eczaneler.gen.tr canlı listesi'):province?(district?province+' / '+district:province+' — tüm ilçeler'):pos?'GPS konumu alındı':'Konum veya il / ilçe seçebilirsin'}{pharmacyMode&&!pharmacyLiveWidget?' · İlçe kapsamındaki tüm nöbetçi eczaneler':!pharmacyMode?' · '+effectiveRadius+' km yarıçap':''}</span>
      <span>Seçimler otomatik kaydedilir</span>
    </div>
 
    {err&&!pharmacyLiveWidget&&<div className="error nearby-error">{err} {pharmacyMode&&<a href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">Resmî e-Devlet nöbetçi eczane sorgusunu aç</a>}</div>}
 
-   {mushMerkezLiveWidget?
+   {pharmacyLiveWidget?
     <section className="pharmacy-live-widget" aria-label="Muş Merkez canlı nöbetçi eczane listesi">
       <div className="result-head"><b>Muş Merkez · Canlı nöbetçi eczaneler</b><a href="https://www.eczaneler.gen.tr/nobetci-mus-merkez" target="_blank" rel="noreferrer">Kaynakta aç <ExternalLink/></a></div>
       <iframe
