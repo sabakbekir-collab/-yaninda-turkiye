@@ -6,6 +6,21 @@ export type PlaceSearchOptions={
   nearbyDistricts?:boolean;
 };
 
+export type ResolvedLocationArea={province:string;district:string};
+
+export async function resolveLocationArea(position:Position):Promise<ResolvedLocationArea>{
+  const query=new URLSearchParams({lat:String(position.lat),lon:String(position.lon)});
+  const response=await fetch('/api/location/area?'+query.toString(),{
+    cache:'no-store',
+    headers:{Accept:'application/json'},
+    signal:AbortSignal.timeout(11000)
+  });
+  if(!response.ok)throw new Error('Konumdan il ve ilçe bilgisi belirlenemedi.');
+  const data=await response.json() as Partial<ResolvedLocationArea>;
+  if(typeof data.province!=='string'||!data.province.trim())throw new Error('Konumdan il bilgisi alınamadı.');
+  return {province:data.province.trim(),district:typeof data.district==='string'?data.district.trim():''};
+}
+
 export async function findPlaces(
   category:string,
   position?:Position,
