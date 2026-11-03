@@ -30,9 +30,13 @@ export async function findPlaces(
     if(r.status===400 && data && typeof data==='object' && 'error' in data && (data as {error?:unknown}).error==='duty_pharmacy_location_unknown'){
       throw new Error('Nöbetçi eczane araması için il bilgisi belirlenemedi. Lütfen il seç veya konum izni ver.');
     }
-    if(r.status===503 && data && typeof data==='object' && 'error' in data){
+    if((r.status===503||r.status===429) && data && typeof data==='object' && 'error' in data){
       const code=(data as {error?:unknown}).error;
       if(code==='duty_pharmacy_unavailable'){
+        const reason=(data as {reason?:unknown}).reason;
+        if(reason==='stale_duty_list')throw new Error('Kaynaktaki nöbet listesi güncel değil; yanlış bilgi göstermemek için sonuç gizlendi. Resmî e-Devlet sorgusunu kullanabilirsin.');
+        if(reason==='provider_rate_limited')throw new Error('Nöbetçi eczane kaynağı şu anda yoğun. Lütfen birkaç dakika sonra tekrar deneyin.');
+        if(reason==='provider_timeout')throw new Error('Nöbetçi eczane kaynağı zamanında yanıt vermedi. Lütfen tekrar deneyin.');
         throw new Error('Güncel nöbetçi eczane verisine şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.');
       }
       if(code==='upstream_unavailable'){

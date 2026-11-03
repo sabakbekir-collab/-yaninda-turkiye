@@ -1,8 +1,12 @@
 import type {Env} from '../lib/types';
+import {sameOrigin} from '../lib/auth';
+import {rateLimited} from '../lib/ratelimit';
 
 const allowed=new Set(['page_view','search','location_click','pharmacy_click','hospital_click','atm_click','service_click','phone_click','whatsapp_click','directions_click','emergency_click','favorite_click']);
 
 export async function onRequestPost({request,env}:{request:Request;env:Env}){
+  if(!sameOrigin(request))return new Response(null,{status:403});
+  if(await rateLimited(env,request,'events',120,60))return new Response(null,{status:429,headers:{'Retry-After':'60'}});
   try{
     const body=await request.json() as {type?:string;metadata?:Record<string,unknown>};
     if(!body.type||!allowed.has(body.type))return new Response(null,{status:400});

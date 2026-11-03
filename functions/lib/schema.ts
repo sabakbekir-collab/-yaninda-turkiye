@@ -63,6 +63,15 @@ export function ensureSchema(env: Env): Promise<void> {
         expires_at TEXT NOT NULL
       )`,
       `CREATE INDEX IF NOT EXISTS idx_api_cache_expires ON api_cache(expires_at)`,
+      `CREATE TABLE IF NOT EXISTS admin_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        action TEXT NOT NULL,
+        target_id INTEGER,
+        detail TEXT,
+        ip TEXT,
+        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_admin_logs_created ON admin_logs(created_at)`,
     ];
 
     for (const sql of statements) {

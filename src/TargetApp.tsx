@@ -75,9 +75,17 @@ function MobileNav(){
  return <nav className="mobile-nav"><NavLink to="/">⌂<small>Ana Sayfa</small></NavLink><NavLink className={nearbyActive?'active':''} to="/nearby"><Compass/><small>Yakınımda</small></NavLink><NavLink className={mapActive?'active':''} to="/nearby?view=map"><MapIcon/><small>Harita</small></NavLink><NavLink className="danger" to="/emergency"><Siren/><small>Acil</small></NavLink><NavLink to="/menu"><Menu/><small>Menü</small></NavLink></nav>
 }
 
+type AdRow={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null};
+const adPlacement={top:'home_top',mid:'home_mid',bottom:'home_bottom'} as const;
+const httpUrl=(v?:string|null)=>{try{const u=new URL(v||'');return u.protocol==='https:'||u.protocol==='http:'?u.toString():''}catch{return ''}};
+// Only real, admin-approved ads from /api/ads are shown. No placeholder brands: nothing renders when there is no ad.
 function Ad({kind}:{kind:'top'|'mid'|'bottom'}){
- const d=kind==='top'?{img:imgs.pharmacy,title:'GÜVEN ECZANESİ',text:'7/24 HİZMETİNİZDE',button:'Hemen Konumunu Al',cls:'red'}:kind==='mid'?{img:imgs.burger,title:'BURGER KING',text:'LEZZET HER ZAMAN YANINDA',button:'En Yakın Şubeyi Bul',cls:'burger'}:{img:imgs.trend,title:'trendyol',text:'ARADIĞIN HER ŞEY TRENDYOL’DA',button:'Hemen İncele',cls:'trend'};
- return <a href="#" className={'yt-ad '+d.cls} onClick={e=>e.preventDefault()}><img src={d.img} alt=""/><div><small>REKLAM</small><strong>{d.title}</strong><b>{d.text}</b><button>{d.button}</button></div></a>
+ const[ad,setAd]=useState<AdRow|null>(null);
+ useEffect(()=>{let live=true;fetch('/api/ads?placement='+adPlacement[kind]).then(r=>r.ok?r.json():null).then((d:{ads?:AdRow[]}|null)=>{if(live&&d&&Array.isArray(d.ads)&&d.ads[0]&&typeof d.ads[0].title==='string')setAd(d.ads[0])}).catch(()=>undefined);return()=>{live=false}},[kind]);
+ if(!ad)return null;
+ const href=httpUrl(ad.target_url),img=httpUrl(ad.image_url);
+ const body=<>{img&&<img src={img} alt="" loading="lazy"/>}<div><small>REKLAM</small><strong>{ad.title}</strong>{ad.text&&<b>{ad.text}</b>}</div></>;
+ return href?<a href={href} target="_blank" rel="sponsored noopener noreferrer" className="yt-ad red">{body}</a>:<div className="yt-ad red">{body}</div>
 }
 
 const quick:[string,string,LucideIcon,string][]=[
@@ -130,6 +138,7 @@ function Home(){
       <span className="modern-service-icon"><Icon/></span><div><strong>{title}</strong><small>{text}</small></div>{img&&<img src={img} alt=""/>}<span className="modern-card-arrow"><ChevronRight/></span>
     </button>)}
    </section>
+   <Ad kind="mid"/>
    <button className="modern-map-promo" onClick={()=>nav('/nearby?view=map')}>
      <span className="modern-map-art"><MapIcon/><MapPin/></span><div><em>DAHA FAZLASI</em><strong>Yakınındaki tüm hizmetleri haritada gör</strong></div><ChevronRight/>
    </button>
@@ -457,7 +466,7 @@ type AdminAd={id:string|number;title:string;image_url?:string;placement?:string;
 type AdminData={stats?:AdminStats;ads?:AdminAd[]};
 function Admin(){
  const[email,setEmail]=useState(''),[password,setPassword]=useState(''),[ok,setOk]=useState(false),[data,setData]=useState<AdminData>(),[error,setError]=useState('');
- const login=async(e:FormEvent)=>{e.preventDefault();const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'login',email,password})});if(r.ok){setOk(true)}else setError('Giriş bilgileri hatalı veya admin yapılandırılmamış.')};
+ const login=async(e:FormEvent)=>{e.preventDefault();setError('');try{const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'login',email,password})});if(r.ok){setOk(true)}else if(r.status===429)setError('Çok fazla deneme yapıldı. Lütfen 10 dakika sonra tekrar deneyin.');else setError('Giriş bilgileri hatalı veya admin yapılandırılmamış.')}catch{setError('Bağlantı kurulamadı. Lütfen tekrar deneyin.')}};
  useEffect(()=>{if(ok)fetch('/api/admin').then(r=>r.ok?r.json():null).then(setData).catch(()=>{})},[ok]);
  if(!ok)return <main className="admin-login"><div><ShieldCheck/><h1>Admin Paneli</h1><p>Yanında Türkiye yönetim merkezi</p><form onSubmit={login}><label>E-posta<input type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Şifre<input type="password" value={password} onChange={e=>setPassword(e.target.value)}/></label>{error&&<div className="error">{error}</div>}<button>Giriş Yap <ArrowRight/></button></form></div></main>;
  const stats=data?.stats||{}; const ads=data?.ads||[];

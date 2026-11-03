@@ -8,6 +8,7 @@ import { onRequestPost as postAiChat } from "../functions/api/ai";
 import { onRequestPost as postAdminAi } from "../functions/api/admin-ai";
 import type { Env } from "../functions/lib/types";
 import { ensureSchema } from "../functions/lib/schema";
+import { validSession } from "../functions/lib/auth";
 
 type RuntimeEnv = Env & {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -72,8 +73,10 @@ export default {
         });
       }
 
+      // Diagnostic endpoint: admin-only (it exposes raw provider responses).
       if (path === "/api/duty-check" && request.method === "GET") {
-        const city = (url.searchParams.get("city") || "istanbul").trim();
+        if (!(await validSession(request, env))) return Response.json({ error: "unauthorized" }, { status: 401 });
+        const city = (url.searchParams.get("city") || "istanbul").trim().toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 40) || "istanbul";
         const provider = new URL("https://eczaneadresi.com/api/public/v1/duty-pharmacies");
         provider.searchParams.set("city", city);
         provider.searchParams.set("limit", "5");
@@ -102,16 +105,17 @@ export default {
         }
       }
 
+      // Schema first so rate limiting (api_cache) also works on the very first AI/admin call.
+      if (path.startsWith("/api/") && env.DB) {
+        try { await ensureSchema(env); } catch (e) { console.error("ensureSchema failed", e); }
+      }
+
       if (path === "/api/admin/ai" && request.method === "POST") {
         return await postAdminAi({ request, env });
       }
 
       if ((path === "/api/ai/chat" || path === "/api/ai") && request.method === "POST") {
         return await postAiChat({ request, env });
-      }
-
-      if (path.startsWith("/api/") && env.DB) {
-        await ensureSchema(env);
       }
 
       if (path === "/api/places" && request.method === "GET") {
@@ -149,6 +153,8 @@ export default {
       const assetResponse = await env.ASSETS.fetch(request);
       const headers = new Headers(assetResponse.headers);
       headers.set("Permissions-Policy", "geolocation=(self)");
+      // HTML must always revalidate so a new deploy shows up immediately (hashed /assets/* stay cacheable).
+      if ((headers.get("Content-Type") || "").includes("text/html")) headers.set("Cache-Control", "no-cache");
       return new Response(assetResponse.body, {
         status: assetResponse.status,
         statusText: assetResponse.statusText,

@@ -138,7 +138,7 @@ function isActiveDutyDate(value?:string){
   return activeDutyDates().includes(normalized);
 }
 
-export async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,_radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string}>{
+export async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,_radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string;reason?:string;providerStatus?:number}>{
   const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string,applyDistrictFilter:boolean)=>{
     if(!isActiveDutyDate(data.date)||!Array.isArray(data.pharmacies))return [];
     const out:Place[]=[];
@@ -172,13 +172,15 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
   // GPS is used only to sort results by distance for convenience.
   if(!province)return {places:[],ok:false};
   try{
+    let lastStatus:number|undefined;
     const fetchFeed=async(withDistrict:boolean)=>{
       const u=new URL('https://eczaneadresi.com/api/public/v1/duty-pharmacies');
       u.searchParams.set('city',slug(province));
       if(withDistrict&&district)u.searchParams.set('district',slug(district));
       u.searchParams.set('limit','200');
       const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(10000)});
-      if(!r.ok)return null;
+      if(!r.ok){lastStatus=r.status;return null}
+      lastStatus=undefined;
       return await r.json() as {date?:string;pharmacies?:Array<Record<string,unknown>>};
     };
     let data=await fetchFeed(Boolean(district));
@@ -187,10 +189,17 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
       data=await fetchFeed(false);
       all=data?buildPlaces(data,'duty-pharmacy-province-',false):[];
     }
-    if(!data||!isActiveDutyDate(data.date))return {places:[],ok:false,date:data?.date};
+    if(!data){
+      const st=lastStatus;
+      const reason=st===429?'provider_rate_limited':st===403||st===401?'provider_forbidden':st===404?'provider_not_found':st&&st>=500?'provider_server_error':'provider_error';
+      return {places:[],ok:false,reason,providerStatus:st};
+    }
+    // A feed dated neither today nor (before 09:00 TR) yesterday is stale: never show it as "nöbetçi".
+    if(!isActiveDutyDate(data.date))return {places:[],ok:false,date:data.date,reason:'stale_duty_list'};
     return {places:all.slice(0,25),ok:true,date:data.date};
-  }catch{
-    return {places:[],ok:false};
+  }catch(e){
+    const timeout=e instanceof Error&&(e.name==='TimeoutError'||e.name==='AbortError');
+    return {places:[],ok:false,reason:timeout?'provider_timeout':'provider_error'};
   }
 }
 
@@ -310,7 +319,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     }
     if(!dutyProvince)return Response.json({error:'duty_pharmacy_location_unknown'},{status:400,headers:{'Cache-Control':'no-store'}});
     const duty=await dutyPharmacies(env,dutyProvince,dutyDistrict,lat,lon,effectiveRadius);
-    if(!duty.ok)return Response.json({error:'duty_pharmacy_unavailable'},{status:503,headers:{'Cache-Control':'no-store'}});
+    if(!duty.ok)return Response.json({error:'duty_pharmacy_unavailable',reason:duty.reason||'provider_error',providerStatus:duty.providerStatus,date:duty.date},{status:duty.reason==='provider_rate_limited'?429:503,headers:{'Cache-Control':'no-store'}});
     const dutyResult=duty.places.slice(0,40);
     // Never cache an empty duty result: an upstream "today" miss must not
     // become a persistent false zero.

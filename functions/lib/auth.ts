@@ -35,3 +35,9 @@ export function sameOrigin(request:Request){
   if(!origin)return true;
   try{return new URL(origin).origin===new URL(request.url).origin}catch{return false}
 }
+
+/** Constant-time string comparison (hashes both sides so length does not leak). */
+export async function secureCompare(a:string,b:string,secret:string){
+  const [x,y]=await Promise.all([sign(a,secret),sign(b,secret)]);
+  return safeEqual(x,y);
+}

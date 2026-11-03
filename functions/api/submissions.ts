@@ -1,6 +1,10 @@
 import type {Env} from '../lib/types';
+import {sameOrigin} from '../lib/auth';
+import {rateLimited} from '../lib/ratelimit';
 const text=(v:unknown,n=300)=>typeof v==='string'?v.trim().replace(/[<>]/g,'').slice(0,n):'';
 export async function onRequestPost({request,env}:{request:Request;env:Env}){
+  if(!sameOrigin(request))return new Response(null,{status:403});
+  if(await rateLimited(env,request,'submissions',5,3600))return new Response(null,{status:429,headers:{'Retry-After':'3600'}});
   try{
     const b=await request.json() as Record<string,unknown>;
     const name=text(b.name,120),category=text(b.category,50),phone=text(b.phone,25),address=text(b.address,300),province=text(b.province,50),district=text(b.district,80);
