@@ -136,6 +136,52 @@ function isActiveDutyDate(value?:unknown){
   return key!==null&&activeDutyDates().includes(key);
 }
 
+/**
+ * Independent secondary roster. Turkpidya documents provincial pharmacists'
+ * chambers and municipality lists as its source. Coverage is partial; accept
+ * only dated records with coordinates, and never infer a duty date.
+ */
+async function turkpidyaDutyFallback(province:string,district:string,lat:number,lon:number):Promise<{places:Place[];ok:boolean;date?:string;reason?:string}>{
+  try{
+    const u=new URL('https://turkpidya.com/wp-json/turkpidya-data/v1/pharmacies/on-duty');
+    u.searchParams.set('city',slug(province));
+    const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(9000)});
+    if(!r.ok)return {places:[],ok:false,reason:'secondary_http_'+r.status};
+    const body=await r.json() as unknown;
+    const root=body&&typeof body==='object'&&!Array.isArray(body)?body as Record<string,unknown>:{};
+    const nested=root.data&&typeof root.data==='object'&&!Array.isArray(root.data)?root.data as Record<string,unknown>:{};
+    const rows=Array.isArray(body)?body:Array.isArray(root.pharmacies)?root.pharmacies:Array.isArray(root.data)?root.data:Array.isArray(nested.pharmacies)?nested.pharmacies:Array.isArray(nested.items)?nested.items:Array.isArray(root.results)?root.results:[];
+    const rootDate=root.rosterDate??root.roster_date??root.sourceDate??root.source_date??root.date??root.tarih??nested.rosterDate??nested.roster_date??nested.date??nested.tarih;
+    const out:Place[]=[];
+    for(const [i,value] of rows.entries()){
+      if(!value||typeof value!=='object'||Array.isArray(value))continue;
+      const x=value as Record<string,unknown>;
+      const recordDate=dutyDateKey(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih??rootDate);
+      if(!recordDate||!activeDutyDates().includes(recordDate))continue;
+      const recordCity=clean(x.city??x.province??x.il);
+      if(recordCity&&slug(recordCity)!==slug(province))continue;
+      const recordDistrict=clean(x.district??x.ilce??x.county);
+      if(district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
+      const location=x.location&&typeof x.location==='object'?x.location as Record<string,unknown>:{};
+      const la=Number(x.lat??x.latitude??location.lat),lo=Number(x.lng??x.lon??x.longitude??location.lng??location.lon);
+      const name=clean(x.name??x.pharmacyName??x.pharmacy_name??x.title??x.ad);
+      if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < -90||la > 90||lo < -180||lo > 180)continue;
+      out.push({id:'turkpidya-duty-'+String(x.id??x.pharmacyId??x.pharmacy_id??i),name,category:'pharmacy',lat:la,lon:lo,
+        address:clean(x.address??x.adres),phone:clean(x.phone??x.telephone??x.telefon,60),
+        openingHours:clean(x.hours??x.dutyHours??x.duty_hours,180),
+        source:'Veri: Turkpidya — il eczacı odaları ve belediyeler; tarihli kaynak listesi',
+        distance:distance(lat,lon,la,lo),district:recordDistrict||undefined,isDuty:true,
+        officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
+        verifiedAt:recordDate,dutyUpdatedAt:new Date().toISOString()});
+    }
+    out.sort((a,b)=>(a.distance??999)-(b.distance??999));
+    return {places:out.slice(0,25),ok:true,date:dutyDateKey(rootDate)||undefined};
+  }catch(e){
+    const timeout=e instanceof Error&&(e.name==='TimeoutError'||e.name==='AbortError');
+    return {places:[],ok:false,reason:timeout?'secondary_timeout':'secondary_error'};
+  }
+}
+
 export async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,_radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string;reason?:string;providerStatus?:number}>{
   const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string,applyDistrictFilter:boolean)=>{
     if(!Array.isArray(data.pharmacies))return [];
@@ -341,19 +387,34 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       dutyDistrict=area?.district||'';
     }
     if(!dutyProvince)return Response.json(debug?{ok:false,error:'duty_pharmacy_location_unknown',input:{province,district},coordinates:{lat,lon},geocodedArea:null,activeDutyDates:activeDutyDates()}:{error:'duty_pharmacy_location_unknown'},{status:400,headers:{'Cache-Control':'no-store'}});
-    const duty=await dutyPharmacies(env,dutyProvince,dutyDistrict,lat,lon,effectiveRadius);
-    if(!duty.ok){
-      const status=duty.reason==='provider_rate_limited'?429:503;
-      const body=debug?{ok:false,error:'duty_pharmacy_unavailable',reason:duty.reason||'provider_error',providerStatus:duty.providerStatus,feedDate:duty.date||null,query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},activeDutyDates:activeDutyDates(),resultCount:0}: {error:'duty_pharmacy_unavailable',reason:duty.reason||'provider_error',providerStatus:duty.providerStatus,date:duty.date};
+    const primaryDuty=await dutyPharmacies(env,dutyProvince,dutyDistrict,lat,lon,effectiveRadius);
+    // Fall back to a separate chamber/municipality-backed roster only if the
+    // primary provider has no current dated entries. Do not merge rosters.
+    let dutyResult=primaryDuty.places.slice(0,40);
+    let dutySource='Eczane Adresi';
+    let dutyDate=primaryDuty.date;
+    let secondaryReason:string|undefined;
+    if(!dutyResult.length){
+      const secondary=await turkpidyaDutyFallback(dutyProvince,dutyDistrict,lat,lon);
+      secondaryReason=secondary.reason;
+      if(secondary.places.length){
+        dutyResult=secondary.places;
+        dutySource='Turkpidya (il eczacı odaları ve belediyeler)';
+        dutyDate=secondary.date;
+      }
+    }
+    if(!dutyResult.length){
+      const failed=!primaryDuty.ok;
+      const status=failed&&primaryDuty.reason==='provider_rate_limited'?429:failed?503:200;
+      const body=debug?{ok:!failed,error:failed?'duty_pharmacy_unavailable':undefined,reason:primaryDuty.reason||'no_current_duty_records',secondaryReason,providerStatus:primaryDuty.providerStatus,feedDate:dutyDate||null,query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},activeDutyDates:activeDutyDates(),resultCount:0,sourcesTried:['Eczane Adresi','Turkpidya']}:{error:failed?'duty_pharmacy_unavailable':'no_current_duty_records',reason:primaryDuty.reason||'no_current_duty_records',secondaryReason,date:dutyDate};
       return Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
     }
-    const dutyResult=duty.places.slice(0,40);
-    if(debug)return Response.json({ok:true,source:'Eczane Adresi',query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},feedDate:duty.date||null,activeDutyDates:activeDutyDates(),resultCount:dutyResult.length,reason:dutyResult.length?null:'no_current_duty_records',sample:dutyResult.slice(0,5)}, {headers:{'Cache-Control':'no-store','X-Data-Source':'Eczane Adresi'}});
+    if(debug)return Response.json({ok:true,source:dutySource,query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},feedDate:dutyDate||null,activeDutyDates:activeDutyDates(),resultCount:dutyResult.length,reason:null,sample:dutyResult.slice(0,5)}, {headers:{'Cache-Control':'no-store','X-Data-Source':dutySource}});
     // Never cache an empty duty result: an upstream "today" miss must not
     // become a persistent false zero.
     if(dutyResult.length)await dbCachePut(env,key,dutyResult,5*60*1000);
     const headers=new Headers({'Cache-Control':dutyResult.length?'public,max-age=300':'no-store','X-Data-Source':'Eczane Adresi'});
-    if(duty.date)headers.set('X-Duty-Date',duty.date);
+    headers.set('X-Data-Source',dutySource);\n    if(dutyDate)headers.set('X-Duty-Date',dutyDate);
     return Response.json(dutyResult,{headers});
   }
 
