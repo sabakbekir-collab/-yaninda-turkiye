@@ -414,7 +414,8 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     // become a persistent false zero.
     if(dutyResult.length)await dbCachePut(env,key,dutyResult,5*60*1000);
     const headers=new Headers({'Cache-Control':dutyResult.length?'public,max-age=300':'no-store','X-Data-Source':'Eczane Adresi'});
-    headers.set('X-Data-Source',dutySource);\n    if(dutyDate)headers.set('X-Duty-Date',dutyDate);
+    headers.set('X-Data-Source',dutySource);
+    if(dutyDate)headers.set('X-Duty-Date',dutyDate);
     return Response.json(dutyResult,{headers});
   }
 
