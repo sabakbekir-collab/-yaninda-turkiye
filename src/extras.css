@@ -1,5 +1,4 @@
-html[data-theme="dark"]{color-scheme:dark;background:#fff;filter:invert(1) hue-rotate(180deg)}
-html[data-theme="dark"] img,html[data-theme="dark"] video,html[data-theme="dark"] .leaflet-container,html[data-theme="dark"] .yt-hero-bg,html[data-theme="dark"] .yt-ad img{filter:invert(1) hue-rotate(180deg)}
+html[data-theme="dark"]{color-scheme:light;filter:none;background:#fff7fb}
 .place-extra-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .place-extra-actions button{display:inline-flex;align-items:center;gap:6px;border:1px solid #d9dee7;background:#fff;color:#334155;border-radius:10px;padding:7px 10px;font-size:13px;font-weight:700;cursor:pointer}
 .place-extra-actions svg{width:15px;height:15px}
