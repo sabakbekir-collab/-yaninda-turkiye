@@ -426,7 +426,7 @@ function Nearby(){
         referrerPolicy="strict-origin-when-cross-origin"
         style={{width:'100%',height:340,border:0,borderRadius:14,background:'#fff'}}
       />
-      <p className="pharmacy-widget-note">Liste doğrudan Eczaneler.gen.tr'nin resmî “Sitene Ekle” görünümünden yüklenir. Eczaneye gitmeden önce telefonla açık olduğunu teyit et.</p>
+      <p className="pharmacy-widget-note"><strong>Hatırlatma:</strong> Nöbet listeleri değişebilir. Yola çıkmadan önce eczaneyi telefonla arayıp nöbetçi ve açık olduğunu teyit edin.</p>
     </section>
    :
    <>
