@@ -72,7 +72,7 @@ function MobileNav(){
  const location=useLocation();
  const nearbyActive=location.pathname==='/nearby'&&new URLSearchParams(location.search).get('view')!=='map';
  const mapActive=location.pathname==='/nearby'&&new URLSearchParams(location.search).get('view')==='map';
- return <nav className="mobile-nav"><NavLink to="/">⌂<small>Ana Sayfa</small></NavLink><NavLink className={nearbyActive?'active':''} to="/nearby"><Compass/><small>Yakınımda</small></NavLink><NavLink className={mapActive?'active':''} to="/nearby?view=map"><MapIcon/><small>Harita</small></NavLink><NavLink className="danger" to="/emergency"><Siren/><small>Acil</small></NavLink><NavLink to="/menu"><Menu/><small>Menü</small></NavLink></nav>
+ return <nav className="mobile-nav"><NavLink to="/"><Activity/><small>Ana Sayfa</small></NavLink><NavLink className={nearbyActive||mapActive?'active':''} to="/nearby"><Compass/><small>Keşfet</small></NavLink><NavLink to="/favorites"><Heart/><small>Favoriler</small></NavLink><NavLink to="/menu"><UserCircle/><small>Hesabım</small></NavLink></nav>
 }
 
 type AdRow={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null};
@@ -128,10 +128,11 @@ function Home(){
  ] as const;
  return <main className="yt-home yt-modern-home">
    <section className="modern-home-head">
-    <div className="modern-brand-block"><div className="modern-brand-mark"><MapPin fill="currentColor"/></div><div><strong>YANINDA <i>TÜRKİYE</i></strong><small>Yaşamını kolaylaştıran hizmetler tek yerde</small></div></div>
+    <div className="modern-brand-block"><div className="modern-brand-mark"><MapPin fill="currentColor"/></div><div><strong>YANINDA <i>TÜRKİYE</i></strong><small>Türkiye'nin Günlük Yaşam Asistanı</small></div></div>
     <button className="modern-location-chip" onClick={()=>nav('/nearby')}><MapPin/><span>{readHeaderLocation()}</span><ChevronRight/></button>
-    <button className="modern-notify" aria-label="Bildirimler"><Bell/></button>
+    <button className="modern-notify" aria-label="Menü" onClick={()=>nav('/menu')}><Menu/></button>
    </section>
+   <section className="modern-welcome-banner"><div><span>YANINDA TÜRKİYE</span><h1>Hayatın her anında<br/>yanında.</h1><p>İhtiyacın olan her şey tek yerde.</p></div><MapPin/></section>
    <form className="modern-search" onSubmit={search}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Eczane, hastane, restoran, usta..."/><button type="button" aria-label="Sesli arama">●</button></form>
    <div className="modern-location-status"><MapPin/><span><b>Mevcut konumun</b><small>{locationLabel} · Otomatik algılanıyor</small></span><span className="location-live-dot"/></div>
    <section className="modern-section">
