@@ -80,13 +80,28 @@ async function reverseArea(lat:number,lon:number):Promise<{province:string;distr
   try{
     const u=new URL('https://nominatim.openstreetmap.org/reverse');
     u.searchParams.set('format','jsonv2');u.searchParams.set('lat',String(lat));u.searchParams.set('lon',String(lon));
-    u.searchParams.set('zoom','10');u.searchParams.set('addressdetails','1');u.searchParams.set('accept-language','tr');
-    const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(7000)});
+    // Zoom 12 exposes district/municipality details more reliably than zoom 10.
+    u.searchParams.set('zoom','12');u.searchParams.set('addressdetails','1');u.searchParams.set('accept-language','tr');
+    const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(9000)});
     if(!r.ok)return null;
     const x=await r.json() as {address?:Record<string,string>};
     const a=x.address||{};
-    return {province:a.province||a.state||'',district:a.city_district||a.district||a.town||''};
+    const province=a.province||a.state||a.region||'';
+    const district=a.city_district||a.district||a.county||a.municipality||a.town||'';
+    return province?{province,district}:null;
   }catch{return null}
+}
+
+export async function onRequestAreaGet({request}:{request:Request}){
+  const u=new URL(request.url);
+  const lat=Number(u.searchParams.get('lat'));
+  const lon=Number(u.searchParams.get('lon'));
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<35||lat>43||lon<25||lon>46){
+    return Response.json({error:'invalid_coordinates'},{status:400,headers:{'Cache-Control':'no-store'}});
+  }
+  const area=await reverseArea(lat,lon);
+  if(!area)return Response.json({error:'area_not_found'},{status:503,headers:{'Cache-Control':'no-store'}});
+  return Response.json(area,{headers:{'Cache-Control':'no-store'}});
 }
 
 function activeDutyDates(){
