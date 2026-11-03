@@ -451,6 +451,7 @@ function Nearby(){
           </div>
         )}
       </div>
+     }
    </>
    }
  </main>
