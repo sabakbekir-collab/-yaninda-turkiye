@@ -1,5 +1,5 @@
 import type {Place} from './types';
-import {OSM_FILTERS,buildOverpassQuery} from './osmQuery';
+import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from './osmQuery';
 const ENDPOINTS=['https://overpass-api.de/api/interpreter','https://overpass.private.coffee/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
 type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
 function km(a:number,b:number,c:number,d:number){const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))}
@@ -17,6 +17,6 @@ export async function overpassFromBrowser(category:string,lat:number,lon:number,
  const elements=fulfilled.find(x=>x.value.length>0)?.value;
  if(!elements){if(fulfilled.length)return [];throw new Error(settled.map(x=>x.status==='rejected'?(x.reason instanceof Error?x.reason.message:'network_error'):'empty').join(','))}
  const out:Place[]=[];
- for(const x of elements){const p=x.center||(x.lat!==undefined&&x.lon!==undefined?{lat:x.lat,lon:x.lon}:null),t=x.tags||{},name=txt(t.name||t['name:tr']||t.brand||t.operator,160);if(!p||!name||name.length<2)continue;const distance=km(lat,lon,p.lat,p.lon);if(distance>radiusKm)continue;const street=[t['addr:street'],t['addr:housenumber'],t['addr:neighbourhood']||t['addr:suburb'],t['addr:district'],t['addr:city']||t['addr:town']].filter(Boolean).join(' ');out.push({id:'osm-'+x.type+'-'+x.id,name,category,lat:p.lat,lon:p.lon,address:txt(t['addr:full']||t['contact:address']||street,300),phone:txt(t.phone||t['contact:phone']||t['contact:mobile']||t.mobile,60),openingHours:txt(t.opening_hours,180),website:txt(t.website||t['contact:website'],300),operator:txt(t.operator||t.brand,160),source:'OpenStreetMap',distance,district:txt(t['addr:district']||t['addr:suburb']||t['addr:town']||t['addr:city'],80)})}
+ for(const x of elements){const p=x.center||(x.lat!==undefined&&x.lon!==undefined?{lat:x.lat,lon:x.lon}:null),t=x.tags||{},name=txt(t.name||t['name:tr']||t.brand||t.operator,160)||UNNAMED_LABELS[category];if(!p||!name||name.length<2)continue;const distance=km(lat,lon,p.lat,p.lon);if(distance>radiusKm)continue;const street=[t['addr:street'],t['addr:housenumber'],t['addr:neighbourhood']||t['addr:suburb'],t['addr:district'],t['addr:city']||t['addr:town']].filter(Boolean).join(' ');out.push({id:'osm-'+x.type+'-'+x.id,name,category,lat:p.lat,lon:p.lon,address:txt(t['addr:full']||t['contact:address']||street,300),phone:txt(t.phone||t['contact:phone']||t['contact:mobile']||t.mobile,60),openingHours:txt(t.opening_hours,180),website:txt(t.website||t['contact:website'],300),operator:txt(t.operator||t.brand,160),source:'OpenStreetMap',distance,district:txt(t['addr:district']||t['addr:suburb']||t['addr:town']||t['addr:city'],80)})}
  out.sort((a,b)=>(a.distance??999)-(b.distance??999));return out.slice(0,40);
 }
