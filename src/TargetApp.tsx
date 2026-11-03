@@ -448,8 +448,8 @@ function Nearby(){
    {err&&!pharmacyLiveWidget&&<div className="error nearby-error">{err} {pharmacyMode&&<a href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">Resmî e-Devlet nöbetçi eczane sorgusunu aç</a>}</div>}
 
    {pharmacyLiveWidget?
-    <section className="pharmacy-live-widget" aria-label="Muş Merkez canlı nöbetçi eczane listesi">
-      <div className="result-head"><b>Muş Merkez · Canlı nöbetçi eczaneler</b><a href="https://www.eczaneler.gen.tr/nobetci-mus-merkez" target="_blank" rel="noreferrer">Kaynakta aç <ExternalLink/></a></div>
+    <section className="pharmacy-live-widget" aria-label="İl canlı nöbetçi eczane listesi">
+      <div className="result-head"><b>{canonProvince} İli · Canlı nöbetçi eczaneler</b><a href={'https://www.eczaneler.gen.tr/nobetci-'+normalizeSearchText(canonProvince).replace(/\\s+/g,'-')} target="_blank" rel="noreferrer">Kaynakta aç <ExternalLink/></a></div>
       <iframe
         src={pharmacyWidgetUrl}
         title="Eczaneler.gen.tr canlı nöbetçi eczaneler"
