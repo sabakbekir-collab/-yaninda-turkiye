@@ -1,4 +1,4 @@
-import { onRequestGet as getPlaces } from "../functions/api/places";
+import { onRequestGet as getPlaces, onRequestAreaGet as getLocationArea } from "../functions/api/places";
 import { onRequestGet as getAds } from "../functions/api/ads";
 import { onRequestPost as postEvents } from "../functions/api/events";
 import { onRequestGet as getAdmin, onRequestPost as postAdmin } from "../functions/api/admin";
@@ -116,6 +116,10 @@ export default {
 
       if ((path === "/api/ai/chat" || path === "/api/ai") && request.method === "POST") {
         return await postAiChat({ request, env });
+      }
+
+      if (path === "/api/location/area" && request.method === "GET") {
+        return await getLocationArea({ request });
       }
 
       if (path === "/api/places" && request.method === "GET") {
