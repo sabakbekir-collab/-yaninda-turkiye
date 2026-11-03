@@ -61,11 +61,21 @@ export async function findPlaces(
     throw new Error('Hizmet verileri şu anda alınamadı.');
   }
   if(!Array.isArray(data))throw new Error('invalid places response');
-  return data.filter((p):p is Place=>Boolean(
+  const cleaned=data.filter((p):p is Place=>Boolean(
     p&&typeof p.name==='string'&&p.name.trim().length>=2&&
     !/^isimsiz( açık veri kaydı)?$/i.test(p.name.trim())&&
     (category!=='pharmacy'||p.isDuty===true)
   ));
+  // The Worker may return HTTP 200 with an empty array when its upstream
+  // providers respond successfully but have no records. For GPS searches,
+  // try the same OSM query from the phone before displaying a false zero.
+  if(cleaned.length===0&&category!=='pharmacy'&&position&&Number.isFinite(position.lat)&&Number.isFinite(position.lon)){
+    try{return await overpassFromBrowser(category,position.lat,position.lon,options.radiusKm??5)}catch(error){
+      const detail=error instanceof Error?error.message:'browser_fallback_failed';
+      throw new Error('Bu bölgede sunucudan sonuç gelmedi; telefonun doğrudan harita sorgusu da başarısız ('+detail+').');
+    }
+  }
+  return cleaned;
 }
 
 export function track(type:string,metadata:Record<string,string|number|boolean>={}){
