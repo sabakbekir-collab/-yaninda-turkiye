@@ -114,17 +114,7 @@ function Home(){
    return()=>{cancelled=true;window.removeEventListener('yt-nearby-memory',refresh)};
  },[]);
  const go=(id:string)=>id==='emergency'?nav('/emergency'):nav('/nearby',{state:{category:id,...(readNearbyMemory().position?{position:readNearbyMemory().position,province:readNearbyMemory().province,district:readNearbyMemory().district}:{})}});
- const useDeviceLocation=async()=>{
-   // Request GPS directly inside the tap handler so iOS Safari keeps the
-   // transient user activation required to show its location permission prompt.
-   try{
-     const current=await getCurrentLocation({forceFresh:true});
-     const area=await resolveLocationArea(current);
-     nav('/nearby',{state:{position:current,province:area.province,district:area.district}});
-   }catch(error){
-     nav('/nearby',{state:{locationError:error instanceof Error?error.message:'Cihaz konumu alınamadı. Konum iznini kontrol edip tekrar deneyin.'}});
-   }
- };
+
  const go=(id:string)=>id==='emergency'?nav('/emergency'):nav('/nearby',{state:{category:id}});
  const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
  const cards=[
