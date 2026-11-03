@@ -340,6 +340,11 @@ function Nearby(){
  const categoryList=categories.filter(c=>!['service','emergency'].includes(c.id));
  const activeLabel=pharmacyMode?'Nöbetçi Eczaneler':(categoryList.find(c=>c.id===cat)?.label||services.find(s=>s[0]===cat)?.[1]||'Hizmet');
  const officialPharmacyUrl='https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama';
+ // Eczaneler.gen.tr's official Sitene Ekle iframe for Muş Merkez (lokasyon 1534).
+ // Keep this provider-owned live list separate from OSM/general pharmacy records.
+ const mushMerkezLiveWidget=pharmacyMode&&normalizeSearchText(canonProvince)==='mus'&&
+   (!canonDistrict||normalizeSearchText(canonDistrict)==='merkez'||normalizeSearchText(canonDistrict)==='mus merkez');
+ const mushMerkezWidgetUrl='https://www.eczaneler.gen.tr/iframe.php?lokasyon=1534';
 
  return <main className="inner nearby-page">
    <div className="page-title nearby-title">
@@ -406,14 +411,30 @@ function Nearby(){
 
    {err&&<div className="error nearby-error">{err} {pharmacyMode&&<a href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">Resmî e-Devlet nöbetçi eczane sorgusunu aç</a>}</div>}
 
-   <div className="result-head">
+   {mushMerkezLiveWidget?
+    <section className="pharmacy-live-widget" aria-label="Muş Merkez canlı nöbetçi eczane listesi">
+      <div className="result-head"><b>Muş Merkez · Canlı nöbetçi eczaneler</b><a href="https://www.eczaneler.gen.tr/nobetci-mus-merkez" target="_blank" rel="noreferrer">Kaynakta aç <ExternalLink/></a></div>
+      <iframe
+        src={mushMerkezWidgetUrl}
+        title="Eczaneler.gen.tr Muş Merkez nöbetçi eczaneler"
+        loading="lazy"
+        referrerPolicy="strict-origin-when-cross-origin"
+        style={{width:'100%',height:340,border:0,borderRadius:14,background:'#fff'}}
+      />
+      <p className="pharmacy-widget-note">Liste doğrudan Eczaneler.gen.tr'nin resmî “Sitene Ekle” görünümünden yüklenir. Eczaneye gitmeden önce telefonla açık olduğunu teyit et.</p>
+    </section>
+   :
+   <>
+    <div className="result-head">
      <b>{activeLabel} <span>{loading?'…':places.length}</span></b>
      <div><button className={view==='list'?'active':''} onClick={()=>setView('list')}><List/>Liste</button><button className={view==='map'?'active':''} onClick={()=>setView('map')}><MapIcon/>Harita</button></div>
-   </div>
+    </div>
 
-   {loading?<div className="results skeleton-results">{[1,2,3].map(i=><div className="nearby-skeleton" key={i}/>)}</div>:
-    view==='map'&&places[0]?<div className="map"><MapContainer center={[places[0].lat,places[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{places.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:
-    <div className="results">{places.length?places.map(p=><EnhancedPlaceCard key={p.id} p={p}/>):<div className="empty nearby-empty"><MapPin/><h3>{hasSearched?(pharmacyMode?'Bu konumda güncel nöbetçi eczane kaydı bulunamadı':'Bu bölgede kayıt bulunamadı'):'Arama yapmaya hazır'}</h3><p>{hasSearched?(pharmacyMode?'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.':'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.'):'İl / ilçe seçip Yakınımdakileri Bul’a bas veya konumunu kullan.'}</p><button onClick={hasSearched?search:locate}>{hasSearched?<Search/>:<LocateFixed/>}{hasSearched?'Tekrar Ara':'Konumumu Kullan'}</button>{hasSearched&&pharmacyMode&&<a className="official-duty-link" href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">e-Devlet’te resmî sorgula <ExternalLink/></a>}{hasSearched&&pharmacyMode&&normalizeSearchText(province)==='mus'&&<a className="official-duty-link" href="https://www.batmaneczaciodasi.org.tr/nobetci-eczaneler/mus" target="_blank" rel="noreferrer">Muş Eczacı Odası nöbet listesini aç <ExternalLink/></a>}</div>}</div>}
+    {loading?<div className="results skeleton-results">{[1,2,3].map(i=><div className="nearby-skeleton" key={i}/>)}</div>:
+     view==='map'&&places[0]?<div className="map"><MapContainer center={[places[0].lat,places[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{places.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:
+     <div className="results">{places.length?places.map(p=><EnhancedPlaceCard key={p.id} p={p}/>):<div className="empty nearby-empty"><MapPin/><h3>{hasSearched?(pharmacyMode?'Bu konumda güncel nöbetçi eczane kaydı bulunamadı':'Bu bölgede kayıt bulunamadı'):'Arama yapmaya hazır'}</h3><p>{hasSearched?(pharmacyMode?'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.':'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.'):'İl / ilçe seçip Yakınımdakiler’i Bul’a bas veya konumunu kullan.'}</p><button onClick={hasSearched?search:locate}>{hasSearched?<Search/>:<LocateFixed/>}{hasSearched?'Tekrar Ara':'Konumumu Kullan'}</button>{hasSearched&&pharmacyMode&&<a className="official-duty-link" href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">e-Devlet’te resmî sorgula <ExternalLink/></a>}{hasSearched&&pharmacyMode&&normalizeSearchText(province)==='mus'&&<a className="official-duty-link" href="https://www.batmaneczaciodasi.org.tr/nobetci-eczaneler/mus" target="_blank" rel="noreferrer">Muş Eczacı Odası nöbet listesini aç <ExternalLink/></a>}</div>}</div>
+   </>
+   }
  </main>
 }
 function LegacyPlaceCard({p}:{p:Place}){
