@@ -240,13 +240,20 @@ async function overpass(category:string,lat:number,lon:number,radiusKm:number):P
     if(!Array.isArray(data.elements))throw new Error('overpass_bad_body');
     return data.elements;
   };
-  try{
-    const elements=await Promise.any(endpoints.map(ask));
+  // A valid empty response from one replica must not win the race while
+  // another replica has actual places. Keep the first non-empty result.
+  const settled=await Promise.allSettled(endpoints.map(ask));
+  const fulfilled=settled.filter((x):x is PromiseFulfilledResult<OsmEl[]>=>x.status==='fulfilled');
+  const elements=fulfilled.find(x=>x.value.length>0)?.value;
+  if(elements){
     const mapped:Place[]=[];
     for(const x of elements){const p=osmPlace(x,category,lat,lon);if(p!==null)mapped.push(p)}
     mapped.sort((a,b)=>(a.distance??999)-(b.distance??999));
     return {ok:true,places:mapped};
-  }catch{}
+  }
+  // At least one server answered correctly but reported no records: this is
+  // a genuine empty result, not an upstream outage.
+  if(fulfilled.length)return {ok:true,places:[]};
   return {ok:false,places:[]};
 }
 
@@ -266,7 +273,7 @@ async function nominatimFallback(env:Env,category:string,area:string,lat:number,
   if(Array.isArray(cached))return {places:cached as Place[],ok:true};
   try{
     const u=new URL('https://nominatim.openstreetmap.org/search');
-    u.searchParams.set('format','jsonv2');u.searchParams.set('q',term+', '+area);
+    u.searchParams.set('format','jsonv2');u.searchParams.set('q',area?term+', '+area:term);
     u.searchParams.set('limit','20');u.searchParams.set('countrycodes','tr');u.searchParams.set('layer','poi');
     u.searchParams.set('viewbox',`${(lon-box).toFixed(5)},${(lat+box).toFixed(5)},${(lon+box).toFixed(5)},${(lat-box).toFixed(5)}`);
     u.searchParams.set('bounded','1');u.searchParams.set('addressdetails','1');u.searchParams.set('accept-language','tr');
@@ -354,10 +361,19 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   let places=primary.places;
   let upstreamOk=primary.ok;
   if(!places.length){
-    const fallback=await nominatimFallback(env,category,areaQuery(district,province),lat,lon,effectiveRadius);
+    // GPS searches may not have a manually selected province/district.
+    // Resolve the area for the text-search fallback, but keep coordinate-based
+    // search working even if reverse geocoding is temporarily unavailable.
+    let fallbackArea=areaQuery(district,province);
+    if(!fallbackArea){
+      const resolved=await reverseArea(lat,lon);
+      fallbackArea=areaQuery(resolved?.district||'',resolved?.province||'');
+    }
+    const fallback=await nominatimFallback(env,category,fallbackArea,lat,lon,effectiveRadius);
     places=fallback.places;
-    // An empty fallback after a failed Overpass call is NOT proof that nothing exists: keep the failure visible.
-    if(fallback.places.length)upstreamOk=true;
+    // A successful empty provider response is a valid zero-result response;
+    // only report upstream failure when every source failed.
+    if(fallback.ok)upstreamOk=true;
   }
 
   let approved:Place[]=[];
