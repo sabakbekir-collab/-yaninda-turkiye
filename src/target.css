@@ -272,3 +272,45 @@ html[data-theme="dark"]{color-scheme:light;filter:none;background:#fff7fb}
 .location-live-dot{width:9px;height:9px;border-radius:50%;background:#20b878;box-shadow:0 0 0 4px #20b87820}
 .action-row{grid-template-columns:minmax(0,1fr)}
 @media(max-width:760px){.modern-location-status{margin-left:12px;margin-right:12px;width:calc(100% - 24px)}}
+
+
+/* Mobile-first premium home refresh inspired by the approved reference */
+.yt-modern-home{max-width:760px;padding-bottom:100px}
+.modern-home-head{padding:17px 16px 12px}
+.modern-brand-mark{border-radius:50% 50% 50% 12%;width:48px;height:48px}
+.modern-brand-block strong{font-size:19px;letter-spacing:-.04em}
+.modern-welcome-banner{margin:5px 14px 13px;min-height:174px;border-radius:23px;overflow:hidden;position:relative;padding:22px 20px;color:#fff;background:linear-gradient(100deg,rgba(37,5,65,.94),rgba(107,17,127,.7) 58%,rgba(227,26,83,.42)),url('https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?auto=format&fit=crop&w=1200&q=85') center 48%/cover;box-shadow:0 12px 28px #68155c30}
+.modern-welcome-banner:after{content:'';position:absolute;inset:auto -25px -75px auto;width:210px;height:210px;border:1px solid #ffffff55;border-radius:50%;box-shadow:0 0 0 22px #ffffff12,0 0 0 46px #ffffff0b}
+.modern-welcome-banner>div{position:relative;z-index:1}
+.modern-welcome-banner span{font-size:9px;font-weight:900;letter-spacing:.16em;color:#ffd9ef}
+.modern-welcome-banner h1{font:800 26px/1.08 Manrope;margin:9px 0 7px;letter-spacing:-.04em}
+.modern-welcome-banner p{font-size:11px;margin:0;color:#ffe9f5}
+.modern-welcome-banner>svg{position:absolute;right:27px;top:30px;width:64px;height:64px;color:#fff;opacity:.9;filter:drop-shadow(0 7px 12px #23052b)}
+.modern-search{margin-top:0;border-radius:999px;height:50px}
+.modern-location-status{border-radius:13px;min-height:48px;margin-bottom:14px}
+.modern-section-title h2{font-size:17px}
+.modern-quick{gap:8px}
+.modern-quick button{border-radius:13px;min-height:68px}
+.modern-service-list{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.modern-service-card{min-height:103px;border-radius:16px;padding:9px 7px;align-items:center;text-align:center;justify-content:flex-start;gap:7px}
+.modern-service-icon{width:43px;height:43px;border-radius:14px;box-shadow:0 4px 10px #3a154d10}
+.modern-service-card>div{width:100%;display:grid;gap:2px}
+.modern-service-card strong{font-size:9px;line-height:1.2}
+.modern-service-card small{display:none}
+.modern-service-card>img{display:none}
+.modern-card-arrow{display:none}
+.modern-service-card:nth-child(1) .modern-service-icon{background:linear-gradient(145deg,#ff3151,#d10d39);color:#fff}
+.modern-service-card:nth-child(2) .modern-service-icon{background:linear-gradient(145deg,#3195ff,#1554d1);color:#fff}
+.modern-service-card:nth-child(3) .modern-service-icon{background:linear-gradient(145deg,#a44df2,#5e22c9);color:#fff}
+.modern-service-card:nth-child(4) .modern-service-icon{background:linear-gradient(145deg,#ffad28,#ed6500);color:#fff}
+.modern-service-card:nth-child(5) .modern-service-icon{background:linear-gradient(145deg,#18c978,#078c54);color:#fff}
+.modern-service-card:nth-child(6) .modern-service-icon{background:linear-gradient(145deg,#ffb52e,#e77a00);color:#fff}
+.modern-service-card:nth-child(7) .modern-service-icon{background:linear-gradient(145deg,#ff527f,#d51b54);color:#fff}
+.modern-service-card:nth-child(8) .modern-service-icon{background:linear-gradient(145deg,#31a6ed,#1765bf);color:#fff}
+.modern-campaign-link{border-radius:14px}
+.mobile-nav{height:68px;padding:6px 8px max(6px,env(safe-area-inset-bottom));grid-template-columns:repeat(4,1fr)}
+.mobile-nav a{gap:4px;font-size:10px;font-weight:700}
+.mobile-nav a svg{width:20px;height:20px}
+.mobile-nav a.active{color:#e52b62}
+@media(min-width:761px){.yt-modern-home{max-width:900px}.modern-welcome-banner{min-height:220px;padding:30px}.modern-welcome-banner h1{font-size:34px}.modern-service-list{grid-template-columns:repeat(4,minmax(0,1fr))}.modern-service-card{min-height:125px}}
+@media(max-width:390px){.modern-service-list{gap:6px}.modern-service-card{min-height:96px;padding:7px 4px}.modern-service-icon{width:39px;height:39px}.modern-service-card strong{font-size:8px}.modern-welcome-banner{min-height:155px}.modern-welcome-banner h1{font-size:23px}}
