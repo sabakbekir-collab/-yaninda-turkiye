@@ -156,12 +156,18 @@ function Home(){
  </main>
 }
 type NearbyMemory={category?:string;province?:string;district?:string;radius?:number;nearbyDistricts?:boolean;position?:Position};
+function cleanNearbyMemory(value:NearbyMemory):NearbyMemory{
+  const province=typeof value.province==='string'?value.province:'';
+  const rawDistrict=typeof value.district==='string'?value.district:'';
+  const district=rawDistrict?(resolveName(rawDistrict,districtsFor(province))||''):'';
+  return {...value,province,district};
+}
 function readNearbyMemory():NearbyMemory{
-  try{const raw=localStorage.getItem('yt-nearby-selection-v5');if(!raw)return {};const value=JSON.parse(raw) as NearbyMemory;return value&&typeof value==='object'?value:{};}catch{return {}}
+  try{const raw=localStorage.getItem('yt-nearby-selection-v5');if(!raw)return {};const value=JSON.parse(raw) as NearbyMemory;return value&&typeof value==='object'?cleanNearbyMemory(value):{};}catch{return {}}
 }
 function writeNearbyMemory(value:NearbyMemory){
   try{
-    localStorage.setItem('yt-nearby-selection-v5',JSON.stringify(value));
+    localStorage.setItem('yt-nearby-selection-v5',JSON.stringify(cleanNearbyMemory(value)));
     window.dispatchEvent(new Event('yt-nearby-memory'));
   }catch{}
 }
