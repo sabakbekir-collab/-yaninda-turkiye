@@ -79,6 +79,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
+          # Keep workflow files controlled by the repository, not by the uploaded archive.
+          git restore --source=HEAD --staged --worktree .github/workflows
           if git diff --cached --quiet; then
             echo "No project changes to commit."
           else
