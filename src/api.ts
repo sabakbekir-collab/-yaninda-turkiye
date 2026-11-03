@@ -55,7 +55,9 @@ export async function findPlaces(
             throw new Error('Sunucu ve telefon bağlantısından harita verisi alınamadı ('+detail+'). Biraz sonra tekrar deneyin.');
           }
         }
-        throw new Error('Hizmet verisi sağlayıcısına şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.');
+        const attempts=(data as {attempts?:unknown}).attempts;
+        const detail=Array.isArray(attempts)&&attempts.length?' Kaynak yanıtları: '+attempts.slice(0,4).map(String).join(' | '):'';
+        throw new Error('Hizmet verisi sağlayıcısına şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.'+detail);
       }
     }
     throw new Error('Hizmet verileri şu anda alınamadı.');
