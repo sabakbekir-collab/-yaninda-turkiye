@@ -196,7 +196,8 @@ async function overpass(category:string,lat:number,lon:number,radiusKm:number):P
     'https://overpass-api.de/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
     'https://overpass.kumi.systems/api/interpreter',
-    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+    'https://overpass.openstreetmap.fr/api/interpreter',
+    'https://lz4.overpass-api.de/api/interpreter',
   ];
   const ask=async(endpoint:string):Promise<OsmEl[]>=>{
     const r=await fetch(endpoint,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded','User-Agent':OSM_UA},body:'data='+encodeURIComponent(query),signal:AbortSignal.timeout(9000)});
@@ -205,8 +206,26 @@ async function overpass(category:string,lat:number,lon:number,radiusKm:number):P
     if(!Array.isArray(data.elements))throw new Error('overpass_bad_body');
     return data.elements;
   };
+  const askNonEmpty=async(endpoint:string)=>{
+    const elements=await ask(endpoint);
+    if(!elements.length)throw new Error('overpass_empty');
+    return elements;
+  };
+  const runRound=()=>Promise.any(endpoints.map(askNonEmpty));
   try{
-    const elements=await Promise.any(endpoints.map(ask));
+    let elements:OsmEl[];
+    try{elements=await runRound();}
+    catch(first){
+      await new Promise(resolve=>setTimeout(resolve,1500));
+      try{elements=await runRound();}
+      catch(second){
+        const errors=[...(first instanceof AggregateError?first.errors:[first]),...(second instanceof AggregateError?second.errors:[second])];
+        const attempts=errors.map(x=>x instanceof Error?x.message:String(x));
+        // Empty from every replica is a genuine no-record result, not a transport outage.
+        if(attempts.length&&attempts.every(x=>x==='overpass_empty'))return {ok:true,places:[],raw:0,attempts};
+        return {ok:false,places:[],attempts:attempts.slice(0,10)};
+      }
+    }
     const mapped:Place[]=[];
     for(const x of elements){const p=osmPlace(x,category,lat,lon);if(p!==null)mapped.push(p)}
     mapped.sort((a,b)=>(a.distance??999)-(b.distance??999));
