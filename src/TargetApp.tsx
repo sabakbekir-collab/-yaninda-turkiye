@@ -192,8 +192,8 @@ function Nearby(){
  const state=location.state as NearbyNavigationState|null;
 
  const[cat,setCat]=useState(params.get('category')||state?.category||memory.category||'pharmacy');
- const[province,setProvince]=useState(params.get('province')||state?.province||memory.province||'');
- const[district,setDistrict]=useState(params.get('district')||state?.district||memory.district||'');
+ const[province,setProvince]=useState(params.get('province')||state?.province||'');
+ const[district,setDistrict]=useState(params.get('district')||state?.district||'');
  const[provinceOpen,setProvinceOpen]=useState(false);
  const locateRef=useRef<()=>void>(()=>{});
  const[districtOpen,setDistrictOpen]=useState(false);
@@ -239,19 +239,15 @@ function Nearby(){
        const permission=await getLocationPermissionState();
        if(cancelled)return;
        setLocationState(permission);
-       if(state?.position||province||district||submitted)return;
-       const saved=readNearbyMemory();
-       if(saved.position&&saved.province){
-         setPos(saved.position);setProvince(saved.province);setDistrict(saved.district||'');
-         setHasSearched(true);
-         setSubmitted({category:cat,province:saved.province,district:saved.district||'',radius,nearbyDistricts,pos:saved.position});
-         return;
-       }
+       // Explicit URL/navigation selections are manual; otherwise always detect
+       // the device's current location on entry instead of reusing stale GPS.
+       if(state?.position||params.has('province')||params.has('district')||state?.province||state?.district)return;
        if(permission==='denied'||permission==='unsupported')return;
        const current=await getCurrentLocation({forceFresh:true});
        const area=await resolveLocationArea(current);
        if(cancelled)return;
        setPos(current);setProvince(area.province);setDistrict(area.district);setLocationState('granted');setHasSearched(true);
+       const saved=readNearbyMemory();
        writeNearbyMemory({...saved,province:area.province,district:area.district,position:current});
        setSubmitted({category:cat,province:area.province,district:area.district,radius,nearbyDistricts,pos:current});
      }catch(error){
@@ -479,7 +475,7 @@ function Nearby(){
             <MapPin />
             <h3>{hasSearched ? (pharmacyMode ? 'Bu konumda güncel nöbetçi eczane kaydı bulunamadı' : 'Bu bölgede kayıt bulunamadı') : 'Arama yapmaya hazır'}</h3>
             <p>{hasSearched ? (pharmacyMode ? 'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl / ilçe seçip Yakınındakileri Bul’a bas veya konumunu kullan.'}</p>
-            <button onClick={hasSearched ? search : locate}>{hasSearched ? <Search /> : <LocateFixed />}{hasSearched ? 'Tekrar Ara' : 'Konumumu Kullan'}</button>
+            {hasSearched&&<button onClick={search}><Search/>Tekrar Ara</button>}
             {hasSearched && pharmacyMode && <a className="official-duty-link" href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">e-Devlet’te resmî sorgula <ExternalLink /></a>}
             {hasSearched && pharmacyMode && normalizeSearchText(province) === 'mus' && <a className="official-duty-link" href="https://www.batmaneczaciodasi.org.tr/nobetci-eczaneler/mus" target="_blank" rel="noreferrer">Muş Eczacı Odası nöbet listesini aç <ExternalLink /></a>}
           </div>
