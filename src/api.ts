@@ -1,4 +1,5 @@
 import type {Place,Position} from './types';
+import {overpassFromBrowser} from './overpassClient';
 
 export type PlaceSearchOptions={
   radiusKm?:number;
@@ -46,6 +47,14 @@ export async function findPlaces(
         throw new Error('Güncel nöbetçi eczane verisine şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.');
       }
       if(code==='upstream_unavailable'){
+        // Worker kaynaklarına bulut IP'sinden erişilemiyorsa, aynı koordinatları
+        // kullanıcının kendi internet bağlantısından doğrudan sorgula.
+        if(category!=='pharmacy'&&position&&Number.isFinite(position.lat)&&Number.isFinite(position.lon)){
+          try{return await overpassFromBrowser(category,position.lat,position.lon,options.radiusKm??5)}catch(error){
+            const detail=error instanceof Error?error.message:'browser_fallback_failed';
+            throw new Error('Sunucu ve telefon bağlantısından harita verisi alınamadı ('+detail+'). Biraz sonra tekrar deneyin.');
+          }
+        }
         throw new Error('Hizmet verisi sağlayıcısına şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.');
       }
     }
