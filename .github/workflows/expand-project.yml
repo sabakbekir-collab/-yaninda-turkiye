@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'yaninda-turkiye-fixed*.zip'
+      - '.github/workflows/expand-project.yml'
   workflow_dispatch:
 
 permissions:
