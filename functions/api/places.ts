@@ -1,41 +1,11 @@
 // Yanımda Türkiye places.ts — strict-null-safe production build
 import type {Env,Place} from '../lib/types';
 import {isCentralDistrict,trSlug} from '../../src/text';
+import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery';
 
 type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
 
-const filters:Record<string,string>={
-  pharmacy:'["amenity"="pharmacy"]',
-  hospital:'["amenity"~"hospital|clinic"]',
-  atm:'["amenity"="atm"]',
-  police:'["amenity"="police"]',
-  fire_station:'["amenity"="fire_station"]',
-  fuel:'["amenity"="fuel"]',
-  taxi:'["amenity"="taxi"]',
-  market:'["shop"~"supermarket|convenience"]',
-  restaurant:'["amenity"~"restaurant|fast_food"]',
-  bakery:'["shop"="bakery"]',
-  transport:'["public_transport"]',
-  hotel:'["tourism"~"hotel|hostel|guest_house"]',
-  cargo:'["amenity"="post_office"]',
-  towing:'["service:vehicle:recovery"="yes"]',
-  government:'["office"="government"]',
-  electrician:'["craft"="electrician"]',
-  plumber:'["craft"="plumber"]',
-  locksmith:'["craft"="locksmith"]',
-  cleaning:'["craft"="cleaning"]',
-  moving:'["craft"="moving_company"]',
-  hvac:'["craft"~"hvac|heating_engineer"]',
-  painter:'["craft"="painter"]',
-  car_repair:'["shop"="car_repair"]',
-  tyres:'["shop"="tyres"]',
-  phone_repair:'["shop"="mobile_phone"]',
-  computer_repair:'["shop"="computer"]',
-  furniture:'["craft"="carpenter"]',
-  gardener:'["craft"="gardener"]',
-  other:'["craft"]',
-  service:'["craft"]'
-};
+const filters=OSM_FILTERS;
 
 // HTTP header values must be ASCII; Turkish dotless ı makes fetch() reject the request before sending it.
 const OSM_UA='YanimdaTurkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)';
@@ -43,7 +13,7 @@ const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').replace
 const slug=trSlug;
 const areaQuery=(district:string,province:string)=>[district&&!isCentralDistrict(district)?district:'',province,'Türkiye'].filter(Boolean).join(', ');
 const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
-const cacheKey=(...parts:string[])=>'places:v13:'+parts.join(':');
+const cacheKey=(...parts:string[])=>'places:v14:'+parts.join(':');
 
 function tidyAddress(tags:Record<string,string>,fallback?:string){
   const full=tags['addr:full']||tags['contact:address'];
@@ -89,7 +59,7 @@ async function geocode(env:Env,query:string):Promise<{lat:number;lon:number}|nul
 function osmPlace(x:OsmEl,category:string,lat:number,lon:number):Place|null{
   const p=x.center||{lat:x.lat!,lon:x.lon!};
   const tags=x.tags||{};
-  const name=clean(tags.name||tags['name:tr']||tags.brand||tags.operator);
+  const name=clean(tags.name||tags['name:tr']||tags.brand||tags.operator)||UNNAMED_LABELS[category];
   if(!name||name.length<2||/^isimsiz( açık veri kaydı)?$/i.test(name))return null;
   const d=distance(lat,lon,p.lat,p.lon);
   const district=clean(tags['addr:district']||tags['addr:suburb']||tags['addr:town']||tags['addr:city']);
@@ -220,13 +190,8 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
   }
 }
 
-async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean}>{
-  const f=filters[category];
-  const meters=Math.max(2000,Math.min(30000,Math.round(radiusKm*1000)));
-  const query=category==='government'
-    ? `[out:json][timeout:20];(node["office"="government"](around:${meters},${lat},${lon});way["office"="government"](around:${meters},${lat},${lon});relation["office"="government"](around:${meters},${lat},${lon});node["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon});way["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon});relation["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon}););out center tags 300;`
-    : `[out:json][timeout:20];(node${f}(around:${meters},${lat},${lon});way${f}(around:${meters},${lat},${lon});relation${f}(around:${meters},${lat},${lon}););out center tags 300;`;
-  // Public Overpass servers are often rate-limited or overloaded: ask several in parallel and take the first valid answer.
+async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean;attempts?:string[];raw?:number}>{
+  const query=buildOverpassQuery(category,lat,lon,radiusKm);
   const endpoints=[
     'https://overpass-api.de/api/interpreter',
     'https://overpass.private.coffee/api/interpreter',
@@ -240,21 +205,16 @@ async function overpass(category:string,lat:number,lon:number,radiusKm:number):P
     if(!Array.isArray(data.elements))throw new Error('overpass_bad_body');
     return data.elements;
   };
-  // A valid empty response from one replica must not win the race while
-  // another replica has actual places. Keep the first non-empty result.
-  const settled=await Promise.allSettled(endpoints.map(ask));
-  const fulfilled=settled.filter((x):x is PromiseFulfilledResult<OsmEl[]>=>x.status==='fulfilled');
-  const elements=fulfilled.find(x=>x.value.length>0)?.value;
-  if(elements){
+  try{
+    const elements=await Promise.any(endpoints.map(ask));
     const mapped:Place[]=[];
     for(const x of elements){const p=osmPlace(x,category,lat,lon);if(p!==null)mapped.push(p)}
     mapped.sort((a,b)=>(a.distance??999)-(b.distance??999));
-    return {ok:true,places:mapped};
+    return {ok:true,places:mapped,raw:elements.length};
+  }catch(e){
+    const attempts=e instanceof AggregateError?e.errors.map(x=>x instanceof Error?x.message:String(x)):[e instanceof Error?e.message:'overpass_error'];
+    return {ok:false,places:[],attempts};
   }
-  // At least one server answered correctly but reported no records: this is
-  // a genuine empty result, not an upstream outage.
-  if(fulfilled.length)return {ok:true,places:[]};
-  return {ok:false,places:[]};
 }
 
 const nomTerms:Record<string,string>={
@@ -360,6 +320,8 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   const primary=await overpass(category,lat,lon,effectiveRadius);
   let places=primary.places;
   let upstreamOk=primary.ok;
+  const attempts=primary.attempts||[];
+  const rawCount=primary.raw;
   if(!places.length){
     // GPS searches may not have a manually selected province/district.
     // Resolve the area for the text-search fallback, but keep coordinate-based
@@ -399,7 +361,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     .sort((a,b)=>(a.distance??999)-(b.distance??999))
     .slice(0,40);
 
-  if(!result.length&&!upstreamOk)return Response.json({error:'upstream_unavailable'},{status:503,headers:{'Cache-Control':'no-store'}});
+  if(!result.length&&!upstreamOk)return Response.json({error:'upstream_unavailable',attempts,center:{lat,lon}},{status:503,headers:{'Cache-Control':'no-store'}});
   await dbCachePut(env,key,result,result.length?15*60*1000:5*60*1000);
-  return Response.json(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'OpenStreetMap'}});
+  return Response.json(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'OpenStreetMap','X-Upstream-Raw':String(rawCount??'')}});
 }
