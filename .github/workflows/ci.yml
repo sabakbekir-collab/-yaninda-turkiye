@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - 'yaninda-turkiye-fixed.zip'
+      - 'yaninda-turkiye-fixed*.zip'
   pull_request:
     branches: [main]
 
