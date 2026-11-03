@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
     paths:
-      - 'yaninda-turkiye-fixed.zip'
+      - 'yaninda-turkiye-fixed*.zip'
   workflow_dispatch:
 
 permissions:
@@ -25,20 +25,29 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Check archive
+      - name: Find and check archive
         shell: bash
         run: |
           set -euo pipefail
-          test -s yaninda-turkiye-fixed.zip
-          unzip -tq yaninda-turkiye-fixed.zip
+          shopt -s nullglob
+          archives=(yaninda-turkiye-fixed*.zip)
+          if [ "${#archives[@]}" -ne 1 ]; then
+            echo "Expected exactly one yaninda-turkiye-fixed*.zip archive; found ${#archives[@]}."
+            printf '%s\n' "${archives[@]}"
+            exit 1
+          fi
+          printf '%s\n' "${archives[0]}" > .yaninda_archive_name
+          test -s "${archives[0]}"
+          unzip -tq "${archives[0]}"
 
       - name: Extract project
         shell: bash
         run: |
           set -euo pipefail
+          archive="$(cat .yaninda_archive_name)"
           rm -rf .yaninda_extract
           mkdir .yaninda_extract
-          unzip -q yaninda-turkiye-fixed.zip -d .yaninda_extract
+          unzip -q "$archive" -d .yaninda_extract
           shopt -s dotglob nullglob
           entries=(.yaninda_extract/*)
           if [ "${#entries[@]}" -eq 1 ] && [ -d "${entries[0]}" ]; then
@@ -46,7 +55,7 @@ jobs:
           else
             cp -a .yaninda_extract/. .
           fi
-          rm -rf .yaninda_extract yaninda-turkiye-fixed.zip
+          rm -rf .yaninda_extract "$archive" .yaninda_archive_name
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
