@@ -20,9 +20,13 @@ export async function overpassFromBrowser(category:string,lat:number,lon:number,
  };
  let elements:OsmEl[];
  try{elements=await Promise.any(ENDPOINTS.map(ask))}
- catch{
+ catch(first){
   await new Promise(res=>setTimeout(res,1500));
-  elements=await Promise.any(ENDPOINTS.map(ask));
+  try{elements=await Promise.any(ENDPOINTS.map(ask))}
+  catch(second){
+   const errors=[...(first instanceof AggregateError?first.errors:[first]),...(second instanceof AggregateError?second.errors:[second])];
+   throw new Error(errors.map(x=>x instanceof Error?x.message:String(x)).slice(0,10).join(' | '));
+  }
  }
  const out:Place[]=[];
  for(const x of elements){
