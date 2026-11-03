@@ -1,5 +1,7 @@
 import type {Place,Position} from './types';
 import {overpassFromBrowser} from './overpassClient';
+import {districtsFor} from './turkeyDistricts';
+import {resolveName} from './text';
 
 export type PlaceSearchOptions={
   radiusKm?:number;
@@ -18,7 +20,12 @@ export async function resolveLocationArea(position:Position):Promise<ResolvedLoc
   if(!response.ok)throw new Error('Konumdan il ve ilçe bilgisi belirlenemedi.');
   const data=await response.json() as Partial<ResolvedLocationArea>;
   if(typeof data.province!=='string'||!data.province.trim())throw new Error('Konumdan il bilgisi alınamadı.');
-  return {province:data.province.trim(),district:typeof data.district==='string'?data.district.trim():''};
+  const province=data.province.trim();
+  const rawDistrict=typeof data.district==='string'?data.district.trim():'';
+  // Reverse geocoders sometimes return a neighbourhood/suburb in the district field.
+  // Only accept a district that exactly matches the official district list for that province.
+  const district=rawDistrict?(resolveName(rawDistrict,districtsFor(province))||''):'';
+  return {province,district};
 }
 
 export async function findPlaces(
