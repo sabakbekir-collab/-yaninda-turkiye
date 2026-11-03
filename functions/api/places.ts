@@ -129,18 +129,31 @@ function activeDutyDates(){
   if(hour<9){today.setUTCDate(today.getUTCDate()-1);dates.push(today.toISOString().slice(0,10));}
   return dates;
 }
-function isActiveDutyDate(value?:string){
-  if(!value)return false;
+/** Normalises provider dates (YYYY-MM-DD, DD.MM.YYYY, ISO with time/offset, epoch) to an Istanbul calendar day. */
+function dutyDateKey(value:unknown):string|null{
+  if(value===null||value===undefined||value==='')return null;
+  const istDay=(d:Date)=>Number.isNaN(d.getTime())?null:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
+  if(typeof value==='number')return istDay(new Date(value<1e12?value*1000:value));
+  if(typeof value!=='string')return null;
   const raw=value.trim();
-  let normalized=raw.slice(0,10);
-  const dmy=raw.match(/^(\d{2})[./-](\d{2})[./-](\d{4})/);
-  if(dmy)normalized=dmy[3]+'-'+dmy[2]+'-'+dmy[1];
-  return activeDutyDates().includes(normalized);
+  const dmy=raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
+  if(dmy)return dmy[3]+'-'+dmy[2].padStart(2,'0')+'-'+dmy[1].padStart(2,'0');
+  if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;
+  // ISO timestamps with a time part: convert to the Istanbul day (UTC midnight of the TR day is 21:00Z the day before).
+  if(/^\d{4}-\d{2}-\d{2}[T ]/.test(raw)){
+    const hasZone=/(Z|[+-]\d{2}:?\d{2})$/.test(raw);
+    return hasZone?istDay(new Date(raw)):raw.slice(0,10);
+  }
+  return null;
+}
+function isActiveDutyDate(value?:unknown){
+  const key=dutyDateKey(value);
+  return key!==null&&activeDutyDates().includes(key);
 }
 
 export async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,_radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string;reason?:string;providerStatus?:number}>{
   const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string,applyDistrictFilter:boolean)=>{
-    if(!isActiveDutyDate(data.date)||!Array.isArray(data.pharmacies))return [];
+    if(!Array.isArray(data.pharmacies))return [];
     const out:Place[]=[];
     for(const [i,x] of data.pharmacies.entries()){
       // Provider JSON is untrusted: malformed null/primitive rows must not crash the whole response.
@@ -152,6 +165,9 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
       };
       const la=coordinate(x.lat,x.latitude),lo=coordinate(x.lng,x.lon,x.longitude),name=clean(x.name);
       if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < -90||la > 90||lo < -180||lo > 180)continue;
+      // Each record may carry its own duty date; otherwise the feed date applies. Unknown or stale dates are never shown as "nöbetçi".
+      const recordDate=x.date??x.duty_date??x.dutyDate??x.nobet_tarihi;
+      if(!isActiveDutyDate(recordDate??data.date))continue;
       const recordDistrict=clean(x.district);
       if(applyDistrictFilter&&district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
       const d=distance(lat,lon,la,lo);
@@ -162,7 +178,7 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
         source:'Veri: Eczane Adresi (CC BY 4.0) — resmî doğrulama değildir',distance:d,
         district:recordDistrict||undefined,isDuty:true,
         officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
-        verifiedAt:data.date,dutyUpdatedAt:new Date().toISOString()
+        verifiedAt:dutyDateKey(recordDate??data.date)||undefined,dutyUpdatedAt:new Date().toISOString()
       });
     }
     out.sort((a,b)=>(a.distance??999)-(b.distance??999));
@@ -195,7 +211,8 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
       return {places:[],ok:false,reason,providerStatus:st};
     }
     // A feed dated neither today nor (before 09:00 TR) yesterday is stale: never show it as "nöbetçi".
-    if(!isActiveDutyDate(data.date))return {places:[],ok:false,date:data.date,reason:'stale_duty_list'};
+    const anyActive=Array.isArray(data.pharmacies)&&data.pharmacies.some(x=>x&&typeof x==='object'&&isActiveDutyDate((x as Record<string,unknown>).date??(x as Record<string,unknown>).duty_date??(x as Record<string,unknown>).dutyDate??(x as Record<string,unknown>).nobet_tarihi??data.date));
+    if(!all.length&&!anyActive&&Array.isArray(data.pharmacies)&&data.pharmacies.length>0)return {places:[],ok:false,date:String(data.date??''),reason:'stale_duty_list'};
     return {places:all.slice(0,25),ok:true,date:data.date};
   }catch(e){
     const timeout=e instanceof Error&&(e.name==='TimeoutError'||e.name==='AbortError');
@@ -209,23 +226,27 @@ async function overpass(category:string,lat:number,lon:number,radiusKm:number):P
   const query=category==='government'
     ? `[out:json][timeout:20];(node["office"="government"](around:${meters},${lat},${lon});way["office"="government"](around:${meters},${lat},${lon});relation["office"="government"](around:${meters},${lat},${lon});node["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon});way["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon});relation["amenity"~"townhall|courthouse|public_building"](around:${meters},${lat},${lon}););out center tags 300;`
     : `[out:json][timeout:20];(node${f}(around:${meters},${lat},${lon});way${f}(around:${meters},${lat},${lon});relation${f}(around:${meters},${lat},${lon}););out center tags 300;`;
-  const endpoints=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
-  for(const endpoint of endpoints){
-    try{
-      const r=await fetch(endpoint,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded','User-Agent':OSM_UA},body:'data='+encodeURIComponent(query),signal:AbortSignal.timeout(10000)});
-      if(!r.ok)continue;
-      const data=await r.json() as {elements?:OsmEl[]};
-      if(Array.isArray(data.elements)){
-        const mapped: Place[] = [];
-        for (const x of data.elements) {
-          const p = osmPlace(x, category, lat, lon);
-          if (p !== null) mapped.push(p);
-        }
-        mapped.sort((a,b)=>(a.distance??999)-(b.distance??999));
-        return {ok:true,places:mapped};
-      }
-    }catch{}
-  }
+  // Public Overpass servers are often rate-limited or overloaded: ask several in parallel and take the first valid answer.
+  const endpoints=[
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.private.coffee/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  ];
+  const ask=async(endpoint:string):Promise<OsmEl[]>=>{
+    const r=await fetch(endpoint,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded','User-Agent':OSM_UA},body:'data='+encodeURIComponent(query),signal:AbortSignal.timeout(9000)});
+    if(!r.ok)throw new Error('overpass_'+r.status);
+    const data=await r.json() as {elements?:OsmEl[]};
+    if(!Array.isArray(data.elements))throw new Error('overpass_bad_body');
+    return data.elements;
+  };
+  try{
+    const elements=await Promise.any(endpoints.map(ask));
+    const mapped:Place[]=[];
+    for(const x of elements){const p=osmPlace(x,category,lat,lon);if(p!==null)mapped.push(p)}
+    mapped.sort((a,b)=>(a.distance??999)-(b.distance??999));
+    return {ok:true,places:mapped};
+  }catch{}
   return {ok:false,places:[]};
 }
 
@@ -335,7 +356,8 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   if(!places.length){
     const fallback=await nominatimFallback(env,category,areaQuery(district,province),lat,lon,effectiveRadius);
     places=fallback.places;
-    upstreamOk=upstreamOk||fallback.ok;
+    // An empty fallback after a failed Overpass call is NOT proof that nothing exists: keep the failure visible.
+    if(fallback.places.length)upstreamOk=true;
   }
 
   let approved:Place[]=[];

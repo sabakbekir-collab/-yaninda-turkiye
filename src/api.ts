@@ -19,11 +19,17 @@ export async function findPlaces(
   p.set('radius',String(options.radiusKm??5));
   p.set('nearbyDistricts',options.nearbyDistricts?'1':'0');
 
-  const r=await fetch('/api/places?'+p.toString(),{
-    signal:AbortSignal.timeout(25000),
-    cache:'no-store',
-    headers:{Accept:'application/json'}
-  });
+  let r:Response;
+  try{
+    r=await fetch('/api/places?'+p.toString(),{
+      signal:AbortSignal.timeout(25000),
+      cache:'no-store',
+      headers:{Accept:'application/json'}
+    });
+  }catch(e){
+    if(e instanceof Error&&(e.name==='TimeoutError'||e.name==='AbortError'))throw new Error('Veri kaynağı zamanında yanıt vermedi. Lütfen "Tekrar Ara"ya dokun.');
+    throw new Error('Bağlantı kurulamadı. İnternetini kontrol edip tekrar dene.');
+  }
   let data:unknown;
   try { data=await r.json(); } catch { data=undefined; }
   if(!r.ok){
@@ -34,7 +40,7 @@ export async function findPlaces(
       const code=(data as {error?:unknown}).error;
       if(code==='duty_pharmacy_unavailable'){
         const reason=(data as {reason?:unknown}).reason;
-        if(reason==='stale_duty_list')throw new Error('Kaynaktaki nöbet listesi güncel değil; yanlış bilgi göstermemek için sonuç gizlendi. Resmî e-Devlet sorgusunu kullanabilirsin.');
+        if(reason==='stale_duty_list'){const d=(data as {date?:unknown}).date;throw new Error('Kaynaktaki nöbet listesi güncel değil'+(typeof d==='string'&&d?' (kaynak tarihi: '+d+')':'')+'; yanlış bilgi göstermemek için sonuç gizlendi. Resmî e-Devlet sorgusunu kullanabilirsin.')}
         if(reason==='provider_rate_limited')throw new Error('Nöbetçi eczane kaynağı şu anda yoğun. Lütfen birkaç dakika sonra tekrar deneyin.');
         if(reason==='provider_timeout')throw new Error('Nöbetçi eczane kaynağı zamanında yanıt vermedi. Lütfen tekrar deneyin.');
         throw new Error('Güncel nöbetçi eczane verisine şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.');
