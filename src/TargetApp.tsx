@@ -93,7 +93,27 @@ const quick:[string,string,LucideIcon,string][]=[
 ];
 
 function Home(){
- const nav=useNavigate(); const[q,setQ]=useState('');
+ const nav=useNavigate(); const[q,setQ]=useState(''); const[locationLabel,setLocationLabel]=useState(readHeaderLocation());
+ useEffect(()=>{
+   let cancelled=false;
+   const detect=async()=>{
+     try{
+       const current=await getCurrentLocation({forceFresh:true});
+       const area=await resolveLocationArea(current);
+       if(cancelled)return;
+       const previous=readNearbyMemory();
+       writeNearbyMemory({...previous,province:area.province,district:area.district,position:current});
+       setLocationLabel(area.province+(area.district?', '+area.district:''));
+     }catch{
+       if(!cancelled)setLocationLabel('Konum izni bekleniyor');
+     }
+   };
+   void detect();
+   const refresh=()=>setLocationLabel(readHeaderLocation());
+   window.addEventListener('yt-nearby-memory',refresh);
+   return()=>{cancelled=true;window.removeEventListener('yt-nearby-memory',refresh)};
+ },[]);
+ const go=(id:string)=>id==='emergency'?nav('/emergency'):nav('/nearby',{state:{category:id,...(readNearbyMemory().position?{position:readNearbyMemory().position,province:readNearbyMemory().province,district:readNearbyMemory().district}:{})}});
  const useDeviceLocation=async()=>{
    // Request GPS directly inside the tap handler so iOS Safari keeps the
    // transient user activation required to show its location permission prompt.
@@ -106,7 +126,7 @@ function Home(){
    }
  };
  const go=(id:string)=>id==='emergency'?nav('/emergency'):nav('/nearby',{state:{category:id}});
- const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query)nav('/nearby',{state:{query,category:resolveSearchCategory(query)}})};
+ const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
  const cards=[
   ['pharmacy','Nöbetçi Eczaneler','Yakınınızdaki nöbetçi eczaneleri görüntüleyin','red',Pill,imgs.pharmacy],
   ['hospital','Hastaneler','En yakın hastaneler, poliklinikler ve aciller','blue',Hospital,imgs.hospital],
@@ -124,7 +144,7 @@ function Home(){
     <button className="modern-notify" aria-label="Bildirimler"><Bell/></button>
    </section>
    <form className="modern-search" onSubmit={search}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Eczane, hastane, restoran, usta..."/><button type="button" aria-label="Sesli arama">●</button></form>
-   <button className="modern-use-location" onClick={useDeviceLocation}><span><MapPin fill="currentColor"/></span><div><b>Konumumu Kullan</b><small>Yakınımdaki tüm hizmetleri hemen göster</small></div><Navigation/></button>
+   <div className="modern-location-status"><MapPin/><span><b>Mevcut konumun</b><small>{locationLabel} · Otomatik algılanıyor</small></span><span className="location-live-dot"/></div>
    <section className="modern-section">
     <div className="modern-section-title"><h2>Hızlı işlemler</h2><button onClick={()=>nav('/services')}>Tümünü Gör <ChevronRight/></button></div>
     <div className="modern-quick">
@@ -145,7 +165,7 @@ function Home(){
    </button>
  </main>
 }
-type NearbyMemory={category?:string;province?:string;district?:string;radius?:number;nearbyDistricts?:boolean};
+type NearbyMemory={category?:string;province?:string;district?:string;radius?:number;nearbyDistricts?:boolean;position?:Position};
 function readNearbyMemory():NearbyMemory{
   try{const raw=localStorage.getItem('yt-nearby-selection-v5');if(!raw)return {};const value=JSON.parse(raw) as NearbyMemory;return value&&typeof value==='object'?value:{};}catch{return {}}
 }
@@ -225,22 +245,31 @@ function Nearby(){
 
  useEffect(()=>{
    let cancelled=false;
-   getLocationPermissionState().then(async s=>{
-     if(cancelled)return;
-     setLocationState(s);
-     // If the user already granted location permission, Yakınımda starts
-     // with the real device position. We never open a permission prompt
-     // automatically when the browser is still in "prompt" state.
-     if(s==='granted' && !state?.autoLocate && !province && !district && !submitted){
-       try{
-         const current=await getCurrentLocation();
-         if(cancelled)return;
-         setPos(current);
+   const start=async()=>{
+     try{
+       const permission=await getLocationPermissionState();
+       if(cancelled)return;
+       setLocationState(permission);
+       if(state?.position||province||district||submitted)return;
+       const saved=readNearbyMemory();
+       if(saved.position&&saved.province){
+         setPos(saved.position);setProvince(saved.province);setDistrict(saved.district||'');
          setHasSearched(true);
-         setSubmitted({category:cat,province:'',district:'',radius,nearbyDistricts,pos:current});
-       }catch{}
+         setSubmitted({category:cat,province:saved.province,district:saved.district||'',radius,nearbyDistricts,pos:saved.position});
+         return;
+       }
+       if(permission==='denied'||permission==='unsupported')return;
+       const current=await getCurrentLocation({forceFresh:true});
+       const area=await resolveLocationArea(current);
+       if(cancelled)return;
+       setPos(current);setProvince(area.province);setDistrict(area.district);setLocationState('granted');setHasSearched(true);
+       writeNearbyMemory({...saved,province:area.province,district:area.district,position:current});
+       setSubmitted({category:cat,province:area.province,district:area.district,radius,nearbyDistricts,pos:current});
+     }catch(error){
+       if(!cancelled&&error instanceof LocationError&&error.code==='permission_denied')setLocationState('denied');
      }
-   }).catch(()=>setLocationState('unknown'));
+   };
+   void start();
    return()=>{cancelled=true};
  },[]);
 
@@ -373,7 +402,6 @@ function Nearby(){
    <div className="page-title nearby-title">
      <button className="back-btn" onClick={()=>nav(-1)} aria-label="Geri">‹</button>
      <div><small>CANLI HİZMET ARAMA</small><h1>Yakınındaki Hizmetler</h1></div>
-     <button className="locate-top" onClick={locate} title="Konumumu kullan" aria-label="Konumumu kullan"><LocateFixed/><span>Konumumu Kullan</span></button>
    </div>
 
    {pharmacyMode&&<div className="pharmacy-warning">
@@ -423,7 +451,6 @@ function Nearby(){
 
      <div className="action-row">
        <button className="search-filter primary-search" onClick={search} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
-       <button className="location-search" onClick={locate} disabled={loading}><LocateFixed/> {loading?'Konum alınıyor…':'Konumumu Kullan'}</button>
      </div>
    </div>
 
