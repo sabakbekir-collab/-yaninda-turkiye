@@ -1,4 +1,4 @@
-// Shared by the Worker (functions/api/places.ts) and browser fallback (src/overpassClient.ts).
+// Shared by the Worker and browser fallback. Keep OSM requests small enough for public instances.
 export const OSM_FILTERS:Record<string,string>={
  pharmacy:'["amenity"="pharmacy"]',hospital:'["amenity"~"hospital|clinic"]',atm:'["amenity"="atm"]',
  police:'["amenity"="police"]',fire_station:'["amenity"="fire_station"]',fuel:'["amenity"="fuel"]',
@@ -11,17 +11,15 @@ export const OSM_FILTERS:Record<string,string>={
  phone_repair:'["shop"="mobile_phone"]',computer_repair:'["shop"="computer"]',furniture:'["craft"="carpenter"]',
  gardener:'["craft"="gardener"]',other:'["craft"]',service:'["craft"]'
 };
-// OSM often tags ATMs as a bank with atm=yes rather than amenity=atm.
 const EXTRA_FILTERS:Record<string,string[]>={atm:['["amenity"="bank"]["atm"="yes"]']};
-// Unnamed map features remain useful. Prefer brand/operator; otherwise use a truthful generic label.
-export const UNNAMED_LABELS:Record<string,string>={
- atm:'ATM',fuel:'Akaryakıt istasyonu',police:'Polis',fire_station:'İtfaiye',taxi:'Taksi durağı'
-};
+export const UNNAMED_LABELS:Record<string,string>={atm:'ATM',fuel:'Akaryakıt istasyonu',police:'Polis',fire_station:'İtfaiye',taxi:'Taksi durağı'};
 export function buildOverpassQuery(category:string,lat:number,lon:number,radiusKm:number):string{
  const meters=Math.max(2000,Math.min(30000,Math.round(radiusKm*1000)));
  const a=`(around:${meters},${lat},${lon})`;
- if(category==='government')return `[out:json][timeout:20];(node["office"="government"]${a};way["office"="government"]${a};relation["office"="government"]${a};node["amenity"~"townhall|courthouse|public_building"]${a};way["amenity"~"townhall|courthouse|public_building"]${a};relation["amenity"~"townhall|courthouse|public_building"]${a};);out center tags 300;`;
+ if(category==='government')return `[out:json][timeout:15];(node["office"="government"]${a};way["office"="government"]${a};relation["office"="government"]${a};node["amenity"~"townhall|courthouse|public_building"]${a};way["amenity"~"townhall|courthouse|public_building"]${a};relation["amenity"~"townhall|courthouse|public_building"]${a};);out center tags 250;`;
  const filters=[OSM_FILTERS[category],...(EXTRA_FILTERS[category]||[])];
- const parts=filters.map(f=>`node${f}${a};way${f}${a};relation${f}${a};`).join('');
- return `[out:json][timeout:20];(${parts});out center tags 300;`;
+ if(!filters[0])throw new Error('unsupported_category');
+ const withRelations=category==='hospital'||category==='hotel'||category==='transport';
+ const parts=filters.map(f=>`node${f}${a};way${f}${a};${withRelations?`relation${f}${a};`:''}`).join('');
+ return `[out:json][timeout:15];(${parts});out center tags 250;`;
 }
