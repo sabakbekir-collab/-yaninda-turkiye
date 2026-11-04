@@ -56,10 +56,10 @@ export async function findPlaces(
   try { data=await r.json(); } catch { data=undefined; }
   if(!r.ok){
     if(data&&typeof data==='object'&&'error' in data&&(data as {error?:unknown}).error==='location_geocode_failed'){
-      throw new Error('Seçilen il / ilçe haritada konumlandırılamadı. Konumumu Kullan ile GPS üzerinden tekrar ara veya ilçe seçimini kontrol et.');
+      throw new Error('Seçilen il / ilçe haritada konumlandırılamadı. İl ve ilçe seçimini kontrol et. İstersen isteğe bağlı Konumumu Kullan düğmesini deneyebilirsin.');
     }
     if(r.status===400 && data && typeof data==='object' && 'error' in data && (data as {error?:unknown}).error==='duty_pharmacy_location_unknown'){
-      throw new Error('Nöbetçi eczane araması için il bilgisi belirlenemedi. Lütfen il seç veya konum izni ver.');
+      throw new Error('Nöbetçi eczane araması için il bilgisi belirlenemedi. Lütfen il seç. GPS izni zorunlu değildir.');
     }
     if((r.status===503||r.status===429) && data && typeof data==='object' && 'error' in data){
       const code=(data as {error?:unknown}).error;
