@@ -414,3 +414,38 @@ html[data-theme="dark"]{color-scheme:light;filter:none;background:#fff7fb}
 .calendar-next button svg{width:14px;color:#b8a9bb}
 .calendar-mini-note{font-size:8px;line-height:1.5;color:#a192a5;text-align:center;margin:12px 8px}
 @media(min-width:761px){.calendar-compact{padding-top:25px}}
+
+
+/* Women's emergency support panel */
+.women-emergency-primary{width:100%;max-width:560px;margin:18px auto 15px;padding:14px 15px;border-radius:16px;background:linear-gradient(105deg,#b9164e,#e52b62);color:#fff;display:flex;align-items:center;gap:11px;text-align:left;box-shadow:0 9px 22px #bd1d562b}
+.women-emergency-primary>span{width:42px;height:42px;border-radius:13px;background:#ffffff24;display:grid;place-items:center;flex:none}
+.women-emergency-primary>span svg{width:22px}
+.women-emergency-primary>div{flex:1;display:grid;gap:4px}
+.women-emergency-primary b{font-size:12px}
+.women-emergency-primary small{font-size:9px;color:#ffe0eb}
+.women-emergency-primary strong{display:flex;align-items:center;gap:5px;font:800 18px Manrope;white-space:nowrap}
+.women-emergency-primary strong svg{width:16px}
+.women-support{max-width:650px;margin:18px auto;padding:16px;border:1px solid #f0d7e4;border-radius:19px;background:linear-gradient(145deg,#fff8fb,#fff 75%);text-align:left;box-shadow:0 8px 24px #67143c0c}
+.women-support>header{display:flex;align-items:center;gap:10px}
+.women-support>header>span{width:43px;height:43px;border-radius:14px;background:#ffe5ef;color:#d52564;display:grid;place-items:center}
+.women-support>header>span svg{width:22px}
+.women-support>header>div{display:grid;gap:3px}
+.women-support>header small{font-size:8px;font-weight:900;letter-spacing:.13em;color:#d52564}
+.women-support>header h2{font:800 19px Manrope;color:#492038;margin:0}
+.women-support>p{font-size:10px;color:#846d7a;line-height:1.5;margin:11px 0}
+.kades-link{display:flex;align-items:center;gap:10px;padding:11px;border-radius:13px;background:linear-gradient(105deg,#5b164f,#98245e);color:#fff;margin:10px 0}
+.kades-symbol{width:37px;height:37px;border-radius:11px;background:#ffffff20;display:grid;place-items:center;flex:none}
+.kades-symbol svg{width:20px}
+.kades-link>div{flex:1;display:grid;gap:4px}
+.kades-link b{font-size:10px}
+.kades-link small{font-size:8px;color:#f6dce9}
+.kades-link>svg{width:15px;flex:none}
+.women-hotline{display:flex;align-items:center;gap:10px;padding:11px 3px;border-top:1px solid #f2e7ed;color:#492b3c}
+.women-hotline>span{flex:1;display:grid;gap:3px}
+.women-hotline>span>b{font:800 16px Manrope;color:#c51e59}
+.women-hotline>span>small{font-size:10px;font-weight:800}
+.women-hotline>span>em{font-style:normal;font-size:8px;line-height:1.4;color:#927e8b}
+.women-hotline>svg{width:18px;color:#d52564;flex:none}
+.women-safety-note{display:flex;align-items:flex-start;gap:7px;margin-top:8px;padding:10px;border-radius:11px;background:#fff0f4;color:#79566a;font-size:9px;line-height:1.5}
+.women-safety-note svg{width:15px;min-width:15px;color:#c51e59}
+@media(max-width:760px){.women-support{margin:14px 0;padding:13px;border-radius:16px}.women-emergency-primary{margin-top:14px}.women-hotline>span>b{font-size:15px}}
