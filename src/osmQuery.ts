@@ -1,6 +1,6 @@
 // Shared by the Worker and browser fallback. Keep OSM requests small enough for public instances.
 export const OSM_FILTERS:Record<string,string>={
- pharmacy:'["amenity"="pharmacy"]',hospital:'["amenity"~"hospital|clinic"]',atm:'["amenity"="atm"]',
+ pharmacy:'["amenity"="pharmacy"]',hospital:'["amenity"="hospital"]',atm:'["amenity"="atm"]',
  police:'["amenity"="police"]',fire_station:'["amenity"="fire_station"]',fuel:'["amenity"="fuel"]',
  taxi:'["amenity"="taxi"]',market:'["shop"~"supermarket|convenience"]',restaurant:'["amenity"~"restaurant|fast_food"]',
  bakery:'["shop"="bakery"]',transport:'["public_transport"]',hotel:'["tourism"~"hotel|hostel|guest_house"]',
@@ -15,7 +15,7 @@ const EXTRA_FILTERS:Record<string,string[]>={
  atm:['["amenity"="bank"]["atm"="yes"]'],
  // Many Turkish public hospitals are tagged with healthcare=hospital rather
  // than amenity=hospital; include both schemas to avoid incomplete results.
- hospital:['["healthcare"="hospital"]','["healthcare"="clinic"]']
+ hospital:['["healthcare"="hospital"]']
 };
 export const UNNAMED_LABELS:Record<string,string>={atm:'ATM',fuel:'Akaryakıt istasyonu',police:'Polis',fire_station:'İtfaiye',taxi:'Taksi durağı'};
 export function buildOverpassQuery(category:string,lat:number,lon:number,radiusKm:number):string{
