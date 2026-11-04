@@ -613,8 +613,37 @@ function Emergency(){
    }}><LocateFixed/> Konumumu Yakınıma Gönder</button><small className="share-location-hint">Konum bağlantısını WhatsApp, SMS veya desteklenen başka bir uygulamayla paylaşabilirsin.</small><a className="call112" href="tel:112"><Phone/>112 Acil Çağrı</a>
  </main>
 }
-function AddBusiness(){const[ok,setOk]=useState(false);const[f,setF]=useState({name:'',category:'',phone:'',whatsapp:'',address:'',province:'İstanbul',district:'Beyoğlu',description:'',hours:''});const ds=districtsFor(f.province);const set=(k:string,v:string)=>setF(x=>({...x,[k]:v}));const submit=async(e:FormEvent)=>{e.preventDefault();const r=await fetch('/api/submissions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(f)});if(r.ok)setOk(true)};return <main className="form-page"><h1>İşletmeni / Hizmetini Ekle</h1><p>Bilgilerini bırak, inceleme sonrası ücretsiz yayınlayalım.</p>{ok?<div className="success"><ShieldCheck/><h2>Başvurun alındı.</h2></div>:<form onSubmit={submit}><label>İşletme / hizmet adı<input required value={f.name} onChange={e=>set('name',e.target.value)}/></label><label>Kategori<select required value={f.category} onChange={e=>set('category',e.target.value)}><option value="">Seçin</option>{services.map(s=><option key={s[0]} value={s[0]}>{s[1]}</option>)}</select></label><label>Telefon<input required value={f.phone} onChange={e=>set('phone',e.target.value)}/></label><label>WhatsApp<input value={f.whatsapp} onChange={e=>set('whatsapp',e.target.value)}/></label><label>Açık adres<input required value={f.address} onChange={e=>set('address',e.target.value)}/></label><div className="two"><label>İl<select value={f.province} onChange={e=>{set('province',e.target.value);set('district','')}}>{provinces.map(p=><option key={p}>{p}</option>)}</select></label><label>İlçe<select value={f.district} onChange={e=>set('district',e.target.value)}>{ds.map(d=><option key={d}>{d}</option>)}</select></label></div><label>Açıklama<textarea value={f.description} onChange={e=>set('description',e.target.value)}/></label><button>Başvuruyu Gönder <ArrowRight/></button></form>}</main>}
-
+function AddBusiness(){
+ const[ok,setOk]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const[f,setF]=useState({name:'',category:'',phone:'',whatsapp:'',address:'',province:'İstanbul',district:'Beyoğlu',description:'',hours:''});
+ const ds=districtsFor(f.province);
+ const set=(k:string,v:string)=>setF(x=>({...x,[k]:v}));
+ const submit=async(e:FormEvent)=>{
+   e.preventDefault();if(busy)return;setBusy(true);setError('');
+   try{
+     const r=await fetch('/api/submissions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(f)});
+     const data=await r.json().catch(()=>({})) as {error?:string};
+     if(r.ok){setOk(true);return;}
+     if(r.status===429)throw new Error('Çok fazla başvuru gönderildi. Bir saat sonra tekrar deneyin.');
+     if(data.error==='invalid_input')throw new Error('Bilgileri kontrol et: kategori, telefon, il ve ilçe geçerli olmalı.');
+     if(data.error==='database_unavailable')throw new Error('Başvuru sistemi şu anda kullanılamıyor.');
+     throw new Error('Başvuru gönderilemedi. Lütfen biraz sonra tekrar deneyin.');
+   }catch(e){setError(e instanceof Error?e.message:'Bağlantı kurulamadı. İnternetini kontrol et.');}
+   finally{setBusy(false);}
+ };
+ return <main className="form-page"><h1>İşletmeni / Hizmetini Ekle</h1><p>Bilgilerini bırak, inceleme sonrası ücretsiz yayınlayalım.</p>{ok?<div className="success"><ShieldCheck/><h2>Başvurun alındı.</h2><p>Başvurun incelendikten sonra yayınlanır.</p></div>:<form onSubmit={submit}>
+  <label>İşletme / hizmet adı<input required maxLength={120} value={f.name} onChange={e=>set('name',e.target.value)}/></label>
+  <label>Kategori<select required value={f.category} onChange={e=>set('category',e.target.value)}><option value="">Seçin</option>{services.map(s=><option key={s[0]} value={s[0]}>{s[1]}</option>)}</select></label>
+  <label>Telefon<input required type="tel" inputMode="tel" maxLength={20} value={f.phone} onChange={e=>set('phone',e.target.value)}/></label>
+  <label>WhatsApp<input type="tel" inputMode="tel" maxLength={20} value={f.whatsapp} onChange={e=>set('whatsapp',e.target.value)}/></label>
+  <label>Açık adres<input required minLength={10} maxLength={300} value={f.address} onChange={e=>set('address',e.target.value)}/></label>
+  <div className="two"><label>İl<select value={f.province} onChange={e=>setF(x=>({...x,province:e.target.value,district:districtsFor(e.target.value)[0]||''}))}>{provinces.map(p=><option key={p}>{p}</option>)}</select></label><label>İlçe<select required value={f.district} onChange={e=>set('district',e.target.value)}>{ds.map(d=><option key={d}>{d}</option>)}</select></label></div>
+  <label>Açıklama<textarea maxLength={800} value={f.description} onChange={e=>set('description',e.target.value)}/></label>
+  <label>Çalışma saatleri<input maxLength={150} value={f.hours} onChange={e=>set('hours',e.target.value)}/></label>
+  {error&&<div className="error" role="alert">{error}</div>}
+  <button disabled={busy}>{busy?'Gönderiliyor…':'Başvuruyu Gönder'} <ArrowRight/></button>
+ </form>}</main>
+}
 function MenuPage(){return <main className="menu-page"><h1>Menü</h1>{[['/calendar','Takvim & Önemli Günler',CalendarDays],['/nearby','Yakınımdaki hizmetler',Compass],['/services','Çözüm Merkezi',Wrench],['/emergency','Acil Durum',Siren],['/add-business','İşletmeni Ekle',Building2],['/admin','Admin Girişi',LockKeyhole]].map(([to,t,I])=><NavLink key={String(to)} to={String(to)}><I/><b>{String(t)}</b><ChevronRight/></NavLink>)}</main>}
 
 type AdminStats={visitorsTotal:number;visitorsToday:number;searchesTotal:number;searchesToday:number;phoneClicks:number;directionsClicks:number;emergencyClicks:number;favoriteClicks:number};
