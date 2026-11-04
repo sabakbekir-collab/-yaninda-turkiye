@@ -125,35 +125,18 @@ function Home(){
   void load();return()=>{active=false};
  },[]);
  useEffect(()=>{
-   let cancelled=false;
-   const detect=async()=>{
-     try{
-       const current=await getCurrentLocation({forceFresh:true});
-       const area=await resolveLocationArea(current);
-       if(cancelled)return;
-       setWeatherLoading(true);
-       const weatherUrl='https://api.open-meteo.com/v1/forecast?latitude='+current.lat+'&longitude='+current.lon+'&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto';
-       try{
-         const response=await fetch(weatherUrl,{signal:AbortSignal.timeout(9000),cache:'no-store'});
-         if(!response.ok)throw new Error('weather_unavailable');
-         const data=await response.json() as {current?:{temperature_2m?:number;apparent_temperature?:number;precipitation?:number;weather_code?:number;wind_speed_10m?:number};daily?:{time?:string[];weather_code?:number[];temperature_2m_max?:number[];temperature_2m_min?:number[]}};
-         if(!data.current||!data.daily)throw new Error('weather_bad_response');
-         const c=data.current,d=data.daily;
-         setWeather({temperature:Number(c.temperature_2m),apparent:Number(c.apparent_temperature),precipitation:Number(c.precipitation),wind:Number(c.wind_speed_10m),code:Number(c.weather_code),days:(d.time||[]).slice(0,5).map((date,i)=>({date,code:Number(d.weather_code?.[i]??0),max:Number(d.temperature_2m_max?.[i]??0),min:Number(d.temperature_2m_min?.[i]??0)}))});
-         setWeatherError('');
-       }catch{setWeatherError('Hava durumu şu anda alınamadı.');}
-       finally{setWeatherLoading(false);}
-       const previous=readNearbyMemory();
-       writeNearbyMemory({...previous,province:area.province,district:area.district,position:current});
-       setLocationLabel(area.province+(area.district?', '+area.district:''));
-     }catch{
-       if(!cancelled){setLocationLabel('Konum izni bekleniyor');setWeatherError('Hava durumu için konum izni gerekli.');}
-     }
+   // GPS permission is optional. The app uses the user's saved/manual province
+   // and district for weather and nearby searches without prompting on entry.
+   const refresh=()=>{
+     const saved=readNearbyMemory();
+     const label=saved.province
+       ? saved.province+(saved.district?', '+saved.district:'')
+       : 'Bölge seçilmedi';
+     setLocationLabel(label);
    };
-   void detect();
-   const refresh=()=>setLocationLabel(readHeaderLocation());
+   refresh();
    window.addEventListener('yt-nearby-memory',refresh);
-   return()=>{cancelled=true;window.removeEventListener('yt-nearby-memory',refresh)};
+   return()=>window.removeEventListener('yt-nearby-memory',refresh);
  },[]);
  const go=(id:string)=>id==='emergency'?nav('/emergency'):nav('/nearby',{state:{category:id,...(readNearbyMemory().position?{position:readNearbyMemory().position,province:readNearbyMemory().province,district:readNearbyMemory().district}:{})}});
 
@@ -176,7 +159,7 @@ function Home(){
    </section>
    <section className="modern-welcome-banner"><div><span>YANINDA TÜRKİYE</span><h1>Hayatın her anında<br/>yanında.</h1><p>İhtiyacın olan her şey tek yerde.</p></div><MapPin/></section>
    <form className="modern-search" onSubmit={search}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Eczane, hastane, restoran, usta..."/><button type="button" aria-label="Sesli arama">●</button></form>
-   <div className="modern-location-status"><MapPin/><span><b>Mevcut konumun</b><small>{locationLabel} · Otomatik algılanıyor</small></span><span className="location-live-dot"/></div>
+   <div className="modern-location-status"><MapPin/><span><b>Seçili bölgen</b><small>{locationLabel} · Konum izni gerekmez</small></span><span className="location-live-dot"/></div>
 
    <section className="modern-section">
     <div className="modern-section-title"><h2>Hızlı işlemler</h2><button onClick={()=>nav('/services')}>Tümünü Gör <ChevronRight/></button></div>
@@ -295,32 +278,12 @@ function Nearby(){
    },{replace:true});
  },[cat,province,district,radius,nearbyDistricts,view,setParams]);
 
+ // Do not request device location on page entry. Saved/manual region selection
+ // is sufficient; GPS remains an optional action initiated by the user.
  useEffect(()=>{
-   let cancelled=false;
-   const start=async()=>{
-     try{
-       const permission=await getLocationPermissionState();
-       if(cancelled)return;
-       setLocationState(permission);
-       // Explicit URL/navigation selections are manual; otherwise always detect
-       // the device's current location on entry instead of reusing stale GPS.
-       if(state?.position||params.has('province')||params.has('district')||state?.province||state?.district)return;
-       if(permission==='denied'||permission==='unsupported')return;
-       const current=await getCurrentLocation({forceFresh:true});
-       const area=await resolveLocationArea(current);
-       if(cancelled)return;
-       setPos(current);setProvince(area.province);setDistrict(area.district);setLocationState('granted');setHasSearched(true);
-       const saved=readNearbyMemory();
-       writeNearbyMemory({...saved,province:area.province,district:area.district,position:current});
-       setSubmitted({category:cat,province:area.province,district:area.district,radius,nearbyDistricts,pos:current});
-     }catch(error){
-       if(!cancelled&&error instanceof LocationError&&error.code==='permission_denied')setLocationState('denied');
-     }
-   };
-   void start();
-   return()=>{cancelled=true};
+   if(!province&&memory.province)setProvince(memory.province);
+   if(!district&&memory.district)setDistrict(memory.district);
  },[]);
-
  useEffect(()=>{
    const incoming=location.state as NearbyNavigationState|null;
    if(!incoming)return;
@@ -365,7 +328,7 @@ function Nearby(){
      if(province){
        setSubmitted({category:resolved,province,district,radius,nearbyDistricts});
      }else{
-       setErr('Kategori bulundu. Arama için il / ilçe seç veya “Konumumu Kullan” butonuna bas.');
+       setErr('Kategori bulundu. Arama yapmak için il ve ilçe seç.');
      }
    }
  },[location.key]);
@@ -385,7 +348,7 @@ function Nearby(){
    setErr('');
    if(!province.trim()){
      if(pos){setHasSearched(true);setSubmitted({category:cat,province:'',district:'',radius,nearbyDistricts,pos});return;}
-     setErr('Arama için önce bir il seç veya Konumumu Kullan butonuna bas.');return;
+     setErr('Arama için önce il seç. Konum izni gerekmez.');return;
    }
    if(!validProvince){setErr('İl adını listeden seç.');return;}
    if(!validDistrict){setErr('İlçeyi listeden seç veya “Tüm ilçeler” olarak bırak.');return;}
@@ -456,7 +419,7 @@ function Nearby(){
      <a href={officialPharmacyUrl} target="_blank" rel="noreferrer">Resmî TİTCK / e-Devlet <ExternalLink/></a>
    </div>}
 
-   {locationState==='denied'&&<div className="location-denied"><Info/><span>Konum izni kapalı. İl / ilçe seçimiyle devam edebilirsin.</span></div>}
+
 
    <div className="nearby-filters">
      <div className="filter-line">
@@ -536,7 +499,7 @@ function Nearby(){
           <div className="empty nearby-empty">
             <MapPin />
             <h3>{hasSearched ? (pharmacyMode ? 'Bu konumda güncel nöbetçi eczane kaydı bulunamadı' : 'Bu bölgede kayıt bulunamadı') : 'Arama yapmaya hazır'}</h3>
-            <p>{hasSearched ? (pharmacyMode ? 'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl / ilçe seçip Yakınındakileri Bul’a bas veya konumunu kullan.'}</p>
+            <p>{hasSearched ? (pharmacyMode ? 'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl ve ilçe seçip Yakınındakileri Bul’a bas. Konum izni gerekmez.'}</p>
             {hasSearched&&<button onClick={search}><Search/>Tekrar Ara</button>}
             {hasSearched && pharmacyMode && <a className="official-duty-link" href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">e-Devlet’te resmî sorgula <ExternalLink /></a>}
             {hasSearched && pharmacyMode && normalizeSearchText(province) === 'mus' && <a className="official-duty-link" href="https://www.batmaneczaciodasi.org.tr/nobetci-eczaneler/mus" target="_blank" rel="noreferrer">Muş Eczacı Odası nöbet listesini aç <ExternalLink /></a>}
