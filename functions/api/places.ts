@@ -146,11 +146,11 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
       const recordCity=clean(x.city??x.province??x.il);
       if(recordCity&&slug(recordCity)!==slug(province))continue;
       const recordDistrict=clean(x.district??x.ilce??x.county);
-      if(district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
+      if(district&&(!recordDistrict||slug(recordDistrict)!==slug(district)))continue;
       const location=x.location&&typeof x.location==='object'?x.location as Record<string,unknown>:{};
       const la=Number(x.lat??x.latitude??location.lat),lo=Number(x.lng??x.lon??x.longitude??location.lng??location.lon);
       const name=clean(x.name??x.pharmacyName??x.pharmacy_name??x.title??x.ad);
-      if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < -90||la > 90||lo < -180||lo > 180)continue;
+      if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < 35||la > 43||lo < 25||lo > 46)continue;
       out.push({id:'turkpidya-duty-'+String(x.id??x.pharmacyId??x.pharmacy_id??i),name,category:'pharmacy',lat:la,lon:lo,
         address:clean(x.address??x.adres),phone:clean(x.phone??x.telephone??x.telefon,60),
         openingHours:clean(x.hours??x.dutyHours??x.duty_hours,180),
@@ -195,12 +195,13 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
         return Number(value);
       };
       const la=coordinate(x.lat,x.latitude),lo=coordinate(x.lng,x.lon,x.longitude),name=clean(x.name);
-      if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < -90||la > 90||lo < -180||lo > 180)continue;
+      if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < 35||la > 43||lo < 25||lo > 46)continue;
       // Each record may carry its own duty date; otherwise the feed date applies. Unknown or stale dates are never shown as "nöbetçi".
       const recordDate=x.date??x.duty_date??x.dutyDate??x.nobet_tarihi;
       if(!isActiveDutyDate(recordDate??data.date))continue;
       const recordDistrict=clean(x.district);
-      if(applyDistrictFilter&&district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
+      if(district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
+      if(!applyDistrictFilter&&district&&!recordDistrict)continue;
       const d=distance(lat,lon,la,lo);
       out.push({
         id:idPrefix+String(x.id??i),name,category:'pharmacy',lat:la,lon:lo,
