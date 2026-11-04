@@ -24,7 +24,7 @@ const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').replace
 const slug=trSlug;
 const areaQuery=(district:string,province:string)=>[district&&!isCentralDistrict(district)?district:'',province,'Türkiye'].filter(Boolean).join(', ');
 const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
-const cacheKey=(...parts:string[])=>'places:v15:'+parts.join(':');
+const cacheKey=(...parts:string[])=>'places:v16:'+parts.join(':');
 
 function tidyAddress(tags:Record<string,string>,fallback?:string){
   const full=tags['addr:full']||tags['contact:address'];
@@ -284,7 +284,15 @@ async function localPois(env:Env,category:string,lat:number,lon:number,radiusKm:
 }
 
 async function getPois(env:Env,category:string,lat:number,lon:number,radiusKm:number):Promise<PoiResult>{
-  return (await localPois(env,category,lat,lon,radiusKm))??await overpass(category,lat,lon,radiusKm);
+  const local=await localPois(env,category,lat,lon,radiusKm);
+  // D1 is only an imported snapshot and may be incomplete. An empty local
+  // snapshot must not suppress a live OpenStreetMap lookup (notably ATMs).
+  if(local?.places.length)return local;
+  const live=await overpass(category,lat,lon,radiusKm);
+  if(live.ok&&live.places.length)return live;
+  // Keep useful imported records if the live providers are temporarily down.
+  if(local)return local;
+  return live;
 }
 
 async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<PoiResult>{
