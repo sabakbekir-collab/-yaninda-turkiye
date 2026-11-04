@@ -617,18 +617,70 @@ function AddBusiness(){const[ok,setOk]=useState(false);const[f,setF]=useState({n
 
 function MenuPage(){return <main className="menu-page"><h1>Menü</h1>{[['/calendar','Takvim & Önemli Günler',CalendarDays],['/nearby','Yakınımdaki hizmetler',Compass],['/services','Çözüm Merkezi',Wrench],['/emergency','Acil Durum',Siren],['/add-business','İşletmeni Ekle',Building2],['/admin','Admin Girişi',LockKeyhole]].map(([to,t,I])=><NavLink key={String(to)} to={String(to)}><I/><b>{String(t)}</b><ChevronRight/></NavLink>)}</main>}
 
-type AdminStats={visitorsTotal?:number;visitorsToday?:number;searchesTotal?:number};
-type AdminAd={id:string|number;title:string;image_url?:string;placement?:string;status?:string};
-type AdminData={stats?:AdminStats;ads?:AdminAd[]};
+type AdminStats={visitorsTotal:number;visitorsToday:number;searchesTotal:number;searchesToday:number;phoneClicks:number;directionsClicks:number;emergencyClicks:number;favoriteClicks:number};
+type AdminAd={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null;placement:string;status:string};
+type AdminSubmission={id:number;name:string;category:string;phone:string;address:string;province:string;district:string;status:string};
+type AdminReport={id:number;place_name:string;reason:string;details?:string;created_at:string};
+type AdminData={stats?:AdminStats;ads?:AdminAd[];submissions?:AdminSubmission[];reports?:AdminReport[]};
 function Admin(){
- const[email,setEmail]=useState(''),[password,setPassword]=useState(''),[ok,setOk]=useState(false),[data,setData]=useState<AdminData>(),[error,setError]=useState('');
- const login=async(e:FormEvent)=>{e.preventDefault();setError('');try{const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'login',email,password})});if(r.ok){setOk(true)}else if(r.status===429)setError('Çok fazla deneme yapıldı. Lütfen 10 dakika sonra tekrar deneyin.');else setError('Giriş bilgileri hatalı veya admin yapılandırılmamış.')}catch{setError('Bağlantı kurulamadı. Lütfen tekrar deneyin.')}};
- useEffect(()=>{if(ok)fetch('/api/admin').then(r=>r.ok?r.json():null).then(setData).catch(()=>{})},[ok]);
- if(!ok)return <main className="admin-login"><div><ShieldCheck/><h1>Admin Paneli</h1><p>Yanında Türkiye yönetim merkezi</p><form onSubmit={login}><label>E-posta<input type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Şifre<input type="password" value={password} onChange={e=>setPassword(e.target.value)}/></label>{error&&<div className="error">{error}</div>}<button>Giriş Yap <ArrowRight/></button></form></div></main>;
- const stats=data?.stats||{}; const ads=data?.ads||[];
- return <main className="admin"><aside><div className="admin-brand"><MapPin/> YANINDA <b>TÜRKİYE</b></div>{['Genel Bakış','Hizmetler','Eczaneler','Hastaneler',"ATM'ler",'Akaryakıt','Marketler','Haberler','Reklam Yönetimi','Kullanıcılar','İstatistikler','Ayarlar'].map((x,i)=><button className={i===0?'active':''} key={x}><Activity/>{x}</button>)}</aside><section><header><div><h1>Genel Bakış</h1><p>Yanında Türkiye'nin yönetim merkezi</p></div><div><Bell/> <span>Admin</span><UserCircle/></div></header><div className="stats">{[['Toplam Kullanıcı',stats.visitorsTotal??12548,'↑ 12%'],['Bugünkü Ziyaret',stats.visitorsToday??3245,'↑ 8%'],['Hizmet Aramaları',stats.searchesTotal??8420,'↑ 15%'],['Reklam Geliri','₺1.250','↑ 20%']].map(([a,b,c])=><article key={String(a)}><small>{a}</small><strong>{b}</strong><span>{c}</span></article>)}</div><div className="admin-grid"><div className="panel"><h2>Son 7 Gün Ziyaretçi Grafiği</h2><div className="chart">{[35,50,47,65,48,76,90].map((h,i)=><i key={i} style={{height:h+'%'}}/>)}</div></div><div className="panel"><h2>En Çok Kullanılan Hizmetler</h2>{[['Nöbetçi Eczane',32],['Hastane',18],['ATM',12],['Akaryakıt',10],['Market',8]].map(([x,n])=><div className="bar" key={String(x)}><span>{x}</span><i style={{width:Number(n)*2.2+'%'}}/><b>{n}%</b></div>)}</div></div><div className="panel ads"><div className="panel-title"><div><h2>Reklam Yönetimi</h2><p>Web sitesindeki reklam alanlarını yönet</p></div><button>+ Yeni Reklam Ekle</button></div>{(ads.length?ads:[{id:1,title:'Ana Banner',image_url:imgs.hero,placement:'1200×600'},{id:2,title:'Orta Banner',image_url:imgs.burger,placement:'1200×200'},{id:3,title:'Alt Banner',image_url:imgs.trend,placement:'1200×200'}]).map((ad:AdminAd)=><div className="ad-row" key={ad.id}><img src={ad.image_url||imgs.hero} alt=""/><div><b>{ad.title}</b><small>{ad.placement}</small></div><span>Aktif</span><button>Düzenle</button></div>)}</div><AdminAI/></section></main>
+ const[email,setEmail]=useState(''),[password,setPassword]=useState(''),[ok,setOk]=useState(false),[data,setData]=useState<AdminData>(),[error,setError]=useState(''),[notice,setNotice]=useState(''),[loading,setLoading]=useState(false);
+ const[editingId,setEditingId]=useState<number|null>(null);
+ const[adForm,setAdForm]=useState({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});
+ const refresh=async()=>{
+   const r=await fetch('/api/admin',{cache:'no-store'});
+   if(!r.ok)throw new Error(r.status===401?'Oturum süresi dolmuş. Yeniden giriş yap.':'Yönetim verileri alınamadı.');
+   setData(await r.json() as AdminData);
+ };
+ useEffect(()=>{let active=true;fetch('/api/admin',{cache:'no-store'}).then(async r=>{if(r.ok){const d=await r.json() as AdminData;if(active){setData(d);setOk(true)}}}).catch(()=>undefined);return()=>{active=false}},[]);
+ const login=async(e:FormEvent)=>{
+   e.preventDefault();setError('');setLoading(true);
+   try{const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'login',email,password})});
+     if(!r.ok){setError(r.status===429?'Çok fazla deneme yapıldı. 10 dakika sonra tekrar dene.':'Giriş bilgileri hatalı veya admin yapılandırılmamış.');return;}
+     setOk(true);setPassword('');await refresh();
+   }catch(e){setError(e instanceof Error?e.message:'Bağlantı kurulamadı.')}finally{setLoading(false)}
+ };
+ const action=async(payload:Record<string,unknown>)=>{
+   setNotice('');setError('');setLoading(true);
+   try{const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+     if(!r.ok){const d=await r.json().catch(()=>({})) as {error?:string};throw new Error(d.error||'İşlem tamamlanamadı.');}
+     await refresh();setNotice('İşlem başarıyla tamamlandı.');
+   }catch(e){setError(e instanceof Error?e.message:'Bağlantı kurulamadı.')}finally{setLoading(false)}
+ };
+ const saveAd=async(e:FormEvent)=>{
+   e.preventDefault();
+   await action({action:'save_ad',...(editingId?{id:editingId}:{}),...adForm});
+   setEditingId(null);setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});
+ };
+ const logout=async()=>{
+   try{await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'logout'})})}catch{}
+   setOk(false);setData(undefined);setPassword('');
+ };
+ if(!ok)return <main className="admin-login"><div><ShieldCheck/><h1>Admin Paneli</h1><p>Yanında Türkiye yönetim merkezi</p><form onSubmit={login}><label>E-posta<input type="email" autoComplete="username" required value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Şifre<input type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)}/></label>{error&&<div className="error" role="alert">{error}</div>}<button disabled={loading}>{loading?'Giriş yapılıyor…':'Giriş Yap'} <ArrowRight/></button></form></div></main>;
+ const stats=data?.stats;
+ const ads=data?.ads||[];
+ return <main className="admin"><section>
+   <header><div><h1>Yönetim Paneli</h1><p>Yalnızca veritabanından gelen gerçek kayıtlar gösterilir.</p></div><button type="button" onClick={logout}>Güvenli Çıkış</button></header>
+   {error&&<div className="error" role="alert">{error}</div>}{notice&&<div className="success" role="status">{notice}</div>}
+   <div className="stats">
+    {[['Toplam ziyaret',stats?.visitorsTotal],['Bugünkü ziyaret',stats?.visitorsToday],['Toplam arama',stats?.searchesTotal],['Bugünkü arama',stats?.searchesToday]].map(([label,value])=><article key={String(label)}><small>{label}</small><strong>{typeof value==='number'?value.toLocaleString('tr-TR'):'Veri yok'}</strong></article>)}
+   </div>
+   {!stats&&<p className="admin-data-note">İstatistikler henüz alınamadı; tahmini rakam gösterilmiyor.</p>}
+   <div className="panel ads">
+    <div className="panel-title"><div><h2>Reklam Yönetimi</h2><p>Gerçek reklam kayıtlarını ekle, düzenle, duraklat veya sil.</p></div></div>
+    <form className="admin-ad-form" onSubmit={saveAd}>
+     <label>Başlık<input required maxLength={120} value={adForm.title} onChange={e=>setAdForm(v=>({...v,title:e.target.value}))}/></label>
+     <label>Açıklama<input maxLength={300} value={adForm.text} onChange={e=>setAdForm(v=>({...v,text:e.target.value}))}/></label>
+     <label>Görsel URL<input type="url" value={adForm.image_url} onChange={e=>setAdForm(v=>({...v,image_url:e.target.value}))}/></label>
+     <label>Hedef URL<input type="url" value={adForm.target_url} onChange={e=>setAdForm(v=>({...v,target_url:e.target.value}))}/></label>
+     <label>Alan<select value={adForm.placement} onChange={e=>setAdForm(v=>({...v,placement:e.target.value}))}><option value="home_top">Ana sayfa üst</option><option value="home_mid">Ana sayfa orta</option><option value="home_bottom">Ana sayfa alt</option></select></label>
+     <div><button disabled={loading}>{editingId?'Reklamı Güncelle':'Reklam Ekle'}</button>{editingId&&<button type="button" onClick={()=>{setEditingId(null);setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top'})}}>Vazgeç</button>}</div>
+    </form>
+    {ads.length?ads.map(ad=><div className="ad-row" key={ad.id}>{ad.image_url&&<img src={ad.image_url} alt=""/>}<div><b>{ad.title}</b><small>{ad.placement} · {ad.status==='active'?'Yayında':'Duraklatıldı'}</small></div><button type="button" onClick={()=>{setEditingId(ad.id);setAdForm({title:ad.title,text:ad.text||'',image_url:ad.image_url||'',target_url:ad.target_url||'',placement:ad.placement||'home_top'})}}>Düzenle</button><button type="button" disabled={loading} onClick={()=>void action({action:'toggle_ad',id:ad.id})}>{ad.status==='active'?'Duraklat':'Yayınla'}</button><button type="button" disabled={loading} onClick={()=>{if(window.confirm('Bu reklam silinsin mi?'))void action({action:'delete_ad',id:ad.id})}}>Sil</button></div>):<p>Henüz kayıtlı reklam yok.</p>}
+   </div>
+   <div className="panel"><h2>İşletme Başvuruları</h2>{(data?.submissions||[]).length?(data?.submissions||[]).map(item=><div className="ad-row" key={item.id}><div><b>{item.name}</b><small>{item.category} · {item.province}/{item.district} · {item.phone}</small><small>{item.address} · {item.status}</small></div>{item.status==='pending'&&<><button disabled={loading} onClick={()=>void action({action:'approve_submission',id:item.id})}>Onayla</button><button disabled={loading} onClick={()=>void action({action:'reject_submission',id:item.id})}>Reddet</button></>}</div>):<p>Bekleyen veya kayıtlı başvuru yok.</p>}</div>
+   <div className="panel"><h2>Hatalı Bilgi Bildirimleri</h2>{(data?.reports||[]).length?(data?.reports||[]).map(item=><div className="ad-row" key={item.id}><div><b>{item.place_name}</b><small>{item.reason} · {item.details||'Açıklama yok'}</small></div><button disabled={loading} onClick={()=>void action({action:'resolve_report',id:item.id})}>Çözüldü</button></div>):<p>Açık bildirim yok.</p>}</div>
+  </section></main>;
 }
-
 function Legal({type}:{type:'kvkk'|'privacy'}){
  const privacy=type==='privacy';
  return <main className="inner legal nearby-page">
