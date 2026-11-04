@@ -4,6 +4,7 @@ import {provinceCenter,isWholeProvince} from '../lib/provinceCenters';
 import {isCentralDistrict,trSlug,resolveName} from '../../src/text';
 import {districtMap,districtsFor} from '../../src/turkeyDistricts';
 import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery';
+import {activeDutyDates,dutyDateKey,isActiveDutyDate} from '../lib/dutyDates';
 
 type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
 
@@ -118,38 +119,6 @@ export async function onRequestAreaGet({request}:{request:Request}){
   const area=await reverseArea(lat,lon);
   if(!area)return jsonResponse({error:'area_not_found'},{status:503,headers:{'Cache-Control':'no-store'}});
   return jsonResponse(area,{headers:{'Cache-Control':'no-store'}});
-}
-
-function activeDutyDates(){
-  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
-  const value=(type:string)=>parts.find(p=>p.type===type)?.value||'';
-  const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Istanbul',hour:'2-digit',hourCycle:'h23'}).format(new Date()));
-  const today=new Date(Date.UTC(Number(value('year')),Number(value('month'))-1,Number(value('day'))));
-  const dates=[today.toISOString().slice(0,10)];
-  // Night shifts from the previous day can remain active until 09:00 TR.
-  if(hour<9){today.setUTCDate(today.getUTCDate()-1);dates.push(today.toISOString().slice(0,10));}
-  return dates;
-}
-/** Normalises provider dates (YYYY-MM-DD, DD.MM.YYYY, ISO with time/offset, epoch) to an Istanbul calendar day. */
-function dutyDateKey(value:unknown):string|null{
-  if(value===null||value===undefined||value==='')return null;
-  const istDay=(d:Date)=>Number.isNaN(d.getTime())?null:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
-  if(typeof value==='number')return istDay(new Date(value<1e12?value*1000:value));
-  if(typeof value!=='string')return null;
-  const raw=value.trim();
-  const dmy=raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
-  if(dmy)return dmy[3]+'-'+dmy[2].padStart(2,'0')+'-'+dmy[1].padStart(2,'0');
-  if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;
-  // ISO timestamps with a time part: convert to the Istanbul day (UTC midnight of the TR day is 21:00Z the day before).
-  if(/^\d{4}-\d{2}-\d{2}[T ]/.test(raw)){
-    const hasZone=/(Z|[+-]\d{2}:?\d{2})$/.test(raw);
-    return hasZone?istDay(new Date(raw)):raw.slice(0,10);
-  }
-  return null;
-}
-function isActiveDutyDate(value?:unknown){
-  const key=dutyDateKey(value);
-  return key!==null&&activeDutyDates().includes(key);
 }
 
 /**
