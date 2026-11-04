@@ -470,7 +470,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     }
     if(!dutyResult.length){
       const stale=primaryDuty.reason==='stale_duty_list'||secondaryReason==='stale_duty_list';
-      const failed=!primaryDuty.ok||!secondaryReason&&false||stale;
+      const failed=!primaryDuty.ok||Boolean(secondaryReason)||stale;
       const reason=stale?'stale_duty_list':primaryDuty.reason||secondaryReason||'no_current_duty_records';
       const status=failed&&primaryDuty.reason==='provider_rate_limited'?429:failed?503:200;
       const body=debug?{ok:!failed,error:failed?'duty_pharmacy_unavailable':'no_current_duty_records',reason,secondaryReason,providerStatus:primaryDuty.providerStatus,feedDate:dutyDate||null,sourceDates:{eczaneAdresi:dutyDate||null,turkpidya:secondaryDate||null},query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},activeDutyDates:activeDutyDates(),resultCount:0,sourcesTried:['Eczane Adresi','Turkpidya']}:{error:failed?'duty_pharmacy_unavailable':'no_current_duty_records',reason,secondaryReason,date:dutyDate||secondaryDate};
