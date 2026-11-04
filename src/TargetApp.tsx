@@ -1,7 +1,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import type {FormEvent} from 'react';
 import {NavLink,useLocation,useNavigate,useSearchParams,Routes,Route} from 'react-router-dom';
-import {Activity,ArrowRight,Banknote,Bell,Building2,Bus,ChevronRight,Compass,Fuel,Heart,Hospital,Landmark,List,LocateFixed,LockKeyhole,Map as MapIcon,MapPin,Menu,Navigation,Phone,Search,ShieldCheck,Siren,Store,Pill,UserCircle,Wrench,ExternalLink,Info,Paintbrush,Zap,KeyRound,Truck,Snowflake,Car,Smartphone,Laptop,Armchair,TreePine,ShoppingBasket,Utensils,Hotel,Package} from 'lucide-react';
+import {CloudSun,Activity,ArrowRight,Banknote,Bell,Building2,Bus,ChevronRight,Compass,Fuel,Heart,Hospital,Landmark,List,LocateFixed,LockKeyhole,Map as MapIcon,MapPin,Menu,Navigation,Phone,Search,ShieldCheck,Siren,Store,Pill,UserCircle,Wrench,ExternalLink,Info,Paintbrush,Zap,KeyRound,Truck,Snowflake,Car,Smartphone,Laptop,Armchair,TreePine,ShoppingBasket,Utensils,Hotel,Package} from 'lucide-react';
 import type {LucideIcon} from 'lucide-react';
 import {MapContainer,Marker,Popup,TileLayer} from 'react-leaflet';
 import L from 'leaflet';
@@ -92,8 +92,18 @@ const quick:[string,string,LucideIcon,string][]=[
 ['pharmacy','Eczaneler',Pill,'red'],['hospital','Hastane',Hospital,'blue'],['emergency','Acil Servis',Siren,'red'],['atm',"ATM'ler",Banknote,'purple'],['fuel','Akaryakıt',Fuel,'green'],['market','Market',Store,'orange'],['bakery','Fırın',ShoppingBasket,'amber'],['transport','Ulaşım',Bus,'blue'],['police','Polis',ShieldCheck,'navy'],['fire_station','İtfaiye',Siren,'red']
 ];
 
+type HomeWeather={temperature:number;apparent:number;precipitation:number;wind:number;code:number;days:Array<{date:string;code:number;max:number;min:number}>};
+function weatherLabel(code:number){
+ if(code===0)return 'Açık';if([1,2].includes(code))return 'Az bulutlu';if(code===3)return 'Bulutlu';
+ if([45,48].includes(code))return 'Sisli';if([51,53,55,56,57].includes(code))return 'Çisenti';
+ if([61,63,65,66,67,80,81,82].includes(code))return 'Yağmurlu';if([71,73,75,77,85,86].includes(code))return 'Karlı';
+ if([95,96,99].includes(code))return 'Gök gürültülü';return 'Hava durumu';
+}
 function Home(){
  const nav=useNavigate(); const[q,setQ]=useState(''); const[locationLabel,setLocationLabel]=useState(readHeaderLocation());
+ const[weather,setWeather]=useState<HomeWeather|null>(null);
+ const[weatherError,setWeatherError]=useState('');
+ const[weatherLoading,setWeatherLoading]=useState(false);
  useEffect(()=>{
    let cancelled=false;
    const detect=async()=>{
@@ -101,11 +111,23 @@ function Home(){
        const current=await getCurrentLocation({forceFresh:true});
        const area=await resolveLocationArea(current);
        if(cancelled)return;
+       setWeatherLoading(true);
+       const weatherUrl='https://api.open-meteo.com/v1/forecast?latitude='+current.lat+'&longitude='+current.lon+'&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto';
+       try{
+         const response=await fetch(weatherUrl,{signal:AbortSignal.timeout(9000),cache:'no-store'});
+         if(!response.ok)throw new Error('weather_unavailable');
+         const data=await response.json() as {current?:{temperature_2m?:number;apparent_temperature?:number;precipitation?:number;weather_code?:number;wind_speed_10m?:number};daily?:{time?:string[];weather_code?:number[];temperature_2m_max?:number[];temperature_2m_min?:number[]}};
+         if(!data.current||!data.daily)throw new Error('weather_bad_response');
+         const c=data.current,d=data.daily;
+         setWeather({temperature:Number(c.temperature_2m),apparent:Number(c.apparent_temperature),precipitation:Number(c.precipitation),wind:Number(c.wind_speed_10m),code:Number(c.weather_code),days:(d.time||[]).slice(0,5).map((date,i)=>({date,code:Number(d.weather_code?.[i]??0),max:Number(d.temperature_2m_max?.[i]??0),min:Number(d.temperature_2m_min?.[i]??0)}))});
+         setWeatherError('');
+       }catch{setWeatherError('Hava durumu şu anda alınamadı.');}
+       finally{setWeatherLoading(false);}
        const previous=readNearbyMemory();
        writeNearbyMemory({...previous,province:area.province,district:area.district,position:current});
        setLocationLabel(area.province+(area.district?', '+area.district:''));
      }catch{
-       if(!cancelled)setLocationLabel('Konum izni bekleniyor');
+       if(!cancelled){setLocationLabel('Konum izni bekleniyor');setWeatherError('Hava durumu için konum izni gerekli.');}
      }
    };
    void detect();
@@ -135,6 +157,9 @@ function Home(){
    <section className="modern-welcome-banner"><div><span>YANINDA TÜRKİYE</span><h1>Hayatın her anında<br/>yanında.</h1><p>İhtiyacın olan her şey tek yerde.</p></div><MapPin/></section>
    <form className="modern-search" onSubmit={search}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Eczane, hastane, restoran, usta..."/><button type="button" aria-label="Sesli arama">●</button></form>
    <div className="modern-location-status"><MapPin/><span><b>Mevcut konumun</b><small>{locationLabel} · Otomatik algılanıyor</small></span><span className="location-live-dot"/></div>
+   <section className="home-weather-card" aria-label="Konuma göre hava durumu">
+    <div className="home-weather-top"><div><small>BUGÜN · {locationLabel}</small><h2><CloudSun/> Hava Durumu</h2></div><span>{weather?weatherLabel(weather.code):weatherLoading?'Yükleniyor…':'Güncel tahmin'}</span></div>
+    {weather?<><div className="home-weather-current"><strong>{Math.round(weather.temperature)}°</strong><div><b>{weatherLabel(weather.code)}</b><small>Hissedilen {Math.round(weather.apparent)}°</small></div></div><div className="home-weather-metrics"><span>Yağış <b>{weather.precipitation.toLocaleString('tr-TR')} mm</b></span><span>Rüzgâr <b>{Math.round(weather.wind)} km/sa</b></span></div><div className="home-weather-days">{weather.days.map((day,i)=><div key={day.date}><small>{i===0?'Bugün':new Date(day.date+'T12:00:00').toLocaleDateString('tr-TR',{weekday:'short'})}</small><b>{weatherLabel(day.code)}</b><span>{Math.round(day.max)}° / {Math.round(day.min)}°</span></div>)}</div></>:<p className="home-weather-error">{weatherError||'Konum algılanınca hava durumu gösterilecek.'}</p>}</section>
    <section className="modern-section">
     <div className="modern-section-title"><h2>Hızlı işlemler</h2><button onClick={()=>nav('/services')}>Tümünü Gör <ChevronRight/></button></div>
     <div className="modern-quick">
