@@ -1,6 +1,6 @@
 import {useEffect,useRef,useState} from "react";
 import {MessageCircle,Send,X,LocateFixed,Navigation} from "lucide-react";
-import {getCurrentLocation,LocationError} from "./location";
+import {getCurrentLocation,getLocationPermissionState,LocationError} from "./location";
 import "./chat.css";
 
 type Msg={role:"user"|"assistant";content:string};
@@ -28,8 +28,16 @@ export default function ChatWidget(){
    setLocation(current);
    return current;
   }catch(error){
-   const denied=error instanceof LocationError&&error.code==="permission_denied";
-   setLocationError(denied?"Konum izni kapalı. iPhone Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri → Safari yolundan izin ver.":"Konum alınamadı. Tekrar deneyebilir veya il/ilçe seçerek devam edebilirsin.");
+   const code=error instanceof LocationError?error.code:"unknown";
+   setLocationError(
+    code==="permission_denied"
+     ?"Konum izni reddedildi. iPhone Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri → Safari bölümünü kontrol et."
+     :code==="timeout"
+      ?"Konum isteği zaman aşımına uğradı. Açık alanda tekrar dene veya il/ilçe seç."
+      :code==="unavailable"
+       ?"GPS kapalı veya cihaz konumu alınamıyor. Konum Servisleri'ni aç ya da il/ilçe seç."
+       :"Konum hizmeti kullanılamıyor. İl/ilçe seçerek devam edebilirsin."
+   );
    return undefined;
   }finally{setLocationBusy(false)}
  }
@@ -40,9 +48,17 @@ export default function ChatWidget(){
   const next=[...messages,{role:"user" as const,content:text}].slice(-12);
   setMessages(m=>[...m,{role:"user",content:text}]);setLoading(true);
   try{
-   // Nearby searches use the saved/manual province and district first. GPS is only requested when the user taps the explicit location button.
+   // Manual area remains the default. For nearby queries, silently reuse GPS
+   // only when permission is already granted; never trigger a permission prompt.
    const area=readSelectedArea();
-   const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({messages:next,location,area})});
+   const asksNearby=/yakınım|yakınımd|en yakın|çevremde|civarımda/i.test(text);
+   let currentLocation=location;
+   if(asksNearby&&!currentLocation){
+    try{
+     if(await getLocationPermissionState()==="granted")currentLocation=await ensureLocation();
+    }catch{/* Manual province/district search remains available. */}
+   }
+   const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({messages:next,location:currentLocation,area})});
    const d=await r.json().catch(()=>({})) as Reply;
    setMessages(m=>[...m,{role:"assistant",content:typeof d.reply==="string"?d.reply:"Şu anda cevap veremiyorum. Lütfen tekrar deneyin."}]);
    if(Array.isArray(d.places))setResults(d.places);
