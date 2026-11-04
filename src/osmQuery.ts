@@ -11,7 +11,12 @@ export const OSM_FILTERS:Record<string,string>={
  phone_repair:'["shop"="mobile_phone"]',computer_repair:'["shop"="computer"]',furniture:'["craft"="carpenter"]',
  gardener:'["craft"="gardener"]',other:'["craft"]',service:'["craft"]'
 };
-const EXTRA_FILTERS:Record<string,string[]>={atm:['["amenity"="bank"]["atm"="yes"]']};
+const EXTRA_FILTERS:Record<string,string[]>={
+ atm:['["amenity"="bank"]["atm"="yes"]'],
+ // Many Turkish public hospitals are tagged with healthcare=hospital rather
+ // than amenity=hospital; include both schemas to avoid incomplete results.
+ hospital:['["healthcare"="hospital"]','["healthcare"="clinic"]']
+};
 export const UNNAMED_LABELS:Record<string,string>={atm:'ATM',fuel:'Akaryakıt istasyonu',police:'Polis',fire_station:'İtfaiye',taxi:'Taksi durağı'};
 export function buildOverpassQuery(category:string,lat:number,lon:number,radiusKm:number):string{
  const meters=Math.max(2000,Math.min(30000,Math.round(radiusKm*1000)));
