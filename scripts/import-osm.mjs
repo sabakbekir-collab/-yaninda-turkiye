@@ -42,7 +42,6 @@ export function tiles(step=2){
    out.push({s:+south.toFixed(2),w:+west.toFixed(2),n:+Math.min(south+step,BOUNDS.north).toFixed(2),e:+Math.min(west+step,BOUNDS.east).toFixed(2)});
  return out;
 }
-// eslint-disable-next-line no-control-regex
 export function slimTags(tags={}){
  const out={};
  for(const key of KEEP_TAGS){const value=tags?.[key];if(typeof value==='string'&&value.trim())out[key]=value.replace(/[\u0000-\u001f]/g,' ').trim().slice(0,200);}
