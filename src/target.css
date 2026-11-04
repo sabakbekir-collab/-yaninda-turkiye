@@ -338,3 +338,20 @@ html[data-theme="dark"]{color-scheme:light;filter:none;background:#fff7fb}
 .home-weather-days span{font-size:10px;font-weight:800;color:#26384e}
 .home-weather-error{margin:14px 0 2px;font-size:13px;color:#64748b}
 @media(max-width:390px){.home-weather-card{padding:13px}.home-weather-current>strong{font-size:48px}.home-weather-days b{font-size:8px}}
+
+
+/* Secondary information widgets: intentionally below primary local services */
+.home-weather-card{margin:18px 14px 14px}
+.home-exchange-card{margin:0 14px 18px;padding:15px;border:1px solid #eadcf0;border-radius:18px;background:linear-gradient(135deg,#fff 0%,#fbf5ff 100%);box-shadow:0 7px 20px #59185d0d;color:#2c1a3a}
+.home-exchange-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.home-exchange-heading>div{display:grid;gap:4px}
+.home-exchange-heading small{font-size:9px;font-weight:900;letter-spacing:.12em;color:#a16bb3}
+.home-exchange-heading h2{display:flex;align-items:center;gap:7px;margin:0;font:800 17px Manrope;color:#321849}
+.home-exchange-heading h2 svg{width:19px;color:#d82b68}
+.home-exchange-heading>span{font-size:10px;font-weight:800;color:#7c6688}
+.home-exchange-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:13px}
+.home-exchange-grid>div{min-width:0;padding:10px 7px;border:1px solid #f0e4f1;border-radius:12px;background:#fff;display:grid;gap:7px}
+.home-exchange-grid small{font-size:9px;font-weight:800;color:#776783;white-space:nowrap}
+.home-exchange-grid strong{font-size:13px;letter-spacing:-.03em;color:#321849;overflow-wrap:anywhere}
+.home-exchange-note{margin:10px 1px 0;font-size:9px;line-height:1.5;color:#88798f}
+@media(max-width:390px){.home-weather-card{margin-left:12px;margin-right:12px}.home-exchange-card{margin-left:12px;margin-right:12px;padding:12px}.home-exchange-grid{gap:5px}.home-exchange-grid>div{padding:8px 5px}.home-exchange-grid strong{font-size:11px}}
