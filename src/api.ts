@@ -83,7 +83,7 @@ export async function findPlaces(
     // No verified duty records is a valid empty result, not a malformed API response.
     if(category==='pharmacy'&&payload?.error==='no_current_duty_records')return [];
     if(payload?.error==='location_geocode_failed'){
-      throw new Error('Seçilen il / ilçe haritada konumlandırılamadı. Konumumu Kullan ile GPS üzerinden tekrar ara veya ilçe seçimini kontrol et.');
+      throw new Error('Seçilen il / ilçe haritada konumlandırılamadı. İl ve ilçe seçimini kontrol et. İstersen isteğe bağlı Konumumu Kullan düğmesini deneyebilirsin.');
     }
     const contentType=r.headers.get('content-type')||'';
     const detail=payload&&typeof payload.error==='string'
