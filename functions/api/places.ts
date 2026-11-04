@@ -182,7 +182,22 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
         verifiedAt:recordDate,dutyUpdatedAt:new Date().toISOString()});
     }
     out.sort((a,b)=>(a.distance??999)-(b.distance??999));
-    return {places:out.slice(0,25),ok:true,date:dutyDateKey(rootDate)||undefined};
+    const sourceDate=dutyDateKey(rootDate)||undefined;
+    const hasDatedRows=rows.some(value=>{
+      if(!value||typeof value!=='object'||Array.isArray(value))return false;
+      const x=value as Record<string,unknown>;
+      return Boolean(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih??rootDate);
+    });
+    const hasActiveDatedRows=rows.some(value=>{
+      if(!value||typeof value!=='object'||Array.isArray(value))return false;
+      const x=value as Record<string,unknown>;
+      return isActiveDutyDate(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih??rootDate);
+    });
+    const stale=!out.length&&Boolean(
+      (sourceDate&&!activeDutyDates().includes(sourceDate))||
+      (hasDatedRows&&!hasActiveDatedRows)
+    );
+    return {places:out.slice(0,25),ok:!stale,date:sourceDate,reason:stale?'stale_duty_list':undefined};
   }catch(e){
     const timeout=e instanceof Error&&(e.name==='TimeoutError'||e.name==='AbortError');
     return {places:[],ok:false,reason:timeout?'secondary_timeout':'secondary_error'};
@@ -250,7 +265,14 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
     }
     // A feed dated neither today nor (before 09:00 TR) yesterday is stale: never show it as "nöbetçi".
     const anyActive=Array.isArray(data.pharmacies)&&data.pharmacies.some(x=>x&&typeof x==='object'&&isActiveDutyDate((x as Record<string,unknown>).date??(x as Record<string,unknown>).duty_date??(x as Record<string,unknown>).dutyDate??(x as Record<string,unknown>).nobet_tarihi??data.date));
-    if(!all.length&&!anyActive&&Array.isArray(data.pharmacies)&&data.pharmacies.length>0)return {places:[],ok:false,date:String(data.date??''),reason:'stale_duty_list'};
+    const feedDate=dutyDateKey(data.date);
+    // An old feed date is stale even when the provider returns an empty array.
+    // Previously an empty October feed was incorrectly reported as a healthy
+    // "no records today" response for a November lookup.
+    if(!all.length&&!anyActive&&(
+      (feedDate!==null&&!activeDutyDates().includes(feedDate))||
+      (Array.isArray(data.pharmacies)&&data.pharmacies.length>0)
+    ))return {places:[],ok:false,date:String(data.date??''),reason:'stale_duty_list'};
     return {places:all.slice(0,25),ok:true,date:data.date};
   }catch(e){
     const timeout=e instanceof Error&&(e.name==='TimeoutError'||e.name==='AbortError');
@@ -401,7 +423,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     if(!province)return Response.json([]);
     const area=areaQuery(district,province);
     const point=await geocode(env,area);
-    if(!point)return Response.json([]);
+    if(!point)return Response.json({error:'location_geocode_failed',area,category},{status:503,headers:{'Cache-Control':'no-store'}});
     lat=point.lat;lon=point.lon;
   }
   if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<35||lat>43||lon<25||lon>46)return Response.json([]);
@@ -435,9 +457,11 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     let dutySource='Eczane Adresi';
     let dutyDate=primaryDuty.date;
     let secondaryReason:string|undefined;
+    let secondaryDate:string|undefined;
     if(!dutyResult.length){
       const secondary=await turkpidyaDutyFallback(dutyProvince,dutyDistrict,lat,lon);
       secondaryReason=secondary.reason;
+      secondaryDate=secondary.date;
       if(secondary.places.length){
         dutyResult=secondary.places;
         dutySource='Turkpidya (il eczacı odaları ve belediyeler)';
@@ -445,9 +469,11 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       }
     }
     if(!dutyResult.length){
-      const failed=!primaryDuty.ok;
+      const stale=primaryDuty.reason==='stale_duty_list'||secondaryReason==='stale_duty_list';
+      const failed=!primaryDuty.ok||!secondaryReason&&false||stale;
+      const reason=stale?'stale_duty_list':primaryDuty.reason||secondaryReason||'no_current_duty_records';
       const status=failed&&primaryDuty.reason==='provider_rate_limited'?429:failed?503:200;
-      const body=debug?{ok:!failed,error:failed?'duty_pharmacy_unavailable':undefined,reason:primaryDuty.reason||'no_current_duty_records',secondaryReason,providerStatus:primaryDuty.providerStatus,feedDate:dutyDate||null,query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},activeDutyDates:activeDutyDates(),resultCount:0,sourcesTried:['Eczane Adresi','Turkpidya']}:{error:failed?'duty_pharmacy_unavailable':'no_current_duty_records',reason:primaryDuty.reason||'no_current_duty_records',secondaryReason,date:dutyDate};
+      const body=debug?{ok:!failed,error:failed?'duty_pharmacy_unavailable':'no_current_duty_records',reason,secondaryReason,providerStatus:primaryDuty.providerStatus,feedDate:dutyDate||null,sourceDates:{eczaneAdresi:dutyDate||null,turkpidya:secondaryDate||null},query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},activeDutyDates:activeDutyDates(),resultCount:0,sourcesTried:['Eczane Adresi','Turkpidya']}:{error:failed?'duty_pharmacy_unavailable':'no_current_duty_records',reason,secondaryReason,date:dutyDate||secondaryDate};
       return Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
     }
     if(debug)return Response.json({ok:true,source:dutySource,query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},feedDate:dutyDate||null,activeDutyDates:activeDutyDates(),resultCount:dutyResult.length,reason:null,sample:dutyResult.slice(0,5)}, {headers:{'Cache-Control':'no-store','X-Data-Source':dutySource}});
