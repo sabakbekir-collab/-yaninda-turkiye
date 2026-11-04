@@ -104,6 +104,25 @@ function Home(){
  const[weather,setWeather]=useState<HomeWeather|null>(null);
  const[weatherError,setWeatherError]=useState('');
  const[weatherLoading,setWeatherLoading]=useState(false);
+ const[exchange,setExchange]=useState<{usd:number;eur:number;gbp:number;date:string}|null>(null);
+ const[exchangeError,setExchangeError]=useState('');
+ const[exchangeLoading,setExchangeLoading]=useState(false);
+ useEffect(()=>{
+  let active=true;
+  const load=async()=>{
+   setExchangeLoading(true);
+   try{
+    const response=await fetch('https://open.er-api.com/v6/latest/USD',{cache:'no-store',signal:AbortSignal.timeout(10000)});
+    if(!response.ok)throw new Error('exchange_unavailable');
+    const data=await response.json() as {result?:string;time_last_update_utc?:string;rates?:Record<string,number>};
+    const rates=data.rates;
+    if(data.result!=='success'||!rates||!Number.isFinite(rates.TRY)||!Number.isFinite(rates.EUR)||!Number.isFinite(rates.GBP))throw new Error('exchange_bad_response');
+    if(active){setExchange({usd:rates.TRY,eur:rates.TRY/rates.EUR,gbp:rates.TRY/rates.GBP,date:data.time_last_update_utc||''});setExchangeError('');}
+   }catch{if(active)setExchangeError('Döviz verisi şu anda alınamıyor.');}
+   finally{if(active)setExchangeLoading(false);}
+  };
+  void load();return()=>{active=false};
+ },[]);
  useEffect(()=>{
    let cancelled=false;
    const detect=async()=>{
@@ -157,9 +176,7 @@ function Home(){
    <section className="modern-welcome-banner"><div><span>YANINDA TÜRKİYE</span><h1>Hayatın her anında<br/>yanında.</h1><p>İhtiyacın olan her şey tek yerde.</p></div><MapPin/></section>
    <form className="modern-search" onSubmit={search}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Eczane, hastane, restoran, usta..."/><button type="button" aria-label="Sesli arama">●</button></form>
    <div className="modern-location-status"><MapPin/><span><b>Mevcut konumun</b><small>{locationLabel} · Otomatik algılanıyor</small></span><span className="location-live-dot"/></div>
-   <section className="home-weather-card" aria-label="Konuma göre hava durumu">
-    <div className="home-weather-top"><div><small>BUGÜN · {locationLabel}</small><h2><CloudSun/> Hava Durumu</h2></div><span>{weather?weatherLabel(weather.code):weatherLoading?'Yükleniyor…':'Güncel tahmin'}</span></div>
-    {weather?<><div className="home-weather-current"><strong>{Math.round(weather.temperature)}°</strong><div><b>{weatherLabel(weather.code)}</b><small>Hissedilen {Math.round(weather.apparent)}°</small></div></div><div className="home-weather-metrics"><span>Yağış <b>{weather.precipitation.toLocaleString('tr-TR')} mm</b></span><span>Rüzgâr <b>{Math.round(weather.wind)} km/sa</b></span></div><div className="home-weather-days">{weather.days.map((day,i)=><div key={day.date}><small>{i===0?'Bugün':new Date(day.date+'T12:00:00').toLocaleDateString('tr-TR',{weekday:'short'})}</small><b>{weatherLabel(day.code)}</b><span>{Math.round(day.max)}° / {Math.round(day.min)}°</span></div>)}</div></>:<p className="home-weather-error">{weatherError||'Konum algılanınca hava durumu gösterilecek.'}</p>}</section>
+
    <section className="modern-section">
     <div className="modern-section-title"><h2>Hızlı işlemler</h2><button onClick={()=>nav('/services')}>Tümünü Gör <ChevronRight/></button></div>
     <div className="modern-quick">
@@ -173,6 +190,17 @@ function Home(){
     {cards.map(([id,title,text,tone,Icon,img])=><button key={id} className={"modern-service-card "+tone} onClick={()=>go(id)}>
       <span className="modern-service-icon"><Icon/></span><div><strong>{title}</strong><small>{text}</small></div>{img&&<img src={img} alt=""/>}<span className="modern-card-arrow"><ChevronRight/></span>
     </button>)}
+   </section>
+   <section className="home-weather-card" aria-label="Konuma göre hava durumu">
+    <div className="home-weather-top"><div><small>BUGÜN · {locationLabel}</small><h2><CloudSun/> Hava Durumu</h2></div><span>{weather?weatherLabel(weather.code):weatherLoading?'Yükleniyor…':'Güncel tahmin'}</span></div>
+    {weather?<><div className="home-weather-current"><strong>{Math.round(weather.temperature)}°</strong><div><b>{weatherLabel(weather.code)}</b><small>Hissedilen {Math.round(weather.apparent)}°</small></div></div><div className="home-weather-metrics"><span>Yağış <b>{weather.precipitation.toLocaleString('tr-TR')} mm</b></span><span>Rüzgâr <b>{Math.round(weather.wind)} km/sa</b></span></div><div className="home-weather-days">{weather.days.map((day,i)=><div key={day.date}><small>{i===0?'Bugün':new Date(day.date+'T12:00:00').toLocaleDateString('tr-TR',{weekday:'short'})}</small><b>{weatherLabel(day.code)}</b><span>{Math.round(day.max)}° / {Math.round(day.min)}°</span></div>)}</div></>:<p className="home-weather-error">{weatherError||'Konum algılanınca hava durumu gösterilecek.'}</p>}</section>
+   <section className="home-exchange-card" aria-label="Döviz kurları">
+    <div className="home-exchange-heading"><div><small>PİYASA BİLGİSİ</small><h2><Activity/> Döviz Kurları</h2></div><span>{exchangeLoading?'Güncelleniyor…':exchange?'Günlük veri':'Veri bekleniyor'}</span></div>
+    {exchange?<><div className="home-exchange-grid">
+      <div><small>🇺🇸 USD / TRY</small><strong>{exchange.usd.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:4})} ₺</strong></div>
+      <div><small>🇪🇺 EUR / TRY</small><strong>{exchange.eur.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:4})} ₺</strong></div>
+      <div><small>🇬🇧 GBP / TRY</small><strong>{exchange.gbp.toLocaleString('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:4})} ₺</strong></div>
+     </div><p className="home-exchange-note">Son güncelleme: {exchange.date?new Date(exchange.date).toLocaleString('tr-TR'):'—'} · Günlük referans kurudur; banka alış-satış fiyatı değildir.</p></>:<p className="home-exchange-note">{exchangeError||'Döviz kurları yükleniyor.'}</p>}
    </section>
    <Ad kind="mid"/><button className="modern-campaign-link" onClick={()=>nav('/ads')}><span><Store/></span><div><b>Reklam & Kampanyalar</b><small>Fırsatları keşfet, işletmeni tanıt</small></div><ChevronRight/></button>
    <button className="modern-map-promo" onClick={()=>nav('/nearby?view=map')}>
