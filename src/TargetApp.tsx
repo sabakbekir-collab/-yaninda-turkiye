@@ -8,7 +8,7 @@ import L from 'leaflet';
 import {categories,keywordMap,provinces,services} from './data';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName,trSlug} from './text';
-import {findPlaces,resolveLocationArea} from './api';
+import {findPlaces,resolveLocationArea,track} from './api';
 import {getCurrentLocation,LocationError} from './location';
 import type {Place,Position} from './types';
 import ChatWidget from './ChatWidget';
@@ -183,7 +183,7 @@ function Home(){
  },[locationLabel]);
  const go=(id:string)=>id==='emergency'?nav('/emergency'):nav('/nearby',{state:{category:id,...(readNearbyMemory().position?{position:readNearbyMemory().position,province:readNearbyMemory().province,district:readNearbyMemory().district}:{})}});
 
- const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
+ const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){track('search',{source:'home'});const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
  const cards=[
   ['pharmacy','Nöbetçi Eczaneler','Yakınınızdaki nöbetçi eczaneleri görüntüleyin','red',Pill,imgs.pharmacy],
   ['hospital','Hastaneler','En yakın hastaneler, poliklinikler ve aciller','blue',Hospital,imgs.hospital],
@@ -389,6 +389,7 @@ function Nearby(){
 
  const search=()=>{
    setErr('');
+   track('search',{category:cat,province:canonProvince,district:canonDistrict});
    if(!province.trim()){
      if(pos){setHasSearched(true);setSubmitted({category:cat,province:'',district:'',radius,nearbyDistricts,pos});return;}
      setErr('Arama için önce il seç. Konum izni gerekmez.');return;
@@ -727,5 +728,7 @@ function Legal({type}:{type:'kvkk'|'privacy'}){
 function Simple({title}:{title:string}){return <main className="simple"><h1>{title}</h1><p>Yanında Türkiye.</p></main>}
 
 export default function TargetApp(){
+ const location=useLocation();
+ useEffect(()=>{track('page_view',{path:location.pathname});},[location.pathname]);
  return <div><Header/><Routes><Route path="/" element={<Home/>}/><Route path="/nearby" element={<Nearby/>}/><Route path="/services" element={<Services/>}/><Route path="/ads" element={<AdCampaigns/>}/><Route path="/emergency" element={<Emergency/>}/><Route path="/add-business" element={<AddBusiness/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/admin" element={<Admin/>}/><Route path="/favorites" element={<FavoritesPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/news" element={<Simple title="Haberler"/>}/><Route path="/contact" element={<Simple title="İletişim"/>}/><Route path="/kvkk" element={<Legal type="kvkk"/>}/><Route path="/gizlilik" element={<Legal type="privacy"/>}/><Route path="*" element={<Home/>}/></Routes><MobileNav/><ChatWidget/></div>
 }
