@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/security-health-admin-ai]
     paths-ignore:
       - 'yaninda-turkiye-fixed*.zip'
   pull_request:
