@@ -1,5 +1,5 @@
 import type {Env} from '../lib/types';
-import {cookieHeader,clearCookie,makeSession,sameOrigin,validSession,secureCompare} from '../lib/auth';
+import {cookieHeader,clearCookie,makeSession,strictSameOrigin,validSession,secureCompare} from '../lib/auth';
 import {rateLimited,clientIp} from '../lib/ratelimit';
 import {parseTurkeyCoordinates} from '../lib/locationValidation';
 
@@ -20,7 +20,7 @@ async function audit(env:Env,request:Request,action:string,targetId:number|null,
 const parseId=(v:unknown):number|null=>typeof v==='number'&&Number.isInteger(v)&&v>0?v:null;
 
 export async function onRequestPost({request,env}:{request:Request;env:Env}){
-  if(!sameOrigin(request))return new Response('Forbidden',{status:403});
+  if(!strictSameOrigin(request))return new Response('Forbidden',{status:403});
   try{
     const body=await json(request);
     const action=clean(body.action,40);
