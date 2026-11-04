@@ -371,11 +371,6 @@ function Nearby(){
 
  useEffect(()=>{
    if(!submitted)return;
-   // The official live iframe is the source of truth for Muş Merkez; do not
-   // also call the legacy API and risk showing a stale/empty duplicate list.
-   const usesOfficialMushWidget=submitted.category==='pharmacy'&&normalizeSearchText(submitted.province)==='mus'&&
-     (!submitted.district||normalizeSearchText(submitted.district)==='merkez'||normalizeSearchText(submitted.district)==='mus merkez');
-   if(usesOfficialMushWidget){setPlaces([]);setErr('');setLoading(false);return;}
    let cancelled=false;
    setLoading(true);setErr('');
    findPlaces(submitted.category,submitted.pos,submitted.province,submitted.district,{radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts})
