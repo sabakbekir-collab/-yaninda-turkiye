@@ -20,7 +20,7 @@ function context({ missingDb = false, fail = false, results = [] } = {}) {
 test("ads endpoint returns active ads and strips unsafe URLs", async () => {
   const response = await onRequestGet(context({ results: [{ id: 1, title: "Test", image_url: "javascript:alert(1)", target_url: "https://safe.example" }] }));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ads: [{ id: 1, title: "Test", text: "", image_url: null, target_url: "https://safe.example/", placement: undefined }] });
+  assert.deepEqual(await response.json(), { ads: [{ id: 1, title: "Test", text: "", image_url: null, target_url: "https://safe.example/" }] });
 });
 
 test("ads endpoint returns 200 with an empty list when inventory is genuinely empty", async () => {
