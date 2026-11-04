@@ -1,5 +1,6 @@
 // Yanımda Türkiye places.ts — strict-null-safe production build
 import type {Env,Place} from '../lib/types';
+import {provinceCenter,isWholeProvince} from '../lib/provinceCenters';
 import {isCentralDistrict,trSlug,resolveName} from '../../src/text';
 import {districtMap,districtsFor} from '../../src/turkeyDistricts';
 import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery';
@@ -430,7 +431,8 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   if(!hasPosition){
     if(!province)return jsonResponse([]);
     const area=areaQuery(district,province);
-    const point=await geocode(env,area);
+    const capital=isWholeProvince(district,province)?provinceCenter(province):null;
+    const point=capital??await geocode(env,area);
     if(!point)return jsonResponse({error:'location_geocode_failed',area,category},{status:503,headers:{'Cache-Control':'no-store'}});
     lat=point.lat;lon=point.lon;
   }
