@@ -106,7 +106,15 @@ export default {
 
       // Schema first so rate limiting (api_cache) also works on the very first AI/admin call.
       if (path.startsWith("/api/") && env.DB) {
-        try { await ensureSchema(env); } catch (e) { console.error("ensureSchema failed", e); }
+        try {
+          await ensureSchema(env);
+        } catch (error) {
+          console.error("ensureSchema failed", error);
+          return Response.json(
+            { error: "database_schema_unavailable" },
+            { status: 503, headers: { "Cache-Control": "no-store" } },
+          );
+        }
       }
 
       if (path === "/api/admin/ai" && request.method === "POST") {
