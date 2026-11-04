@@ -7,7 +7,7 @@ import {MapContainer,Marker,Popup,TileLayer} from 'react-leaflet';
 import L from 'leaflet';
 import {categories,keywordMap,provinces,services} from './data';
 import {districtsFor} from './turkeyDistricts';
-import {resolveName} from './text';
+import {resolveName,trSlug} from './text';
 import {findPlaces,resolveLocationArea} from './api';
 import {getCurrentLocation,getLocationPermissionState,LocationError} from './location';
 import type {Place,Position} from './types';
@@ -198,9 +198,11 @@ function Nearby(){
  const memory=readNearbyMemory();
  const state=location.state as NearbyNavigationState|null;
 
+ const initialProvince=params.get('province')||state?.province||memory.province||'';
+ const initialDistrict=params.get('district')||state?.district||memory.district||'';
  const[cat,setCat]=useState(params.get('category')||state?.category||memory.category||'pharmacy');
- const[province,setProvince]=useState(params.get('province')||state?.province||'');
- const[district,setDistrict]=useState(params.get('district')||state?.district||'');
+ const[province,setProvince]=useState(initialProvince);
+ const[district,setDistrict]=useState(()=>resolveName(initialDistrict,districtsFor(resolveName(initialProvince,provinces)||initialProvince))||'');
  const[provinceOpen,setProvinceOpen]=useState(false);
  const locateRef=useRef<()=>void>(()=>{});
  const[districtOpen,setDistrictOpen]=useState(false);
@@ -277,8 +279,9 @@ function Nearby(){
      // older caller only supplies coordinates, resolve the area here as well.
      if(incoming.province){
        setProvince(incoming.province);
-       setDistrict(incoming.district||'');
-       setSubmitted({category:incoming.category||cat,province:incoming.province,district:incoming.district||'',radius,nearbyDistricts,pos:incoming.position});
+       const validIncomingDistrict=resolveName(incoming.district||'',districtsFor(resolveName(incoming.province,provinces)||incoming.province))||'';
+       setDistrict(validIncomingDistrict);
+       setSubmitted({category:incoming.category||cat,province:incoming.province,district:validIncomingDistrict,radius,nearbyDistricts,pos:incoming.position});
      }else{
        void resolveLocationArea(incoming.position).then(area=>{
          setProvince(area.province);
@@ -291,7 +294,7 @@ function Nearby(){
    }
    if(incoming.locationError)setErr(incoming.locationError);
    if(incoming.province!==undefined)setProvince(incoming.province);
-   if(incoming.district!==undefined)setDistrict(incoming.district);
+   if(incoming.district!==undefined)setDistrict(resolveName(incoming.district,districtsFor(resolveName(incoming.province||province,provinces)||incoming.province||province))||'');
    if(incoming.category!==undefined)setCat(incoming.category);
    if(incoming.query!==undefined){
      const query=incoming.query.trim();
@@ -386,9 +389,11 @@ function Nearby(){
  const officialPharmacyUrl='https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama';
  // Eczaneler.gen.tr'nin resmi Sitene Ekle iframe'i il bazında tüm Türkiye için kullanılır.
  const provincePlateCodes:Record<string,number>={adana:1,adiyaman:2,afyonkarahisar:3,agri:4,amasya:5,ankara:6,antalya:7,artvin:8,aydin:9,balikesir:10,bilecik:11,bingol:12,bitlis:13,bolu:14,burdur:15,bursa:16,canakkale:17,cankiri:18,corum:19,denizli:20,diyarbakir:21,edirne:22,elazig:23,erzincan:24,erzurum:25,eskisehir:26,gaziantep:27,giresun:28,gumushane:29,hakkari:30,hatay:31,isparta:32,mersin:33,istanbul:34,izmir:35,kars:36,kastamonu:37,kayseri:38,kirklareli:39,kirsehir:40,kocaeli:41,konya:42,kutahya:43,malatya:44,manisa:45,kahramanmaras:46,mardin:47,mugla:48,mus:49,nevsehir:50,nigde:51,ordu:52,rize:53,sakarya:54,samsun:55,siirt:56,sinop:57,sivas:58,tekirdag:59,tokat:60,trabzon:61,tunceli:62,sanliurfa:63,usak:64,van:65,yozgat:66,zonguldak:67,aksaray:68,bayburt:69,karaman:70,kirikkale:71,batman:72,sirnak:73,bartin:74,ardahan:75,igdir:76,yalova:77,karabuk:78,kilis:79,osmaniye:80,duzce:81};
- const provinceCode=provincePlateCodes[normalizeSearchText(canonProvince).replace(/\s+/g,'')];
- const pharmacyLiveWidget=pharmacyMode&&Number.isInteger(provinceCode);
- const pharmacyWidgetUrl=pharmacyLiveWidget?'https://www.eczaneler.gen.tr/iframe.php?lokasyon='+provinceCode:'https://www.eczaneler.gen.tr/turkiye.php';
+ const pharmacyDistrictSlug=canonDistrict&&validDistrict?trSlug(canonDistrict):'';
+ const pharmacyProvinceSlug=trSlug(canonProvince);
+ const pharmacyLiveWidget=pharmacyMode&&validProvince;
+ const pharmacyWidgetSlug=pharmacyDistrictSlug?pharmacyProvinceSlug+'-'+pharmacyDistrictSlug:pharmacyProvinceSlug;
+ const pharmacyWidgetUrl='https://www.eczaneler.gen.tr/nobetci-'+pharmacyWidgetSlug;
 
  return <main className="inner nearby-page">
    <div className="page-title nearby-title">
@@ -454,11 +459,11 @@ function Nearby(){
    {err&&!pharmacyLiveWidget&&<div className="error nearby-error">{err} {pharmacyMode&&<a href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">Resmî e-Devlet nöbetçi eczane sorgusunu aç</a>}</div>}
 
    {pharmacyLiveWidget?
-    <section className="pharmacy-live-widget" aria-label="İl canlı nöbetçi eczane listesi">
-      <div className="result-head"><b>{canonProvince} İli · Canlı nöbetçi eczaneler</b><a href={'https://www.eczaneler.gen.tr/nobetci-'+normalizeSearchText(canonProvince).replace(/\\s+/g,'-')} target="_blank" rel="noreferrer">Kaynakta aç <ExternalLink/></a></div>
+    <section className="pharmacy-live-widget" aria-label="İlçe bazlı canlı nöbetçi eczane listesi">
+      <div className="result-head"><b>{canonProvince}{pharmacyDistrictSlug?' / '+canonDistrict+' İlçesi':' İli'} · Canlı nöbetçi eczaneler</b><a href={pharmacyWidgetUrl} target="_blank" rel="noreferrer">Kaynakta aç <ExternalLink/></a></div>
       <iframe
         src={pharmacyWidgetUrl}
-        title="Eczaneler.gen.tr canlı nöbetçi eczaneler"
+        title="Eczaneler.gen.tr ilçe bazlı canlı nöbetçi eczaneler"
         loading="lazy"
         referrerPolicy="strict-origin-when-cross-origin"
         style={{width:'100%',height:420,border:0,borderRadius:14,background:'#fff'}}
