@@ -40,7 +40,6 @@ export default function ChatWidget(){
   const next=[...messages,{role:"user" as const,content:text}].slice(-12);
   setMessages(m=>[...m,{role:"user",content:text}]);setLoading(true);
   try{
-   const asksNearby=/yakınım|yakınımdaki|en yakın|yakında|eczane|hastane|market|restoran|atm|akaryakıt|fırın|taksi|otel|polis|itfaiye|kargo/i.test(text);
    // Nearby searches use the saved/manual province and district first. GPS is only requested when the user taps the explicit location button.
    const area=readSelectedArea();
    const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({messages:next,location,area})});
