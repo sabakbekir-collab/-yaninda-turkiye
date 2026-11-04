@@ -260,7 +260,7 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
 
 // D1-backed OSM snapshot. It is used only after the import marker exists;
 // absent metadata means "not imported", never an authoritative empty result.
-async function localPois(env:Env,category:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean;raw?:number}|null>{
+async function localPois(env:Env,category:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean;raw?:number;local?:boolean}|null>{
   if(!env.DB)return null;
   try{
     const meta=await env.DB.prepare('SELECT n FROM poi_meta WHERE category=? LIMIT 1').bind(category).first<{n:number}>();
@@ -277,7 +277,7 @@ async function localPois(env:Env,category:string,lat:number,lon:number,radiusKm:
       if(p&&(p.distance??Infinity)<=radiusKm)places.push(p);
     }
     places.sort((a,b)=>(a.distance??999)-(b.distance??999));
-    return {ok:true,places:places.slice(0,250),raw:rows.results.length};
+    return {ok:true,places:places.slice(0,250),raw:rows.results.length,local:true};
   }catch{return null}
 }
 
