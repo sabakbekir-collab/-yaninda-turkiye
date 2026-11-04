@@ -21,6 +21,8 @@ test("epoch seconds and milliseconds are supported", () => {
 test("invalid and impossible dates are rejected", () => {
   assert.equal(dutyDateKey("31.02.2026"), null);
   assert.equal(dutyDateKey("2026-13-01"), null);
+  assert.equal(dutyDateKey("2026-02-31T12:00:00Z"), null);
+  assert.equal(dutyDateKey("2026-04-31T12:00:00+03:00"), null);
   assert.equal(dutyDateKey("not-a-date"), null);
   assert.equal(dutyDateKey({ date: "2026-11-05" }), null);
 });
