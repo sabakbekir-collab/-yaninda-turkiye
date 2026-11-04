@@ -1,5 +1,5 @@
 import type {Env} from "../lib/types";
-import {validSession,sameOrigin} from "../lib/auth";
+import {validSession,strictSameOrigin} from "../lib/auth";
 import {rateLimited} from "../lib/ratelimit";
 
 function json(body:unknown,status=200,extraHeaders:Record<string,string>={}) {
@@ -13,7 +13,7 @@ const ADMIN_AI_PER_MINUTE=5;
 const ADMIN_AI_PER_DAY=30;
 
 export async function onRequestPost({request,env}:{request:Request;env:Env}) {
- if(!sameOrigin(request))return json({error:"forbidden"},403);
+ if(!strictSameOrigin(request))return json({error:"forbidden"},403);
  if(!(await validSession(request,env)))return json({error:"unauthorized"},401);
  if(!env.OPENAI_API_KEY)return json({error:"ai_not_configured",reply:"OPENAI_API_KEY henüz Cloudflare'a eklenmemiş."},503);
  if(!env.DB)return json({error:"rate_limit_unavailable",reply:"Güvenli kullanım limiti şu anda doğrulanamıyor. Lütfen daha sonra tekrar deneyin."},503);
