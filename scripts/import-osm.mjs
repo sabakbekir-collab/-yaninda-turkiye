@@ -44,7 +44,7 @@ export function tiles(step=2){
 }
 export function slimTags(tags={}){
  const out={};
- for(const key of KEEP_TAGS){const value=tags?.[key];if(typeof value==='string'&&value.trim())out[key]=value.replace(/[\u0000-\u001f]/g,' ').trim().slice(0,200);}
+ for(const key of KEEP_TAGS){const value=tags?.[key];if(typeof value==='string'&&value.trim())out[key]=Array.from(value, ch => ch.charCodeAt(0) < 32 || ch.charCodeAt(0) === 127 ? ' ' : ch).join('').trim().slice(0,200);}
  return out;
 }
 export function rowsFromElements(elements){
