@@ -351,8 +351,13 @@ async function nominatimFallback(env:Env,category:string,area:string,lat:number,
 export async function onRequestGet({request,env}:{request:Request;env:Env}){
   const u=new URL(request.url);
   const category=clean(u.searchParams.get('category')||'pharmacy')||'pharmacy';
-  const province=clean(u.searchParams.get('province')||'')||'';
-  const district=clean(u.searchParams.get('district')||'')||'';
+  const rawProvince=clean(u.searchParams.get('province')||'')||'';
+  const province=rawProvince?resolveName(rawProvince,Object.keys(districtMap))||'':'';
+  const rawDistrict=clean(u.searchParams.get('district')||'')||'';
+  // Older clients may send a neighbourhood in the district field. Only pass
+  // official province-specific district names to geocoding and duty providers.
+  const knownDistricts=province?districtsFor(province):[];
+  const district=rawDistrict?(resolveName(rawDistrict,knownDistricts)||''):'';
   const radiusRequested=Number(u.searchParams.get('radius')||'5');
   const radiusKm=Math.max(2,Math.min(20,Number.isFinite(radiusRequested)?radiusRequested:5));
   const nearbyDistricts=u.searchParams.get('nearbyDistricts')==='1';
