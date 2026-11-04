@@ -1,5 +1,4 @@
 import type {Place,Position} from './types';
-import {overpassFromBrowser} from './overpassClient';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName} from './text';
 
@@ -69,17 +68,9 @@ export async function findPlaces(
         throw new Error('Güncel nöbetçi eczane verisine şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.');
       }
       if(code==='upstream_unavailable'){
-        // Worker kaynaklarına bulut IP'sinden erişilemiyorsa, aynı koordinatları
-        // kullanıcının kendi internet bağlantısından doğrudan sorgula.
-        if(category!=='pharmacy'&&position&&Number.isFinite(position.lat)&&Number.isFinite(position.lon)){
-          try{return await overpassFromBrowser(category,position.lat,position.lon,options.radiusKm??5)}catch(error){
-            const detail=error instanceof Error?error.message:'browser_fallback_failed';
-            throw new Error('Sunucu ve telefon bağlantısından harita verisi alınamadı ('+detail+'). Biraz sonra tekrar deneyin.');
-          }
-        }
         const attempts=(data as {attempts?:unknown}).attempts;
-        const detail=Array.isArray(attempts)&&attempts.length?' Kaynak yanıtları: '+attempts.slice(0,4).map(String).join(' | '):'';
-        throw new Error('Hizmet verisi sağlayıcısına şu anda ulaşılamıyor. Lütfen biraz sonra tekrar deneyin.'+detail);
+        const detail=Array.isArray(attempts)&&attempts.length?' Kaynak yanıtları: '+attempts.slice(0,3).map(String).join(' | '):'';
+        throw new Error('Harita veri sağlayıcıları şu anda yanıt vermiyor. Birkaç dakika sonra tekrar deneyin.'+detail);
       }
     }
     throw new Error('Hizmet verileri şu anda alınamadı.');
@@ -96,15 +87,6 @@ export async function findPlaces(
     !/^isimsiz( açık veri kaydı)?$/i.test(p.name.trim())&&
     (category!=='pharmacy'||p.isDuty===true)
   ));
-  // The Worker may return HTTP 200 with an empty array when its upstream
-  // providers respond successfully but have no records. For GPS searches,
-  // try the same OSM query from the phone before displaying a false zero.
-  if(cleaned.length===0&&category!=='pharmacy'&&position&&Number.isFinite(position.lat)&&Number.isFinite(position.lon)){
-    try{return await overpassFromBrowser(category,position.lat,position.lon,options.radiusKm??5)}catch(error){
-      const detail=error instanceof Error?error.message:'browser_fallback_failed';
-      throw new Error('Bu bölgede sunucudan sonuç gelmedi; telefonun doğrudan harita sorgusu da başarısız ('+detail+').');
-    }
-  }
   return cleaned;
 }
 
