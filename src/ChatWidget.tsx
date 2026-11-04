@@ -6,12 +6,14 @@ import "./chat.css";
 type Msg={role:"user"|"assistant";content:string};
 type Place={name:string;address?:string;phone?:string;lat?:number;lon?:number;distance?:number;isDuty?:boolean};
 type Reply={reply?:string;places?:Place[];route?:{url:string;label:string}};
+type SelectedArea={province?:string;district?:string};
+function readSelectedArea():SelectedArea{try{const value=JSON.parse(localStorage.getItem("yt-nearby-selection-v5")||"{}") as SelectedArea;return {province:typeof value.province==="string"?value.province:"",district:typeof value.district==="string"?value.district:""};}catch{return {};}}
 const distanceText=(km?:number)=>typeof km==="number"&&Number.isFinite(km)?(km<1?Math.round(km*1000)+" m":new Intl.NumberFormat("tr-TR",{maximumFractionDigits:1}).format(km)+" km"):"";
 
 export default function ChatWidget(){
  const [open,setOpen]=useState(false),[input,setInput]=useState(""),[loading,setLoading]=useState(false),[location,setLocation]=useState<{lat:number;lon:number}>();
  const [locationBusy,setLocationBusy]=useState(false),[locationError,setLocationError]=useState("");
- const [messages,setMessages]=useState<Msg[]>([{role:"assistant",content:"Merhaba 👋 Ben Yanımda AI. Yakınındaki hizmetleri bulabilir, yol tarifi konusunda yardımcı olabilir ve site içinde seni doğru yere yönlendirebilirim. Örneğin “Beyoğlu'na nasıl gidilir?” veya “yakınımdaki nöbetçi eczaneyi bul” diyebilirsin."}]);
+ const [messages,setMessages]=useState<Msg[]>([{role:"assistant",content:"Merhaba 👋 Ben Yanımda AI. Seçtiğin il ve ilçedeki hizmetleri bulabilir, yol tarifi konusunda yardımcı olabilir ve site içinde seni doğru yere yönlendirebilirim. Konum izni vermen gerekmez. Örneğin “Beyoğlu'na nasıl gidilir?” veya “yakınımdaki nöbetçi eczaneyi bul” diyebilirsin."}]);
  const [results,setResults]=useState<Place[]>([]);
  const [route,setRoute]=useState<Reply["route"]>();
  const end=useRef<HTMLDivElement>(null);
@@ -38,9 +40,9 @@ export default function ChatWidget(){
   const next=[...messages,{role:"user" as const,content:text}].slice(-12);
   setMessages(m=>[...m,{role:"user",content:text}]);setLoading(true);
   try{
-   const asksNearby=/yakınım|yakınımdaki|en yakın|yakında|eczane|hastane|market|restoran|atm|akaryakıt|fırın|taksi|otel|polis|itfaiye|kargo/i.test(text);
-   const current=asksNearby?await ensureLocation():location;
-   const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({messages:next,location:current})});
+   // Nearby searches use the saved/manual province and district first. GPS is only requested when the user taps the explicit location button.
+   const area=readSelectedArea();
+   const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({messages:next,location,area})});
    const d=await r.json().catch(()=>({})) as Reply;
    setMessages(m=>[...m,{role:"assistant",content:typeof d.reply==="string"?d.reply:"Şu anda cevap veremiyorum. Lütfen tekrar deneyin."}]);
    if(Array.isArray(d.places))setResults(d.places);

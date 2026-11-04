@@ -8,8 +8,8 @@ import L from 'leaflet';
 import {categories,keywordMap,provinces,services} from './data';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName,trSlug} from './text';
-import {findPlaces,resolveLocationArea} from './api';
-import {getCurrentLocation,getLocationPermissionState,LocationError} from './location';
+import {findPlaces,resolveLocationArea,track} from './api';
+import {getCurrentLocation,LocationError} from './location';
 import type {Place,Position} from './types';
 import ChatWidget from './ChatWidget';
 import AdminAI from './AdminAI';
@@ -18,6 +18,7 @@ import CalendarPage from './CalendarPage';
 import EnhancedPlaceCard from './PlaceCard';
 import {getTheme,applyTheme,saveTheme} from './theme';
 import {shareText,mapsLink} from './share';
+import {provinceCenter} from '../functions/lib/provinceCenters';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
@@ -125,39 +126,64 @@ function Home(){
   void load();return()=>{active=false};
  },[]);
  useEffect(()=>{
-   let cancelled=false;
-   const detect=async()=>{
-     try{
-       const current=await getCurrentLocation({forceFresh:true});
-       const area=await resolveLocationArea(current);
-       if(cancelled)return;
-       setWeatherLoading(true);
-       const weatherUrl='https://api.open-meteo.com/v1/forecast?latitude='+current.lat+'&longitude='+current.lon+'&current=temperature_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&forecast_days=5&timezone=auto';
-       try{
-         const response=await fetch(weatherUrl,{signal:AbortSignal.timeout(9000),cache:'no-store'});
-         if(!response.ok)throw new Error('weather_unavailable');
-         const data=await response.json() as {current?:{temperature_2m?:number;apparent_temperature?:number;precipitation?:number;weather_code?:number;wind_speed_10m?:number};daily?:{time?:string[];weather_code?:number[];temperature_2m_max?:number[];temperature_2m_min?:number[]}};
-         if(!data.current||!data.daily)throw new Error('weather_bad_response');
-         const c=data.current,d=data.daily;
-         setWeather({temperature:Number(c.temperature_2m),apparent:Number(c.apparent_temperature),precipitation:Number(c.precipitation),wind:Number(c.wind_speed_10m),code:Number(c.weather_code),days:(d.time||[]).slice(0,5).map((date,i)=>({date,code:Number(d.weather_code?.[i]??0),max:Number(d.temperature_2m_max?.[i]??0),min:Number(d.temperature_2m_min?.[i]??0)}))});
-         setWeatherError('');
-       }catch{setWeatherError('Hava durumu şu anda alınamadı.');}
-       finally{setWeatherLoading(false);}
-       const previous=readNearbyMemory();
-       writeNearbyMemory({...previous,province:area.province,district:area.district,position:current});
-       setLocationLabel(area.province+(area.district?', '+area.district:''));
-     }catch{
-       if(!cancelled){setLocationLabel('Konum izni bekleniyor');setWeatherError('Hava durumu için konum izni gerekli.');}
-     }
+   // GPS permission is optional. The app uses the user's saved/manual province
+   // and district for weather and nearby searches without prompting on entry.
+   const refresh=()=>{
+     const saved=readNearbyMemory();
+     const label=saved.province
+       ? saved.province+(saved.district?', '+saved.district:'')
+       : 'Bölge seçilmedi';
+     setLocationLabel(label);
    };
-   void detect();
-   const refresh=()=>setLocationLabel(readHeaderLocation());
+   refresh();
    window.addEventListener('yt-nearby-memory',refresh);
-   return()=>{cancelled=true;window.removeEventListener('yt-nearby-memory',refresh)};
+   return()=>window.removeEventListener('yt-nearby-memory',refresh);
  },[]);
+ useEffect(()=>{
+   let active=true;
+   const province=readNearbyMemory().province||'';
+   const center=provinceCenter(province);
+   if(!center){
+     setWeather(null);
+     setWeatherError('Hava durumu için önce il seç.');
+     setWeatherLoading(false);
+     return;
+   }
+   const load=async()=>{
+     setWeatherLoading(true);
+     setWeatherError('');
+     try{
+       const query=new URLSearchParams({
+         latitude:String(center.lat),
+         longitude:String(center.lon),
+         current:'temperature_2m,apparent_temperature,precipitation,wind_speed_10m,weather_code',
+         daily:'weather_code,temperature_2m_max,temperature_2m_min',
+         forecast_days:'5',
+         timezone:'Europe/Istanbul'
+       });
+       const response=await fetch('https://api.open-meteo.com/v1/forecast?'+query.toString(),{cache:'no-store',signal:AbortSignal.timeout(10000)});
+       if(!response.ok)throw new Error('weather_unavailable');
+       const data=await response.json() as {
+         current?:{temperature_2m?:number;apparent_temperature?:number;precipitation?:number;wind_speed_10m?:number;weather_code?:number};
+         daily?:{time?:string[];weather_code?:number[];temperature_2m_max?:number[];temperature_2m_min?:number[]}
+       };
+       const current=data.current,daily=data.daily;
+       if(!current||!daily||!Array.isArray(daily.time)||!Array.isArray(daily.weather_code)||!Array.isArray(daily.temperature_2m_max)||!Array.isArray(daily.temperature_2m_min))throw new Error('weather_bad_response');
+       if(active)setWeather({
+         temperature:Number(current.temperature_2m),apparent:Number(current.apparent_temperature),
+         precipitation:Number(current.precipitation),wind:Number(current.wind_speed_10m),code:Number(current.weather_code),
+         days:daily.time.map((date,i)=>({date,code:Number(daily.weather_code?.[i]),max:Number(daily.temperature_2m_max?.[i]),min:Number(daily.temperature_2m_min?.[i])}))
+       });
+     }catch{
+       if(active){setWeather(null);setWeatherError('Seçilen il için hava durumu şu anda alınamıyor.');}
+     }finally{if(active)setWeatherLoading(false);}
+   };
+   void load();
+   return()=>{active=false};
+ },[locationLabel]);
  const go=(id:string)=>id==='emergency'?nav('/emergency'):nav('/nearby',{state:{category:id,...(readNearbyMemory().position?{position:readNearbyMemory().position,province:readNearbyMemory().province,district:readNearbyMemory().district}:{})}});
 
- const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
+ const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){track('search',{source:'home'});const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
  const cards=[
   ['pharmacy','Nöbetçi Eczaneler','Yakınınızdaki nöbetçi eczaneleri görüntüleyin','red',Pill,imgs.pharmacy],
   ['hospital','Hastaneler','En yakın hastaneler, poliklinikler ve aciller','blue',Hospital,imgs.hospital],
@@ -176,7 +202,7 @@ function Home(){
    </section>
    <section className="modern-welcome-banner"><div><span>YANINDA TÜRKİYE</span><h1>Hayatın her anında<br/>yanında.</h1><p>İhtiyacın olan her şey tek yerde.</p></div><MapPin/></section>
    <form className="modern-search" onSubmit={search}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Eczane, hastane, restoran, usta..."/><button type="button" aria-label="Sesli arama">●</button></form>
-   <div className="modern-location-status"><MapPin/><span><b>Mevcut konumun</b><small>{locationLabel} · Otomatik algılanıyor</small></span><span className="location-live-dot"/></div>
+   <div className="modern-location-status"><MapPin/><span><b>Seçili bölgen</b><small>{locationLabel} · Konum izni gerekmez</small></span><span className="location-live-dot"/></div>
 
    <section className="modern-section">
     <div className="modern-section-title"><h2>Hızlı işlemler</h2><button onClick={()=>nav('/services')}>Tümünü Gör <ChevronRight/></button></div>
@@ -194,7 +220,7 @@ function Home(){
    </section>
    <section className="home-weather-card" aria-label="Konuma göre hava durumu">
     <div className="home-weather-top"><div><small>BUGÜN · {locationLabel}</small><h2><CloudSun/> Hava Durumu</h2></div><span>{weather?weatherLabel(weather.code):weatherLoading?'Yükleniyor…':'Güncel tahmin'}</span></div>
-    {weather?<><div className="home-weather-current"><strong>{Math.round(weather.temperature)}°</strong><div><b>{weatherLabel(weather.code)}</b><small>Hissedilen {Math.round(weather.apparent)}°</small></div></div><div className="home-weather-metrics"><span>Yağış <b>{weather.precipitation.toLocaleString('tr-TR')} mm</b></span><span>Rüzgâr <b>{Math.round(weather.wind)} km/sa</b></span></div><div className="home-weather-days">{weather.days.map((day,i)=><div key={day.date}><small>{i===0?'Bugün':new Date(day.date+'T12:00:00').toLocaleDateString('tr-TR',{weekday:'short'})}</small><b>{weatherLabel(day.code)}</b><span>{Math.round(day.max)}° / {Math.round(day.min)}°</span></div>)}</div></>:<p className="home-weather-error">{weatherError||'Konum algılanınca hava durumu gösterilecek.'}</p>}</section>
+    {weather?<><div className="home-weather-current"><strong>{Math.round(weather.temperature)}°</strong><div><b>{weatherLabel(weather.code)}</b><small>Hissedilen {Math.round(weather.apparent)}°</small></div></div><div className="home-weather-metrics"><span>Yağış <b>{weather.precipitation.toLocaleString('tr-TR')} mm</b></span><span>Rüzgâr <b>{Math.round(weather.wind)} km/sa</b></span></div><div className="home-weather-days">{weather.days.map((day,i)=><div key={day.date}><small>{i===0?'Bugün':new Date(day.date+'T12:00:00').toLocaleDateString('tr-TR',{weekday:'short'})}</small><b>{weatherLabel(day.code)}</b><span>{Math.round(day.max)}° / {Math.round(day.min)}°</span></div>)}</div></>:<p className="home-weather-error">{weatherError||'İl seçildiğinde o ilin merkezine göre tahmin gösterilir.'}</p>}</section>
    <section className="home-exchange-card" aria-label="Döviz kurları">
     <div className="home-exchange-heading"><div><small>PİYASA BİLGİSİ</small><h2><Activity/> Döviz Kurları</h2></div><span>{exchangeLoading?'Güncelleniyor…':exchange?'Günlük veri':'Veri bekleniyor'}</span></div>
     {exchange?<><div className="home-exchange-grid">
@@ -295,32 +321,12 @@ function Nearby(){
    },{replace:true});
  },[cat,province,district,radius,nearbyDistricts,view,setParams]);
 
+ // Do not request device location on page entry. Saved/manual region selection
+ // is sufficient; GPS remains an optional action initiated by the user.
  useEffect(()=>{
-   let cancelled=false;
-   const start=async()=>{
-     try{
-       const permission=await getLocationPermissionState();
-       if(cancelled)return;
-       setLocationState(permission);
-       // Explicit URL/navigation selections are manual; otherwise always detect
-       // the device's current location on entry instead of reusing stale GPS.
-       if(state?.position||params.has('province')||params.has('district')||state?.province||state?.district)return;
-       if(permission==='denied'||permission==='unsupported')return;
-       const current=await getCurrentLocation({forceFresh:true});
-       const area=await resolveLocationArea(current);
-       if(cancelled)return;
-       setPos(current);setProvince(area.province);setDistrict(area.district);setLocationState('granted');setHasSearched(true);
-       const saved=readNearbyMemory();
-       writeNearbyMemory({...saved,province:area.province,district:area.district,position:current});
-       setSubmitted({category:cat,province:area.province,district:area.district,radius,nearbyDistricts,pos:current});
-     }catch(error){
-       if(!cancelled&&error instanceof LocationError&&error.code==='permission_denied')setLocationState('denied');
-     }
-   };
-   void start();
-   return()=>{cancelled=true};
+   if(!province&&memory.province)setProvince(memory.province);
+   if(!district&&memory.district)setDistrict(memory.district);
  },[]);
-
  useEffect(()=>{
    const incoming=location.state as NearbyNavigationState|null;
    if(!incoming)return;
@@ -365,7 +371,7 @@ function Nearby(){
      if(province){
        setSubmitted({category:resolved,province,district,radius,nearbyDistricts});
      }else{
-       setErr('Kategori bulundu. Arama için il / ilçe seç veya “Konumumu Kullan” butonuna bas.');
+       setErr('Kategori bulundu. Arama yapmak için il ve ilçe seç.');
      }
    }
  },[location.key]);
@@ -383,9 +389,10 @@ function Nearby(){
 
  const search=()=>{
    setErr('');
+   track('search',{category:cat,province:canonProvince,district:canonDistrict});
    if(!province.trim()){
      if(pos){setHasSearched(true);setSubmitted({category:cat,province:'',district:'',radius,nearbyDistricts,pos});return;}
-     setErr('Arama için önce bir il seç veya Konumumu Kullan butonuna bas.');return;
+     setErr('Arama için önce il seç. Konum izni gerekmez.');return;
    }
    if(!validProvince){setErr('İl adını listeden seç.');return;}
    if(!validDistrict){setErr('İlçeyi listeden seç veya “Tüm ilçeler” olarak bırak.');return;}
@@ -456,7 +463,7 @@ function Nearby(){
      <a href={officialPharmacyUrl} target="_blank" rel="noreferrer">Resmî TİTCK / e-Devlet <ExternalLink/></a>
    </div>}
 
-   {locationState==='denied'&&<div className="location-denied"><Info/><span>Konum izni kapalı. İl / ilçe seçimiyle devam edebilirsin.</span></div>}
+
 
    <div className="nearby-filters">
      <div className="filter-line">
@@ -536,7 +543,7 @@ function Nearby(){
           <div className="empty nearby-empty">
             <MapPin />
             <h3>{hasSearched ? (pharmacyMode ? 'Bu konumda güncel nöbetçi eczane kaydı bulunamadı' : 'Bu bölgede kayıt bulunamadı') : 'Arama yapmaya hazır'}</h3>
-            <p>{hasSearched ? (pharmacyMode ? 'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl / ilçe seçip Yakınındakileri Bul’a bas veya konumunu kullan.'}</p>
+            <p>{hasSearched ? (pharmacyMode ? 'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl ve ilçe seçip Yakınındakileri Bul’a bas. Konum izni gerekmez.'}</p>
             {hasSearched&&<button onClick={search}><Search/>Tekrar Ara</button>}
             {hasSearched && pharmacyMode && <a className="official-duty-link" href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">e-Devlet’te resmî sorgula <ExternalLink /></a>}
             {hasSearched && pharmacyMode && normalizeSearchText(province) === 'mus' && <a className="official-duty-link" href="https://www.batmaneczaciodasi.org.tr/nobetci-eczaneler/mus" target="_blank" rel="noreferrer">Muş Eczacı Odası nöbet listesini aç <ExternalLink /></a>}
@@ -607,22 +614,104 @@ function Emergency(){
    }}><LocateFixed/> Konumumu Yakınıma Gönder</button><small className="share-location-hint">Konum bağlantısını WhatsApp, SMS veya desteklenen başka bir uygulamayla paylaşabilirsin.</small><a className="call112" href="tel:112"><Phone/>112 Acil Çağrı</a>
  </main>
 }
-function AddBusiness(){const[ok,setOk]=useState(false);const[f,setF]=useState({name:'',category:'',phone:'',whatsapp:'',address:'',province:'İstanbul',district:'Beyoğlu',description:'',hours:''});const ds=districtsFor(f.province);const set=(k:string,v:string)=>setF(x=>({...x,[k]:v}));const submit=async(e:FormEvent)=>{e.preventDefault();const r=await fetch('/api/submissions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(f)});if(r.ok)setOk(true)};return <main className="form-page"><h1>İşletmeni / Hizmetini Ekle</h1><p>Bilgilerini bırak, inceleme sonrası ücretsiz yayınlayalım.</p>{ok?<div className="success"><ShieldCheck/><h2>Başvurun alındı.</h2></div>:<form onSubmit={submit}><label>İşletme / hizmet adı<input required value={f.name} onChange={e=>set('name',e.target.value)}/></label><label>Kategori<select required value={f.category} onChange={e=>set('category',e.target.value)}><option value="">Seçin</option>{services.map(s=><option key={s[0]} value={s[0]}>{s[1]}</option>)}</select></label><label>Telefon<input required value={f.phone} onChange={e=>set('phone',e.target.value)}/></label><label>WhatsApp<input value={f.whatsapp} onChange={e=>set('whatsapp',e.target.value)}/></label><label>Açık adres<input required value={f.address} onChange={e=>set('address',e.target.value)}/></label><div className="two"><label>İl<select value={f.province} onChange={e=>{set('province',e.target.value);set('district','')}}>{provinces.map(p=><option key={p}>{p}</option>)}</select></label><label>İlçe<select value={f.district} onChange={e=>set('district',e.target.value)}>{ds.map(d=><option key={d}>{d}</option>)}</select></label></div><label>Açıklama<textarea value={f.description} onChange={e=>set('description',e.target.value)}/></label><button>Başvuruyu Gönder <ArrowRight/></button></form>}</main>}
-
+function AddBusiness(){
+ const[ok,setOk]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const[f,setF]=useState({name:'',category:'',phone:'',whatsapp:'',address:'',province:'İstanbul',district:'Beyoğlu',description:'',hours:''});
+ const ds=districtsFor(f.province);
+ const set=(k:string,v:string)=>setF(x=>({...x,[k]:v}));
+ const submit=async(e:FormEvent)=>{
+   e.preventDefault();if(busy)return;setBusy(true);setError('');
+   try{
+     const r=await fetch('/api/submissions',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(f)});
+     const data=await r.json().catch(()=>({})) as {error?:string};
+     if(r.ok){setOk(true);return;}
+     if(r.status===429)throw new Error('Çok fazla başvuru gönderildi. Bir saat sonra tekrar deneyin.');
+     if(data.error==='invalid_input')throw new Error('Bilgileri kontrol et: kategori, telefon, il ve ilçe geçerli olmalı.');
+     if(data.error==='database_unavailable')throw new Error('Başvuru sistemi şu anda kullanılamıyor.');
+     throw new Error('Başvuru gönderilemedi. Lütfen biraz sonra tekrar deneyin.');
+   }catch(e){setError(e instanceof Error?e.message:'Bağlantı kurulamadı. İnternetini kontrol et.');}
+   finally{setBusy(false);}
+ };
+ return <main className="form-page"><h1>İşletmeni / Hizmetini Ekle</h1><p>Bilgilerini bırak, inceleme sonrası ücretsiz yayınlayalım.</p>{ok?<div className="success"><ShieldCheck/><h2>Başvurun alındı.</h2><p>Başvurun incelendikten sonra yayınlanır.</p></div>:<form onSubmit={submit}>
+  <label>İşletme / hizmet adı<input required maxLength={120} value={f.name} onChange={e=>set('name',e.target.value)}/></label>
+  <label>Kategori<select required value={f.category} onChange={e=>set('category',e.target.value)}><option value="">Seçin</option>{services.map(s=><option key={s[0]} value={s[0]}>{s[1]}</option>)}</select></label>
+  <label>Telefon<input required type="tel" inputMode="tel" maxLength={20} value={f.phone} onChange={e=>set('phone',e.target.value)}/></label>
+  <label>WhatsApp<input type="tel" inputMode="tel" maxLength={20} value={f.whatsapp} onChange={e=>set('whatsapp',e.target.value)}/></label>
+  <label>Açık adres<input required minLength={10} maxLength={300} value={f.address} onChange={e=>set('address',e.target.value)}/></label>
+  <div className="two"><label>İl<select value={f.province} onChange={e=>setF(x=>({...x,province:e.target.value,district:districtsFor(e.target.value)[0]||''}))}>{provinces.map(p=><option key={p}>{p}</option>)}</select></label><label>İlçe<select required value={f.district} onChange={e=>set('district',e.target.value)}>{ds.map(d=><option key={d}>{d}</option>)}</select></label></div>
+  <label>Açıklama<textarea maxLength={800} value={f.description} onChange={e=>set('description',e.target.value)}/></label>
+  <label>Çalışma saatleri<input maxLength={150} value={f.hours} onChange={e=>set('hours',e.target.value)}/></label>
+  {error&&<div className="error" role="alert">{error}</div>}
+  <button disabled={busy}>{busy?'Gönderiliyor…':'Başvuruyu Gönder'} <ArrowRight/></button>
+ </form>}</main>
+}
 function MenuPage(){return <main className="menu-page"><h1>Menü</h1>{[['/calendar','Takvim & Önemli Günler',CalendarDays],['/nearby','Yakınımdaki hizmetler',Compass],['/services','Çözüm Merkezi',Wrench],['/emergency','Acil Durum',Siren],['/add-business','İşletmeni Ekle',Building2],['/admin','Admin Girişi',LockKeyhole]].map(([to,t,I])=><NavLink key={String(to)} to={String(to)}><I/><b>{String(t)}</b><ChevronRight/></NavLink>)}</main>}
 
-type AdminStats={visitorsTotal?:number;visitorsToday?:number;searchesTotal?:number};
-type AdminAd={id:string|number;title:string;image_url?:string;placement?:string;status?:string};
-type AdminData={stats?:AdminStats;ads?:AdminAd[]};
+type AdminStats={visitorsTotal:number;visitorsToday:number;searchesTotal:number;searchesToday:number;phoneClicks:number;directionsClicks:number;emergencyClicks:number;favoriteClicks:number};
+type AdminAd={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null;placement:string;status:string};
+type AdminSubmission={id:number;name:string;category:string;phone:string;address:string;province:string;district:string;status:string};
+type AdminReport={id:number;place_name:string;reason:string;details?:string;created_at:string};
+type AdminData={stats?:AdminStats;ads?:AdminAd[];submissions?:AdminSubmission[];reports?:AdminReport[]};
 function Admin(){
- const[email,setEmail]=useState(''),[password,setPassword]=useState(''),[ok,setOk]=useState(false),[data,setData]=useState<AdminData>(),[error,setError]=useState('');
- const login=async(e:FormEvent)=>{e.preventDefault();setError('');try{const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'login',email,password})});if(r.ok){setOk(true)}else if(r.status===429)setError('Çok fazla deneme yapıldı. Lütfen 10 dakika sonra tekrar deneyin.');else setError('Giriş bilgileri hatalı veya admin yapılandırılmamış.')}catch{setError('Bağlantı kurulamadı. Lütfen tekrar deneyin.')}};
- useEffect(()=>{if(ok)fetch('/api/admin').then(r=>r.ok?r.json():null).then(setData).catch(()=>{})},[ok]);
- if(!ok)return <main className="admin-login"><div><ShieldCheck/><h1>Admin Paneli</h1><p>Yanında Türkiye yönetim merkezi</p><form onSubmit={login}><label>E-posta<input type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Şifre<input type="password" value={password} onChange={e=>setPassword(e.target.value)}/></label>{error&&<div className="error">{error}</div>}<button>Giriş Yap <ArrowRight/></button></form></div></main>;
- const stats=data?.stats||{}; const ads=data?.ads||[];
- return <main className="admin"><aside><div className="admin-brand"><MapPin/> YANINDA <b>TÜRKİYE</b></div>{['Genel Bakış','Hizmetler','Eczaneler','Hastaneler',"ATM'ler",'Akaryakıt','Marketler','Haberler','Reklam Yönetimi','Kullanıcılar','İstatistikler','Ayarlar'].map((x,i)=><button className={i===0?'active':''} key={x}><Activity/>{x}</button>)}</aside><section><header><div><h1>Genel Bakış</h1><p>Yanında Türkiye'nin yönetim merkezi</p></div><div><Bell/> <span>Admin</span><UserCircle/></div></header><div className="stats">{[['Toplam Kullanıcı',stats.visitorsTotal??12548,'↑ 12%'],['Bugünkü Ziyaret',stats.visitorsToday??3245,'↑ 8%'],['Hizmet Aramaları',stats.searchesTotal??8420,'↑ 15%'],['Reklam Geliri','₺1.250','↑ 20%']].map(([a,b,c])=><article key={String(a)}><small>{a}</small><strong>{b}</strong><span>{c}</span></article>)}</div><div className="admin-grid"><div className="panel"><h2>Son 7 Gün Ziyaretçi Grafiği</h2><div className="chart">{[35,50,47,65,48,76,90].map((h,i)=><i key={i} style={{height:h+'%'}}/>)}</div></div><div className="panel"><h2>En Çok Kullanılan Hizmetler</h2>{[['Nöbetçi Eczane',32],['Hastane',18],['ATM',12],['Akaryakıt',10],['Market',8]].map(([x,n])=><div className="bar" key={String(x)}><span>{x}</span><i style={{width:Number(n)*2.2+'%'}}/><b>{n}%</b></div>)}</div></div><div className="panel ads"><div className="panel-title"><div><h2>Reklam Yönetimi</h2><p>Web sitesindeki reklam alanlarını yönet</p></div><button>+ Yeni Reklam Ekle</button></div>{(ads.length?ads:[{id:1,title:'Ana Banner',image_url:imgs.hero,placement:'1200×600'},{id:2,title:'Orta Banner',image_url:imgs.burger,placement:'1200×200'},{id:3,title:'Alt Banner',image_url:imgs.trend,placement:'1200×200'}]).map((ad:AdminAd)=><div className="ad-row" key={ad.id}><img src={ad.image_url||imgs.hero} alt=""/><div><b>{ad.title}</b><small>{ad.placement}</small></div><span>Aktif</span><button>Düzenle</button></div>)}</div><AdminAI/></section></main>
+ const[email,setEmail]=useState(''),[password,setPassword]=useState(''),[ok,setOk]=useState(false),[data,setData]=useState<AdminData>(),[error,setError]=useState(''),[notice,setNotice]=useState(''),[loading,setLoading]=useState(false);
+ const[editingId,setEditingId]=useState<number|null>(null);
+ const[adForm,setAdForm]=useState({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});
+ const refresh=async()=>{
+   const r=await fetch('/api/admin',{cache:'no-store'});
+   if(!r.ok)throw new Error(r.status===401?'Oturum süresi dolmuş. Yeniden giriş yap.':'Yönetim verileri alınamadı.');
+   setData(await r.json() as AdminData);
+ };
+ useEffect(()=>{let active=true;fetch('/api/admin',{cache:'no-store'}).then(async r=>{if(r.ok){const d=await r.json() as AdminData;if(active){setData(d);setOk(true)}}}).catch(()=>undefined);return()=>{active=false}},[]);
+ const login=async(e:FormEvent)=>{
+   e.preventDefault();setError('');setLoading(true);
+   try{const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'login',email,password})});
+     if(!r.ok){setError(r.status===429?'Çok fazla deneme yapıldı. 10 dakika sonra tekrar dene.':'Giriş bilgileri hatalı veya admin yapılandırılmamış.');return;}
+     setOk(true);setPassword('');await refresh();
+   }catch(e){setError(e instanceof Error?e.message:'Bağlantı kurulamadı.')}finally{setLoading(false)}
+ };
+ const action=async(payload:Record<string,unknown>)=>{
+   setNotice('');setError('');setLoading(true);
+   try{const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
+     if(!r.ok){const d=await r.json().catch(()=>({})) as {error?:string};throw new Error(d.error||'İşlem tamamlanamadı.');}
+     await refresh();setNotice('İşlem başarıyla tamamlandı.');return true;
+   }catch(e){setError(e instanceof Error?e.message:'Bağlantı kurulamadı.');return false}finally{setLoading(false)}
+ };
+ const saveAd=async(e:FormEvent)=>{
+   e.preventDefault();
+   const saved=await action({action:'save_ad',...(editingId?{id:editingId}:{}),...adForm});
+   if(!saved)return;
+   setEditingId(null);setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});
+ };
+ const logout=async()=>{
+   try{await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'logout'})})}catch{}
+   setOk(false);setData(undefined);setPassword('');
+ };
+ if(!ok)return <main className="admin-login"><div><ShieldCheck/><h1>Admin Paneli</h1><p>Yanında Türkiye yönetim merkezi</p><form onSubmit={login}><label>E-posta<input type="email" autoComplete="username" required value={email} onChange={e=>setEmail(e.target.value)}/></label><label>Şifre<input type="password" autoComplete="current-password" required value={password} onChange={e=>setPassword(e.target.value)}/></label>{error&&<div className="error" role="alert">{error}</div>}<button disabled={loading}>{loading?'Giriş yapılıyor…':'Giriş Yap'} <ArrowRight/></button></form></div></main>;
+ const stats=data?.stats;
+ const ads=data?.ads||[];
+ return <main className="admin"><section>
+   <header><div><h1>Yönetim Paneli</h1><p>Yalnızca veritabanından gelen gerçek kayıtlar gösterilir.</p></div><button type="button" onClick={logout}>Güvenli Çıkış</button></header>
+   {error&&<div className="error" role="alert">{error}</div>}{notice&&<div className="success" role="status">{notice}</div>}
+   <div className="stats">
+    {[['Toplam ziyaret',stats?.visitorsTotal],['Bugünkü ziyaret',stats?.visitorsToday],['Toplam arama',stats?.searchesTotal],['Bugünkü arama',stats?.searchesToday]].map(([label,value])=><article key={String(label)}><small>{label}</small><strong>{typeof value==='number'?value.toLocaleString('tr-TR'):'Veri yok'}</strong></article>)}
+   </div>
+   {!stats&&<p className="admin-data-note">İstatistikler henüz alınamadı; tahmini rakam gösterilmiyor.</p>}
+   <div className="panel ads">
+    <div className="panel-title"><div><h2>Reklam Yönetimi</h2><p>Gerçek reklam kayıtlarını ekle, düzenle, duraklat veya sil.</p></div></div>
+    <form className="admin-ad-form" onSubmit={saveAd}>
+     <label>Başlık<input required maxLength={120} value={adForm.title} onChange={e=>setAdForm(v=>({...v,title:e.target.value}))}/></label>
+     <label>Açıklama<input maxLength={300} value={adForm.text} onChange={e=>setAdForm(v=>({...v,text:e.target.value}))}/></label>
+     <label>Görsel URL<input type="url" value={adForm.image_url} onChange={e=>setAdForm(v=>({...v,image_url:e.target.value}))}/></label>
+     <label>Hedef URL<input type="url" value={adForm.target_url} onChange={e=>setAdForm(v=>({...v,target_url:e.target.value}))}/></label>
+     <label>Alan<select value={adForm.placement} onChange={e=>setAdForm(v=>({...v,placement:e.target.value}))}><option value="home_top">Ana sayfa üst</option><option value="home_mid">Ana sayfa orta</option><option value="home_bottom">Ana sayfa alt</option></select></label>
+     <div><button disabled={loading}>{editingId?'Reklamı Güncelle':'Reklam Ekle'}</button>{editingId&&<button type="button" onClick={()=>{setEditingId(null);setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top'})}}>Vazgeç</button>}</div>
+    </form>
+    {ads.length?ads.map(ad=><div className="ad-row" key={ad.id}>{ad.image_url&&<img src={ad.image_url} alt=""/>}<div><b>{ad.title}</b><small>{ad.placement} · {ad.status==='active'?'Yayında':'Duraklatıldı'}</small></div><button type="button" onClick={()=>{setEditingId(ad.id);setAdForm({title:ad.title,text:ad.text||'',image_url:ad.image_url||'',target_url:ad.target_url||'',placement:ad.placement||'home_top'})}}>Düzenle</button><button type="button" disabled={loading} onClick={()=>void action({action:'toggle_ad',id:ad.id})}>{ad.status==='active'?'Duraklat':'Yayınla'}</button><button type="button" disabled={loading} onClick={()=>{if(window.confirm('Bu reklam silinsin mi?'))void action({action:'delete_ad',id:ad.id})}}>Sil</button></div>):<p>Henüz kayıtlı reklam yok.</p>}
+   </div>
+   <div className="panel"><h2>İşletme Başvuruları</h2>{(data?.submissions||[]).length?(data?.submissions||[]).map(item=><div className="ad-row" key={item.id}><div><b>{item.name}</b><small>{item.category} · {item.province}/{item.district} · {item.phone}</small><small>{item.address} · {item.status}</small></div>{item.status==='pending'&&<><button disabled={loading} onClick={()=>void action({action:'approve_submission',id:item.id})}>Onayla</button><button disabled={loading} onClick={()=>void action({action:'reject_submission',id:item.id})}>Reddet</button></>}</div>):<p>Bekleyen veya kayıtlı başvuru yok.</p>}</div>
+   <div className="panel"><h2>Hatalı Bilgi Bildirimleri</h2>{(data?.reports||[]).length?(data?.reports||[]).map(item=><div className="ad-row" key={item.id}><div><b>{item.place_name}</b><small>{item.reason} · {item.details||'Açıklama yok'}</small></div><button disabled={loading} onClick={()=>void action({action:'resolve_report',id:item.id})}>Çözüldü</button></div>):<p>Açık bildirim yok.</p>}</div>
+  </section></main>;
 }
-
 function Legal({type}:{type:'kvkk'|'privacy'}){
  const privacy=type==='privacy';
  return <main className="inner legal nearby-page">
@@ -640,5 +729,7 @@ function Legal({type}:{type:'kvkk'|'privacy'}){
 function Simple({title}:{title:string}){return <main className="simple"><h1>{title}</h1><p>Yanında Türkiye.</p></main>}
 
 export default function TargetApp(){
+ const location=useLocation();
+ useEffect(()=>{track('page_view',{path:location.pathname});},[location.pathname]);
  return <div><Header/><Routes><Route path="/" element={<Home/>}/><Route path="/nearby" element={<Nearby/>}/><Route path="/services" element={<Services/>}/><Route path="/ads" element={<AdCampaigns/>}/><Route path="/emergency" element={<Emergency/>}/><Route path="/add-business" element={<AddBusiness/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/admin" element={<Admin/>}/><Route path="/favorites" element={<FavoritesPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/news" element={<Simple title="Haberler"/>}/><Route path="/contact" element={<Simple title="İletişim"/>}/><Route path="/kvkk" element={<Legal type="kvkk"/>}/><Route path="/gizlilik" element={<Legal type="privacy"/>}/><Route path="*" element={<Home/>}/></Routes><MobileNav/><ChatWidget/></div>
 }

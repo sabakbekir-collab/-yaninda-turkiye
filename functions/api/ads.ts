@@ -2,7 +2,6 @@ type AdsResult = { results?: unknown[] };
 
 type AdsStatement = {
   bind: (...values: unknown[]) => AdsStatement;
-  run: () => Promise<unknown>;
   all: () => Promise<AdsResult>;
 };
 
@@ -21,13 +20,14 @@ export async function onRequestGet({
   request: Request;
   env: AdsEnv;
 }) {
-  if (!env.DB) return Response.json({ ads: [] });
-
-  await env.DB
-    .prepare(
-      "CREATE TABLE IF NOT EXISTS ads (id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,text TEXT,image_url TEXT,target_url TEXT,placement TEXT NOT NULL DEFAULT 'home_top',status TEXT NOT NULL DEFAULT 'active',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)"
-    )
-    .run();
+  // Do not report an empty ad inventory when the database is unavailable.
+  // Schema creation is centralized in the Worker bootstrap.
+  if (!env.DB) {
+    return Response.json(
+      { error: "database_unavailable" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
+  }
 
   try {
     const url = new URL(request.url);
@@ -47,6 +47,9 @@ export async function onRequestGet({
       { headers: { "cache-control": "public, max-age=60" } }
     );
   } catch {
-    return Response.json({ ads: [] });
+    return Response.json(
+      { error: "ads_unavailable" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
+    );
   }
 }

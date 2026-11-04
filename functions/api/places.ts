@@ -4,6 +4,7 @@ import {provinceCenter,isWholeProvince} from '../lib/provinceCenters';
 import {isCentralDistrict,trSlug,resolveName} from '../../src/text';
 import {districtMap,districtsFor} from '../../src/turkeyDistricts';
 import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery';
+import {activeDutyDates,dutyDateKey,isActiveDutyDate} from '../lib/dutyDates';
 
 type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
 
@@ -23,7 +24,7 @@ const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').replace
 const slug=trSlug;
 const areaQuery=(district:string,province:string)=>[district&&!isCentralDistrict(district)?district:'',province,'Türkiye'].filter(Boolean).join(', ');
 const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
-const cacheKey=(...parts:string[])=>'places:v15:'+parts.join(':');
+const cacheKey=(...parts:string[])=>'places:v16:'+parts.join(':');
 
 function tidyAddress(tags:Record<string,string>,fallback?:string){
   const full=tags['addr:full']||tags['contact:address'];
@@ -120,38 +121,6 @@ export async function onRequestAreaGet({request}:{request:Request}){
   return jsonResponse(area,{headers:{'Cache-Control':'no-store'}});
 }
 
-function activeDutyDates(){
-  const parts=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
-  const value=(type:string)=>parts.find(p=>p.type===type)?.value||'';
-  const hour=Number(new Intl.DateTimeFormat('en-GB',{timeZone:'Europe/Istanbul',hour:'2-digit',hourCycle:'h23'}).format(new Date()));
-  const today=new Date(Date.UTC(Number(value('year')),Number(value('month'))-1,Number(value('day'))));
-  const dates=[today.toISOString().slice(0,10)];
-  // Night shifts from the previous day can remain active until 09:00 TR.
-  if(hour<9){today.setUTCDate(today.getUTCDate()-1);dates.push(today.toISOString().slice(0,10));}
-  return dates;
-}
-/** Normalises provider dates (YYYY-MM-DD, DD.MM.YYYY, ISO with time/offset, epoch) to an Istanbul calendar day. */
-function dutyDateKey(value:unknown):string|null{
-  if(value===null||value===undefined||value==='')return null;
-  const istDay=(d:Date)=>Number.isNaN(d.getTime())?null:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Istanbul',year:'numeric',month:'2-digit',day:'2-digit'}).format(d);
-  if(typeof value==='number')return istDay(new Date(value<1e12?value*1000:value));
-  if(typeof value!=='string')return null;
-  const raw=value.trim();
-  const dmy=raw.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})/);
-  if(dmy)return dmy[3]+'-'+dmy[2].padStart(2,'0')+'-'+dmy[1].padStart(2,'0');
-  if(/^\d{4}-\d{2}-\d{2}$/.test(raw))return raw;
-  // ISO timestamps with a time part: convert to the Istanbul day (UTC midnight of the TR day is 21:00Z the day before).
-  if(/^\d{4}-\d{2}-\d{2}[T ]/.test(raw)){
-    const hasZone=/(Z|[+-]\d{2}:?\d{2})$/.test(raw);
-    return hasZone?istDay(new Date(raw)):raw.slice(0,10);
-  }
-  return null;
-}
-function isActiveDutyDate(value?:unknown){
-  const key=dutyDateKey(value);
-  return key!==null&&activeDutyDates().includes(key);
-}
-
 /**
  * Independent secondary roster. Turkpidya documents provincial pharmacists'
  * chambers and municipality lists as its source. Coverage is partial; accept
@@ -177,11 +146,11 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
       const recordCity=clean(x.city??x.province??x.il);
       if(recordCity&&slug(recordCity)!==slug(province))continue;
       const recordDistrict=clean(x.district??x.ilce??x.county);
-      if(district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
+      if(district&&(!recordDistrict||slug(recordDistrict)!==slug(district)))continue;
       const location=x.location&&typeof x.location==='object'?x.location as Record<string,unknown>:{};
       const la=Number(x.lat??x.latitude??location.lat),lo=Number(x.lng??x.lon??x.longitude??location.lng??location.lon);
       const name=clean(x.name??x.pharmacyName??x.pharmacy_name??x.title??x.ad);
-      if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < -90||la > 90||lo < -180||lo > 180)continue;
+      if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < 35||la > 43||lo < 25||lo > 46)continue;
       out.push({id:'turkpidya-duty-'+String(x.id??x.pharmacyId??x.pharmacy_id??i),name,category:'pharmacy',lat:la,lon:lo,
         address:clean(x.address??x.adres),phone:clean(x.phone??x.telephone??x.telefon,60),
         openingHours:clean(x.hours??x.dutyHours??x.duty_hours,180),
@@ -226,12 +195,13 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
         return Number(value);
       };
       const la=coordinate(x.lat,x.latitude),lo=coordinate(x.lng,x.lon,x.longitude),name=clean(x.name);
-      if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < -90||la > 90||lo < -180||lo > 180)continue;
+      if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < 35||la > 43||lo < 25||lo > 46)continue;
       // Each record may carry its own duty date; otherwise the feed date applies. Unknown or stale dates are never shown as "nöbetçi".
       const recordDate=x.date??x.duty_date??x.dutyDate??x.nobet_tarihi;
       if(!isActiveDutyDate(recordDate??data.date))continue;
       const recordDistrict=clean(x.district);
-      if(applyDistrictFilter&&district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
+      if(district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
+      if(!applyDistrictFilter&&district&&!recordDistrict)continue;
       const d=distance(lat,lon,la,lo);
       out.push({
         id:idPrefix+String(x.id??i),name,category:'pharmacy',lat:la,lon:lo,
@@ -315,7 +285,15 @@ async function localPois(env:Env,category:string,lat:number,lon:number,radiusKm:
 }
 
 async function getPois(env:Env,category:string,lat:number,lon:number,radiusKm:number):Promise<PoiResult>{
-  return (await localPois(env,category,lat,lon,radiusKm))??await overpass(category,lat,lon,radiusKm);
+  const local=await localPois(env,category,lat,lon,radiusKm);
+  // D1 is only an imported snapshot and may be incomplete. An empty local
+  // snapshot must not suppress a live OpenStreetMap lookup (notably ATMs).
+  if(local?.places.length)return local;
+  const live=await overpass(category,lat,lon,radiusKm);
+  if(live.ok&&live.places.length)return live;
+  // Keep useful imported records if the live providers are temporarily down.
+  if(local)return local;
+  return live;
 }
 
 async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<PoiResult>{
