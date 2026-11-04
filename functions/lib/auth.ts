@@ -30,10 +30,21 @@ export function cookieHeader(token:string){
   return `yt_admin=${encodeURIComponent(token)}; Path=/api/admin; Max-Age=604800; HttpOnly; Secure; SameSite=Lax`;
 }
 export function clearCookie(){return 'yt_admin=; Path=/api/admin; Max-Age=0; HttpOnly; Secure; SameSite=Lax';}
-export function sameOrigin(request:Request){
+/**
+ * Strict CSRF guard for cookie-authenticated state-changing requests.
+ * Prefer Origin; when absent, accept only an explicit same-origin Fetch Metadata value.
+ */
+export function strictSameOrigin(request:Request){
   const origin=request.headers.get('Origin');
-  if(!origin)return true;
-  try{return new URL(origin).origin===new URL(request.url).origin}catch{return false}
+  if(origin){
+    try{return new URL(origin).origin===new URL(request.url).origin}catch{return false}
+  }
+  return request.headers.get('Sec-Fetch-Site')==='same-origin';
+}
+
+/** @deprecated Use strictSameOrigin for all cookie-authenticated mutations. */
+export function sameOrigin(request:Request){
+  return strictSameOrigin(request);
 }
 
 /** Constant-time string comparison (hashes both sides so length does not leak). */
