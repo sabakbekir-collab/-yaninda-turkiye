@@ -572,21 +572,32 @@ function AdCampaigns(){
 function Services(){const nav=useNavigate();return <main className="inner services-page"><div className="page-title"><button onClick={()=>nav(-1)} aria-label="Geri">‹</button><div><small>YANINDA TÜRKİYE</small><h1>Hizmetler</h1></div></div><p className="lead">İhtiyacın olan hizmeti seç. İl / ilçe seçimin korunur ve aynı bölgeyi tekrar seçmek zorunda kalmazsın.</p><div className="services">{services.map(([id,label,Icon])=><button key={id} onClick={()=>nav('/nearby',{state:{category:id}})}><span><Icon/></span><b>{label}</b><ChevronRight/></button>)}</div><button className="business" onClick={()=>nav('/add-business')}><Building2/><div><b>İşletmeni / Hizmetini Ekle</b><small>Ücretsiz başvur · İnceleme sonrası yayın</small></div><ArrowRight/></button></main>}
 function Emergency(){
  const items=[
-   ['112','Acil Çağrı Merkezi','Acil yardım'],
-   ['114','UZEM — Zehir Danışma','Sağlık Bakanlığı'],
-   ['182','MHRS','Sağlık / randevu'],
-   ['153','Belediye','Belediye hizmetleri'],
-   ['156','Jandarma → 112','Güncel acil çağrı: 112'],
-   ['177','Orman Yangını → 112','Güncel acil çağrı: 112']
+   ['112','Acil Çağrı Merkezi','Polis, ambulans, jandarma ve itfaiye','112'],
+   ['114','UZEM — Zehir Danışma','Zehirlenme danışmanlığı','114'],
+   ['182','MHRS','Hastane randevusu','182'],
+   ['153','Belediye','Belediye hizmetleri','153']
+ ];
+ const women=[
+   {title:'ALO 183 · Şiddetle Mücadele',number:'183',detail:'Kadın, çocuk ve aile için sosyal destek ve yönlendirme · 7/24 ücretsiz',href:'tel:183'},
+   {title:'Aile İçi Şiddet Acil Yardım Hattı',number:'0212 656 96 96',detail:'Türkiye Kadın Dernekleri Federasyonu · Her gün 09.00–24.00',href:'tel:02126569696'},
+   {title:'Alternatif destek hattı',number:'0549 656 96 96',detail:'Türkiye Kadın Dernekleri Federasyonu · Her gün 09.00–24.00',href:'tel:05496569696'}
  ];
  return <main className="emergency emergency-modern">
    <div className="emergency-icon"><Siren/></div><small>ACİL DESTEK</small>
    <h1>Yardıma ihtiyacın<br/><b>varsa Yanında.</b></h1>
    <p>Acil durumda doğru numaraya hızlıca ulaş.</p>
+   <a className="women-emergency-primary" href="tel:112"><span><Siren/></span><div><b>Hayati tehlike / acil şiddet</b><small>112 Acil Çağrı Merkezi · 7/24</small></div><strong>112 <Phone/></strong></a>
+   <section className="women-support">
+     <header><span><Heart/></span><div><small>KADINLARA ÖZEL DESTEK</small><h2>Yalnız değilsin.</h2></div></header>
+     <p>Şiddet, tehdit veya güvenlik riski yaşıyorsan yardım isteyebilirsin.</p>
+     <a className="kades-link" href="https://www.aile.gov.tr/media/278423/hizmet_rehber_kadin_hizmetleri.pdf" target="_blank" rel="noopener noreferrer"><span className="kades-symbol"><ShieldCheck/></span><div><b>KADES · Kadın Acil Destek Uygulaması</b><small>Resmî uygulama bilgisi ve indirme yönlendirmesi</small></div><ExternalLink/></a>
+     {women.map(item=><a className="women-hotline" key={item.number} href={item.href}><span><b>{item.number}</b><small>{item.title}</small><em>{item.detail}</em></span><Phone/></a>)}
+     <div className="women-safety-note"><Info/> Acil tehlikede önce 112’yi ara. KADES’i önceden telefonuna yükleyip kurulumunu tamamla. Güvenli değilse bu sayfayı kapatıp güvendiğin birinden yardım iste.</div>
+   </section>
    <div className="emergency-grid">
-     {items.map(([n,t,s])=><a key={n} href={'tel:'+(n==='156'||n==='177'?'112':n)}><strong>{n}</strong><span>{t}<small>{s}</small></span><Phone/></a>)}
+     {items.map(([n,t,s,phone])=><a key={n} href={'tel:'+phone}><strong>{n}</strong><span>{t}<small>{s}</small></span><Phone/></a>)}
    </div>
-   <div className="emergency-note"><Info/> 156 Jandarma ve 177 Orman Yangını acil çağrıları 112 sistemi altında karşılanıyor. 114 UZEM zehirlenme danışmanlığı için kullanılabilir.</div>
+   <div className="emergency-note"><Info/> 112; polis, jandarma, sağlık, itfaiye ve diğer acil çağrıları karşılar. 114 UZEM zehirlenme danışmanlığı içindir.</div>
    <button className="share-location" onClick={async()=>{
      try{
        const current=await getCurrentLocation({forceFresh:true});
