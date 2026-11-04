@@ -18,6 +18,7 @@ import CalendarPage from './CalendarPage';
 import EnhancedPlaceCard from './PlaceCard';
 import {getTheme,applyTheme,saveTheme} from './theme';
 import {shareText,mapsLink} from './share';
+import {provinceCenter} from '../functions/lib/provinceCenters';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
@@ -138,6 +139,48 @@ function Home(){
    window.addEventListener('yt-nearby-memory',refresh);
    return()=>window.removeEventListener('yt-nearby-memory',refresh);
  },[]);
+ useEffect(()=>{
+   let active=true;
+   const province=readNearbyMemory().province||'';
+   const center=provinceCenter(province);
+   if(!center){
+     setWeather(null);
+     setWeatherError('Hava durumu için önce il seç.');
+     setWeatherLoading(false);
+     return;
+   }
+   const load=async()=>{
+     setWeatherLoading(true);
+     setWeatherError('');
+     try{
+       const query=new URLSearchParams({
+         latitude:String(center.lat),
+         longitude:String(center.lon),
+         current:'temperature_2m,apparent_temperature,precipitation,wind_speed_10m,weather_code',
+         daily:'weather_code,temperature_2m_max,temperature_2m_min',
+         forecast_days:'5',
+         timezone:'Europe/Istanbul'
+       });
+       const response=await fetch('https://api.open-meteo.com/v1/forecast?'+query.toString(),{cache:'no-store',signal:AbortSignal.timeout(10000)});
+       if(!response.ok)throw new Error('weather_unavailable');
+       const data=await response.json() as {
+         current?:{temperature_2m?:number;apparent_temperature?:number;precipitation?:number;wind_speed_10m?:number;weather_code?:number};
+         daily?:{time?:string[];weather_code?:number[];temperature_2m_max?:number[];temperature_2m_min?:number[]}
+       };
+       const current=data.current,daily=data.daily;
+       if(!current||!daily||!Array.isArray(daily.time)||!Array.isArray(daily.weather_code)||!Array.isArray(daily.temperature_2m_max)||!Array.isArray(daily.temperature_2m_min))throw new Error('weather_bad_response');
+       if(active)setWeather({
+         temperature:Number(current.temperature_2m),apparent:Number(current.apparent_temperature),
+         precipitation:Number(current.precipitation),wind:Number(current.wind_speed_10m),code:Number(current.weather_code),
+         days:daily.time.map((date,i)=>({date,code:Number(daily.weather_code?.[i]),max:Number(daily.temperature_2m_max?.[i]),min:Number(daily.temperature_2m_min?.[i])}))
+       });
+     }catch{
+       if(active){setWeather(null);setWeatherError('Seçilen il için hava durumu şu anda alınamıyor.');}
+     }finally{if(active)setWeatherLoading(false);}
+   };
+   void load();
+   return()=>{active=false};
+ },[locationLabel]);
  const go=(id:string)=>id==='emergency'?nav('/emergency'):nav('/nearby',{state:{category:id,...(readNearbyMemory().position?{position:readNearbyMemory().position,province:readNearbyMemory().province,district:readNearbyMemory().district}:{})}});
 
  const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
@@ -177,7 +220,7 @@ function Home(){
    </section>
    <section className="home-weather-card" aria-label="Konuma göre hava durumu">
     <div className="home-weather-top"><div><small>BUGÜN · {locationLabel}</small><h2><CloudSun/> Hava Durumu</h2></div><span>{weather?weatherLabel(weather.code):weatherLoading?'Yükleniyor…':'Güncel tahmin'}</span></div>
-    {weather?<><div className="home-weather-current"><strong>{Math.round(weather.temperature)}°</strong><div><b>{weatherLabel(weather.code)}</b><small>Hissedilen {Math.round(weather.apparent)}°</small></div></div><div className="home-weather-metrics"><span>Yağış <b>{weather.precipitation.toLocaleString('tr-TR')} mm</b></span><span>Rüzgâr <b>{Math.round(weather.wind)} km/sa</b></span></div><div className="home-weather-days">{weather.days.map((day,i)=><div key={day.date}><small>{i===0?'Bugün':new Date(day.date+'T12:00:00').toLocaleDateString('tr-TR',{weekday:'short'})}</small><b>{weatherLabel(day.code)}</b><span>{Math.round(day.max)}° / {Math.round(day.min)}°</span></div>)}</div></>:<p className="home-weather-error">{weatherError||'Konum algılanınca hava durumu gösterilecek.'}</p>}</section>
+    {weather?<><div className="home-weather-current"><strong>{Math.round(weather.temperature)}°</strong><div><b>{weatherLabel(weather.code)}</b><small>Hissedilen {Math.round(weather.apparent)}°</small></div></div><div className="home-weather-metrics"><span>Yağış <b>{weather.precipitation.toLocaleString('tr-TR')} mm</b></span><span>Rüzgâr <b>{Math.round(weather.wind)} km/sa</b></span></div><div className="home-weather-days">{weather.days.map((day,i)=><div key={day.date}><small>{i===0?'Bugün':new Date(day.date+'T12:00:00').toLocaleDateString('tr-TR',{weekday:'short'})}</small><b>{weatherLabel(day.code)}</b><span>{Math.round(day.max)}° / {Math.round(day.min)}°</span></div>)}</div></>:<p className="home-weather-error">{weatherError||'İl seçildiğinde o ilin merkezine göre tahmin gösterilir.'}</p>}</section>
    <section className="home-exchange-card" aria-label="Döviz kurları">
     <div className="home-exchange-heading"><div><small>PİYASA BİLGİSİ</small><h2><Activity/> Döviz Kurları</h2></div><span>{exchangeLoading?'Güncelleniyor…':exchange?'Günlük veri':'Veri bekleniyor'}</span></div>
     {exchange?<><div className="home-exchange-grid">
