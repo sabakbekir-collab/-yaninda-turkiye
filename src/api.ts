@@ -84,7 +84,13 @@ export async function findPlaces(
     }
     throw new Error('Hizmet verileri şu anda alınamadı.');
   }
-  if(!Array.isArray(data))throw new Error('invalid places response');
+  if(!Array.isArray(data)){
+    const contentType=r.headers.get('content-type')||'';
+    const detail=data&&typeof data==='object'&&'error' in data&&typeof (data as {error?:unknown}).error==='string'
+      ?(data as {error:string}).error
+      :contentType.includes('text/html')?'server_returned_html':'unexpected_response_shape';
+    throw new Error('Hizmet kaynağından beklenmeyen yanıt alındı ('+detail+'). Lütfen sayfayı yenileyip tekrar deneyin.');
+  }
   const cleaned=data.filter((p):p is Place=>Boolean(
     p&&typeof p.name==='string'&&p.name.trim().length>=2&&
     !/^isimsiz( açık veri kaydı)?$/i.test(p.name.trim())&&
