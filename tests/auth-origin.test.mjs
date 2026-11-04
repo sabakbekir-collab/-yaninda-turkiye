@@ -1,5 +1,3 @@
-/* global Request */
-/* global Request */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { strictSameOrigin } from "../functions/lib/auth.ts";
