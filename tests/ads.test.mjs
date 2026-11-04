@@ -17,20 +17,28 @@ function context({ missingDb = false, fail = false, results = [] } = {}) {
   };
 }
 
-test("ads endpoint returns active ads when D1 is available", async () => {
-  const response = await onRequestGet(context({ results: [{ id: 1, title: "Test" }] }));
+test("ads endpoint returns active ads and strips unsafe URLs", async () => {
+  const response = await onRequestGet(context({ results: [{ id: 1, title: "Test", image_url: "javascript:alert(1)", target_url: "https://safe.example" }] }));
   assert.equal(response.status, 200);
-  assert.deepEqual(await response.json(), { ads: [{ id: 1, title: "Test" }] });
+  assert.deepEqual(await response.json(), { ads: [{ id: 1, title: "Test", text: "", image_url: null, target_url: "https://safe.example/", placement: undefined }] });
 });
 
-test("ads endpoint returns 503 when D1 binding is missing", async () => {
+test("ads endpoint returns 200 with an empty list when inventory is genuinely empty", async () => {
+  const response = await onRequestGet(context());
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { ads: [] });
+});
+
+test("ads endpoint returns 503, no-store and an empty ads array when D1 binding is missing", async () => {
   const response = await onRequestGet(context({ missingDb: true }));
   assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), { error: "database_unavailable" });
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
+  assert.deepEqual(await response.json(), { ads: [], error: "database_unavailable" });
 });
 
-test("ads endpoint returns 503 when D1 query fails", async () => {
+test("ads endpoint returns 503, no-store and an empty ads array when D1 query fails", async () => {
   const response = await onRequestGet(context({ fail: true }));
   assert.equal(response.status, 503);
-  assert.deepEqual(await response.json(), { error: "ads_unavailable" });
+  assert.equal(response.headers.get("Cache-Control"), "no-store");
+  assert.deepEqual(await response.json(), { ads: [], error: "ads_unavailable" });
 });
