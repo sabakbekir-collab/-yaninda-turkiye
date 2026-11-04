@@ -9,7 +9,7 @@ import {categories,keywordMap,provinces,services} from './data';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName,trSlug} from './text';
 import {findPlaces,resolveLocationArea} from './api';
-import {getCurrentLocation,getLocationPermissionState,LocationError} from './location';
+import {getCurrentLocation,LocationError} from './location';
 import type {Place,Position} from './types';
 import ChatWidget from './ChatWidget';
 import AdminAI from './AdminAI';
