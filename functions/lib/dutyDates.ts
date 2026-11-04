@@ -40,8 +40,12 @@ export function dutyDateKey(value: unknown): string | null {
     return validCalendarDate(year, month, day) ? formatDay(year, month, day) : null;
   }
   if (/^\d{4}-\d{2}-\d{2}[T ]/.test(raw)) {
+    // Validate the calendar portion before Date parsing: JavaScript normalises
+    // impossible dates such as February 31 instead of rejecting them.
+    const datePart = raw.slice(0, 10);
+    if (dutyDateKey(datePart) === null) return null;
     const hasZone = /(Z|[+-]\d{2}:?\d{2})$/i.test(raw);
-    return hasZone ? istanbulDay(new Date(raw)) : dutyDateKey(raw.slice(0, 10));
+    return hasZone ? istanbulDay(new Date(raw)) : datePart;
   }
   return null;
 }
