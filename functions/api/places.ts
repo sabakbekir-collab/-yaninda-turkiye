@@ -258,9 +258,11 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
   }
 }
 
+type PoiResult={places:Place[];ok:boolean;attempts?:string[];raw?:number;local?:boolean};
+
 // D1-backed OSM snapshot. It is used only after the import marker exists;
 // absent metadata means "not imported", never an authoritative empty result.
-async function localPois(env:Env,category:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean;raw?:number;local?:boolean}|null>{
+async function localPois(env:Env,category:string,lat:number,lon:number,radiusKm:number):Promise<PoiResult|null>{
   if(!env.DB)return null;
   try{
     const meta=await env.DB.prepare('SELECT n FROM poi_meta WHERE category=? LIMIT 1').bind(category).first<{n:number}>();
@@ -281,11 +283,11 @@ async function localPois(env:Env,category:string,lat:number,lon:number,radiusKm:
   }catch{return null}
 }
 
-async function getPois(env:Env,category:string,lat:number,lon:number,radiusKm:number){
+async function getPois(env:Env,category:string,lat:number,lon:number,radiusKm:number):Promise<PoiResult>{
   return (await localPois(env,category,lat,lon,radiusKm))??await overpass(category,lat,lon,radiusKm);
 }
 
-async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean;attempts?:string[];raw?:number}>{
+async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<PoiResult>{
   const query=buildOverpassQuery(category,lat,lon,radiusKm);
   const endpoints=[
     'https://overpass-api.de/api/interpreter',
