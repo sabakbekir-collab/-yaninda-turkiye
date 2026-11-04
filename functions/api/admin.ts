@@ -76,7 +76,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
       const coordinates=found?parseTurkeyCoordinates(found.lat,found.lon):null;
       // Do not approve a submission that cannot be mapped to valid Turkish coordinates.
       if(!coordinates)return Response.json({error:'geocoding_failed'},{status:422});
-      await env.DB.prepare('UPDATE submissions SET status=\\'approved\\',latitude=?,longitude=? WHERE id=?').bind(coordinates.latitude,coordinates.longitude,id).run();
+      await env.DB.prepare('UPDATE submissions SET status=\'approved\',latitude=?,longitude=? WHERE id=?').bind(coordinates.latitude,coordinates.longitude,id).run();
     }else if(action==='reject_submission'){
       if(id===null)return Response.json({error:'invalid_id'},{status:400});
       await env.DB.prepare('UPDATE submissions SET status=\'rejected\' WHERE id=?').bind(id).run();
