@@ -428,11 +428,16 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   const numParam=(name:string)=>{const raw=u.searchParams.get(name);return raw!==null&&raw.trim()!==''?Number(raw):NaN};
   let lat=numParam('lat'),lon=numParam('lon');
   const hasPosition=Number.isFinite(lat)&&Number.isFinite(lon);
-  if(!hasPosition){
+  const wholeProvince=!!province&&isWholeProvince(district,province);
+  const capital=wholeProvince?provinceCenter(province):null;
+  // An explicit "all districts" search is anchored to the provincial capital,
+  // even when the client also sends the device's GPS coordinates.
+  if(capital){
+    lat=capital.lat;lon=capital.lon;
+  }else if(!hasPosition){
     if(!province)return jsonResponse([]);
     const area=areaQuery(district,province);
-    const capital=isWholeProvince(district,province)?provinceCenter(province):null;
-    const point=capital??await geocode(env,area);
+    const point=await geocode(env,area);
     if(!point)return jsonResponse({error:'location_geocode_failed',area,category},{status:503,headers:{'Cache-Control':'no-store'}});
     lat=point.lat;lon=point.lon;
   }
