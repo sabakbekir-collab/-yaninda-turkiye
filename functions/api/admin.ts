@@ -1,6 +1,7 @@
 import type {Env} from '../lib/types';
 import {cookieHeader,clearCookie,makeSession,sameOrigin,validSession,secureCompare} from '../lib/auth';
 import {rateLimited,clientIp} from '../lib/ratelimit';
+import {parseTurkeyCoordinates} from '../lib/locationValidation';
 
 const json=async(r:Request)=>await r.json() as Record<string,unknown>;
 const clean=(v:unknown,n=300)=>typeof v==='string'?v.trim().replace(/[<>]/g,'').slice(0,n):'';
@@ -64,14 +65,18 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
       if(id===null)return Response.json({error:'invalid_id'},{status:400});
       const row=await env.DB.prepare('SELECT * FROM submissions WHERE id=? LIMIT 1').bind(id).first<Record<string,unknown>>();
       if(!row)return Response.json({error:'not_found'},{status:404});
-      let latitude:number|undefined,longitude:number|undefined;
-      try{
-        const q=encodeURIComponent(`${row.address}, ${row.district}, ${row.province}, Türkiye`);
-        const g=await fetch(`https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=tr&q=${q}`,{headers:{'User-Agent':`YanimdaTurkiye/1.0 (${env.OSM_CONTACT_EMAIL||'public-web-app'})`},signal:AbortSignal.timeout(7000)});
-        const found=(await g.json() as Array<{lat?:string;lon?:string}>)[0];
-        if(found){latitude=Number(found.lat);longitude=Number(found.lon);}
-      }catch{}
-      await env.DB.prepare('UPDATE submissions SET status=\'approved\',latitude=?,longitude=? WHERE id=?').bind(latitude??null,longitude??null,id).run();
+      const q=new URL('https://nominatim.openstreetmap.org/search');
+      q.searchParams.set('format','jsonv2');
+      q.searchParams.set('limit','1');
+      q.searchParams.set('countrycodes','tr');
+      q.searchParams.set('q',`${row.address}, ${row.district}, ${row.province}, Türkiye`);
+      const g=await fetch(q,{headers:{'Accept':'application/json','User-Agent':`YanimdaTurkiye/1.0 (${env.OSM_CONTACT_EMAIL||'public-web-app'})`},signal:AbortSignal.timeout(7000)});
+      if(!g.ok)return Response.json({error:'geocoding_unavailable'},{status:503});
+      const found=(await g.json() as Array<{lat?:unknown;lon?:unknown}>)[0];
+      const coordinates=found?parseTurkeyCoordinates(found.lat,found.lon):null;
+      // Do not approve a submission that cannot be mapped to valid Turkish coordinates.
+      if(!coordinates)return Response.json({error:'geocoding_failed'},{status:422});
+      await env.DB.prepare('UPDATE submissions SET status=\\'approved\\',latitude=?,longitude=? WHERE id=?').bind(coordinates.latitude,coordinates.longitude,id).run();
     }else if(action==='reject_submission'){
       if(id===null)return Response.json({error:'invalid_id'},{status:400});
       await env.DB.prepare('UPDATE submissions SET status=\'rejected\' WHERE id=?').bind(id).run();
