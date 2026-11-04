@@ -258,6 +258,33 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
   }
 }
 
+// D1-backed OSM snapshot. It is used only after the import marker exists;
+// absent metadata means "not imported", never an authoritative empty result.
+async function localPois(env:Env,category:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean;raw?:number}|null>{
+  if(!env.DB)return null;
+  try{
+    const meta=await env.DB.prepare('SELECT n FROM poi_meta WHERE category=? LIMIT 1').bind(category).first<{n:number}>();
+    if(!meta||!Number.isFinite(meta.n))return null;
+    const dLat=radiusKm/111.32;
+    const dLon=radiusKm/(111.32*Math.max(0.2,Math.cos(lat*Math.PI/180)));
+    const rows=await env.DB.prepare('SELECT type,osm_id,lat,lon,tags FROM poi WHERE category=? AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? LIMIT 10000')
+      .bind(category,lat-dLat,lat+dLat,lon-dLon,lon+dLon).all<{type:string;osm_id:number;lat:number;lon:number;tags:string}>();
+    const places:Place[]=[];
+    for(const row of rows.results){
+      let tags:Record<string,string>={};
+      try{const parsed=JSON.parse(row.tags);if(parsed&&typeof parsed==='object'&&!Array.isArray(parsed))tags=parsed as Record<string,string>}catch{/* malformed tags are ignored */}
+      const p=osmPlace({type:row.type,id:Number(row.osm_id),lat:Number(row.lat),lon:Number(row.lon),tags},category,lat,lon);
+      if(p&&(p.distance??Infinity)<=radiusKm)places.push(p);
+    }
+    places.sort((a,b)=>(a.distance??999)-(b.distance??999));
+    return {ok:true,places:places.slice(0,250),raw:rows.results.length};
+  }catch{return null}
+}
+
+async function getPois(env:Env,category:string,lat:number,lon:number,radiusKm:number){
+  return (await localPois(env,category,lat,lon,radiusKm))??await overpass(category,lat,lon,radiusKm);
+}
+
 async function overpass(category:string,lat:number,lon:number,radiusKm:number):Promise<{places:Place[];ok:boolean;attempts?:string[];raw?:number}>{
   const query=buildOverpassQuery(category,lat,lon,radiusKm);
   const endpoints=[
@@ -431,7 +458,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     return Response.json(dutyResult,{headers});
   }
 
-  const primary=await overpass(category,lat,lon,effectiveRadius);
+  const primary=await getPois(env,category,lat,lon,effectiveRadius);
   let places=primary.places;
   let upstreamOk=primary.ok;
   const attempts=primary.attempts||[];
@@ -477,5 +504,5 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
 
   if(!result.length&&!upstreamOk)return Response.json({error:'upstream_unavailable',attempts,center:{lat,lon}},{status:503,headers:{'Cache-Control':'no-store'}});
   await dbCachePut(env,key,result,result.length?15*60*1000:5*60*1000);
-  return Response.json(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'OpenStreetMap','X-Upstream-Raw':String(rawCount??'')}});
+  return Response.json(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':primary.local?'OpenStreetMap (D1 yerel kopya)':'OpenStreetMap','X-Upstream-Raw':String(rawCount??'')}});
 }
