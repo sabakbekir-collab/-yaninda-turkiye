@@ -102,7 +102,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
         latitude=coordinates.latitude;
         longitude=coordinates.longitude;
       }
-      await env.DB.prepare("UPDATE submissions SET status='approved',latitude=?,longitude=? WHERE id=?").bind(latitude,longitude,id).run();
+      await env.DB.prepare('UPDATE submissions SET status=\\'approved\\',latitude=?,longitude=? WHERE id=?').bind(latitude,longitude,id).run();
     }else if(action==='reject_submission'){
       if(id===null)return Response.json({error:'invalid_id'},{status:400});
       await env.DB.prepare('UPDATE submissions SET status=\'rejected\' WHERE id=?').bind(id).run();
