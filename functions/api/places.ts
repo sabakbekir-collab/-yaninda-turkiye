@@ -8,6 +8,14 @@ type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lo
 
 const filters=OSM_FILTERS;
 
+// Explicit UTF-8 JSON responses prevent Turkish place names from being decoded
+// with a legacy character set by embedded browsers and WebViews.
+function jsonResponse(data:unknown,init?:ResponseInit){
+  const headers=new Headers(init?.headers);
+  headers.set('Content-Type','application/json; charset=utf-8');
+  return new Response(JSON.stringify(data),{...init,headers});
+}
+
 // HTTP header values must be ASCII; Turkish dotless ı makes fetch() reject the request before sending it.
 const OSM_UA='YanimdaTurkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)';
 const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').replace(/\s+/g,' ').trim().slice(0,n):undefined;
@@ -104,11 +112,11 @@ export async function onRequestAreaGet({request}:{request:Request}){
   const lat=Number(u.searchParams.get('lat'));
   const lon=Number(u.searchParams.get('lon'));
   if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<35||lat>43||lon<25||lon>46){
-    return Response.json({error:'invalid_coordinates'},{status:400,headers:{'Cache-Control':'no-store'}});
+    return jsonResponse({error:'invalid_coordinates'},{status:400,headers:{'Cache-Control':'no-store'}});
   }
   const area=await reverseArea(lat,lon);
-  if(!area)return Response.json({error:'area_not_found'},{status:503,headers:{'Cache-Control':'no-store'}});
-  return Response.json(area,{headers:{'Cache-Control':'no-store'}});
+  if(!area)return jsonResponse({error:'area_not_found'},{status:503,headers:{'Cache-Control':'no-store'}});
+  return jsonResponse(area,{headers:{'Cache-Control':'no-store'}});
 }
 
 function activeDutyDates(){
@@ -414,19 +422,19 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   const nearbyDistricts=u.searchParams.get('nearbyDistricts')==='1';
   const debug=u.searchParams.get('debug')==='1';
 
-  if(!filters[category])return Response.json([]);
+  if(!filters[category])return jsonResponse([]);
 
   const numParam=(name:string)=>{const raw=u.searchParams.get(name);return raw!==null&&raw.trim()!==''?Number(raw):NaN};
   let lat=numParam('lat'),lon=numParam('lon');
   const hasPosition=Number.isFinite(lat)&&Number.isFinite(lon);
   if(!hasPosition){
-    if(!province)return Response.json([]);
+    if(!province)return jsonResponse([]);
     const area=areaQuery(district,province);
     const point=await geocode(env,area);
-    if(!point)return Response.json({error:'location_geocode_failed',area,category},{status:503,headers:{'Cache-Control':'no-store'}});
+    if(!point)return jsonResponse({error:'location_geocode_failed',area,category},{status:503,headers:{'Cache-Control':'no-store'}});
     lat=point.lat;lon=point.lon;
   }
-  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<35||lat>43||lon<25||lon>46)return Response.json([]);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<35||lat>43||lon<25||lon>46)return jsonResponse([]);
 
   // Manual district searches are centered on the district and always honor the selected
   // radius. If nearby districts are enabled, broaden that radius by at least 1.5x.
@@ -437,7 +445,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   // disabled until a structured, current official feed is available.
   const key=cacheKey(category,lat.toFixed(3),lon.toFixed(3),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
   const cached=debug?null:await dbCacheGet(env,key);
-  if(Array.isArray(cached))return Response.json(cached,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'cache'}});
+  if(Array.isArray(cached))return jsonResponse(cached,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'cache'}});
 
   // Eczane kategorisi yalnızca güncel nöbet verisini kullanır.
   // OSM'deki genel eczaneler nöbetçi gibi gösterilmez.
@@ -449,7 +457,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       dutyProvince=area?.province||'';
       dutyDistrict=area?.district||'';
     }
-    if(!dutyProvince)return Response.json(debug?{ok:false,error:'duty_pharmacy_location_unknown',input:{province,district},coordinates:{lat,lon},geocodedArea:null,activeDutyDates:activeDutyDates()}:{error:'duty_pharmacy_location_unknown'},{status:400,headers:{'Cache-Control':'no-store'}});
+    if(!dutyProvince)return jsonResponse(debug?{ok:false,error:'duty_pharmacy_location_unknown',input:{province,district},coordinates:{lat,lon},geocodedArea:null,activeDutyDates:activeDutyDates()}:{error:'duty_pharmacy_location_unknown'},{status:400,headers:{'Cache-Control':'no-store'}});
     const primaryDuty=await dutyPharmacies(env,dutyProvince,dutyDistrict,lat,lon,effectiveRadius);
     // Fall back to a separate chamber/municipality-backed roster only if the
     // primary provider has no current dated entries. Do not merge rosters.
@@ -474,16 +482,16 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
       const reason=stale?'stale_duty_list':primaryDuty.reason||secondaryReason||'no_current_duty_records';
       const status=failed&&primaryDuty.reason==='provider_rate_limited'?429:failed?503:200;
       const body=debug?{ok:!failed,error:failed?'duty_pharmacy_unavailable':'no_current_duty_records',reason,secondaryReason,providerStatus:primaryDuty.providerStatus,feedDate:dutyDate||null,sourceDates:{eczaneAdresi:dutyDate||null,turkpidya:secondaryDate||null},query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},activeDutyDates:activeDutyDates(),resultCount:0,sourcesTried:['Eczane Adresi','Turkpidya']}:{error:failed?'duty_pharmacy_unavailable':'no_current_duty_records',reason,secondaryReason,date:dutyDate||secondaryDate};
-      return Response.json(body,{status,headers:{'Cache-Control':'no-store'}});
+      return jsonResponse(body,{status,headers:{'Cache-Control':'no-store'}});
     }
-    if(debug)return Response.json({ok:true,source:dutySource,query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},feedDate:dutyDate||null,activeDutyDates:activeDutyDates(),resultCount:dutyResult.length,reason:null,sample:dutyResult.slice(0,5)}, {headers:{'Cache-Control':'no-store','X-Data-Source':dutySource}});
+    if(debug)return jsonResponse({ok:true,source:dutySource,query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},feedDate:dutyDate||null,activeDutyDates:activeDutyDates(),resultCount:dutyResult.length,reason:null,sample:dutyResult.slice(0,5)}, {headers:{'Cache-Control':'no-store','X-Data-Source':dutySource}});
     // Never cache an empty duty result: an upstream "today" miss must not
     // become a persistent false zero.
     if(dutyResult.length)await dbCachePut(env,key,dutyResult,5*60*1000);
     const headers=new Headers({'Cache-Control':dutyResult.length?'public,max-age=300':'no-store','X-Data-Source':'Eczane Adresi'});
     headers.set('X-Data-Source',dutySource);
     if(dutyDate)headers.set('X-Duty-Date',dutyDate);
-    return Response.json(dutyResult,{headers});
+    return jsonResponse(dutyResult,{headers});
   }
 
   const primary=await getPois(env,category,lat,lon,effectiveRadius);
@@ -530,7 +538,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     .sort((a,b)=>(a.distance??999)-(b.distance??999))
     .slice(0,40);
 
-  if(!result.length&&!upstreamOk)return Response.json({error:'upstream_unavailable',attempts,center:{lat,lon}},{status:503,headers:{'Cache-Control':'no-store'}});
+  if(!result.length&&!upstreamOk)return jsonResponse({error:'upstream_unavailable',attempts,center:{lat,lon}},{status:503,headers:{'Cache-Control':'no-store'}});
   await dbCachePut(env,key,result,result.length?15*60*1000:5*60*1000);
-  return Response.json(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':primary.local?'OpenStreetMap (D1 yerel kopya)':'OpenStreetMap','X-Upstream-Raw':String(rawCount??'')}});
+  return jsonResponse(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':primary.local?'OpenStreetMap (D1 yerel kopya)':'OpenStreetMap','X-Upstream-Raw':String(rawCount??'')}});
 }
