@@ -673,12 +673,13 @@ function Admin(){
    setNotice('');setError('');setLoading(true);
    try{const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(payload)});
      if(!r.ok){const d=await r.json().catch(()=>({})) as {error?:string};throw new Error(d.error||'İşlem tamamlanamadı.');}
-     await refresh();setNotice('İşlem başarıyla tamamlandı.');
-   }catch(e){setError(e instanceof Error?e.message:'Bağlantı kurulamadı.')}finally{setLoading(false)}
+     await refresh();setNotice('İşlem başarıyla tamamlandı.');return true;
+   }catch(e){setError(e instanceof Error?e.message:'Bağlantı kurulamadı.');return false}finally{setLoading(false)}
  };
  const saveAd=async(e:FormEvent)=>{
    e.preventDefault();
-   await action({action:'save_ad',...(editingId?{id:editingId}:{}),...adForm});
+   const saved=await action({action:'save_ad',...(editingId?{id:editingId}:{}),...adForm});
+   if(!saved)return;
    setEditingId(null);setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});
  };
  const logout=async()=>{
