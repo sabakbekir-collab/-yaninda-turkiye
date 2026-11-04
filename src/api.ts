@@ -76,9 +76,15 @@ export async function findPlaces(
     throw new Error('Hizmet verileri şu anda alınamadı.');
   }
   if(!Array.isArray(data)){
+    const payload=data&&typeof data==='object'?data as {error?:unknown;reason?:unknown;date?:unknown}:null;
+    // No verified duty records is a valid empty result, not a malformed API response.
+    if(category==='pharmacy'&&payload?.error==='no_current_duty_records')return [];
+    if(payload?.error==='location_geocode_failed'){
+      throw new Error('Seçilen il / ilçe haritada konumlandırılamadı. Konumumu Kullan ile GPS üzerinden tekrar ara veya ilçe seçimini kontrol et.');
+    }
     const contentType=r.headers.get('content-type')||'';
-    const detail=data&&typeof data==='object'&&'error' in data&&typeof (data as {error?:unknown}).error==='string'
-      ?(data as {error:string}).error
+    const detail=payload&&typeof payload.error==='string'
+      ?payload.error
       :contentType.includes('text/html')?'server_returned_html':'unexpected_response_shape';
     throw new Error('Hizmet kaynağından beklenmeyen yanıt alındı ('+detail+'). Lütfen sayfayı yenileyip tekrar deneyin.');
   }
