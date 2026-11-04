@@ -65,18 +65,44 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
       if(id===null)return Response.json({error:'invalid_id'},{status:400});
       const row=await env.DB.prepare('SELECT * FROM submissions WHERE id=? LIMIT 1').bind(id).first<Record<string,unknown>>();
       if(!row)return Response.json({error:'not_found'},{status:404});
-      const q=new URL('https://nominatim.openstreetmap.org/search');
-      q.searchParams.set('format','jsonv2');
-      q.searchParams.set('limit','1');
-      q.searchParams.set('countrycodes','tr');
-      q.searchParams.set('q',`${row.address}, ${row.district}, ${row.province}, Türkiye`);
-      const g=await fetch(q,{headers:{'Accept':'application/json','User-Agent':`YanimdaTurkiye/1.0 (${env.OSM_CONTACT_EMAIL||'public-web-app'})`},signal:AbortSignal.timeout(7000)});
-      if(!g.ok)return Response.json({error:'geocoding_unavailable'},{status:503});
-      const found=(await g.json() as Array<{lat?:unknown;lon?:unknown}>)[0];
-      const coordinates=found?parseTurkeyCoordinates(found.lat,found.lon):null;
-      // Do not approve a submission that cannot be mapped to valid Turkish coordinates.
-      if(!coordinates)return Response.json({error:'geocoding_failed'},{status:422});
-      await env.DB.prepare('UPDATE submissions SET status=\'approved\',latitude=?,longitude=? WHERE id=?').bind(coordinates.latitude,coordinates.longitude,id).run();
+      let latitude:number;
+      let longitude:number;
+      const hasManualLatitude=Object.prototype.hasOwnProperty.call(body,'latitude');
+      const hasManualLongitude=Object.prototype.hasOwnProperty.call(body,'longitude');
+      if(hasManualLatitude||hasManualLongitude){
+        // Manual coordinates must be actual finite JSON numbers; strings/null/partial pairs are invalid.
+        if(typeof body.latitude!=='number'||!Number.isFinite(body.latitude)||typeof body.longitude!=='number'||!Number.isFinite(body.longitude)){
+          return Response.json({error:'invalid_coordinates'},{status:400});
+        }
+        if(body.latitude<35||body.latitude>43||body.longitude<25||body.longitude>46){
+          return Response.json({error:'coordinates_out_of_range'},{status:400});
+        }
+        latitude=body.latitude;
+        longitude=body.longitude;
+      }else{
+        const q=new URL('https://nominatim.openstreetmap.org/search');
+        q.searchParams.set('format','jsonv2');
+        q.searchParams.set('limit','1');
+        q.searchParams.set('countrycodes','tr');
+        q.searchParams.set('q',`${row.address}, ${row.district}, ${row.province}, Türkiye`);
+        let g:Response;
+        try{
+          g=await fetch(q,{headers:{'Accept':'application/json','User-Agent':`YanimdaTurkiye/1.0 (${env.OSM_CONTACT_EMAIL||'public-web-app'})`},signal:AbortSignal.timeout(7000)});
+        }catch{
+          return Response.json({error:'geocoding_unavailable'},{status:503});
+        }
+        if(!g.ok)return Response.json({error:'geocoding_unavailable'},{status:503});
+        let found:Array<{lat?:unknown;lon?:unknown}>;
+        try{found=await g.json() as Array<{lat?:unknown;lon?:unknown}>;}catch{
+          return Response.json({error:'geocoding_unavailable'},{status:503});
+        }
+        const coordinates=Array.isArray(found)&&found.length?parseTurkeyCoordinates(found[0].lat,found[0].lon):null;
+        // An empty or invalid geocoder result is not an approved listing.
+        if(!coordinates)return Response.json({error:'geocode_failed'},{status:422});
+        latitude=coordinates.latitude;
+        longitude=coordinates.longitude;
+      }
+      await env.DB.prepare('UPDATE submissions SET status=\\'approved\\',latitude=?,longitude=? WHERE id=?').bind(latitude,longitude,id).run();
     }else if(action==='reject_submission'){
       if(id===null)return Response.json({error:'invalid_id'},{status:400});
       await env.DB.prepare('UPDATE submissions SET status=\'rejected\' WHERE id=?').bind(id).run();
