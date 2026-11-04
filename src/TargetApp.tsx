@@ -9,7 +9,7 @@ import {categories,keywordMap,provinces,services} from './data';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName,trSlug} from './text';
 import {findPlaces,resolveLocationArea,track} from './api';
-import {getCurrentLocation,LocationError} from './location';
+import {getCurrentLocation,getLocationPermissionState,LocationError} from './location';
 import type {Place,Position} from './types';
 import ChatWidget from './ChatWidget';
 import AdminAI from './AdminAI';
@@ -330,7 +330,15 @@ function Nearby(){
  useEffect(()=>{
    const incoming=location.state as NearbyNavigationState|null;
    if(!incoming)return;
-   if(incoming.autoLocate){locateRef.current();}
+   if(incoming.autoLocate){
+     // Navigation state must never trigger an iOS permission prompt.
+     // Only silently locate when permission is already granted.
+     void getLocationPermissionState().then(permission=>{
+       setLocationState(permission);
+       if(permission==='granted')locateRef.current();
+       else if(permission==='denied')setErr('Konum izni kapalı. İl ve ilçe seçerek devam edebilirsin.');
+     });
+   }
    if(incoming.position){
      setPos(incoming.position);
      setLocationState('granted');
