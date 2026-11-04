@@ -34,12 +34,12 @@ export default {
       // Health must be independent of schema initialization. Missing or
       // unreachable D1 is an unhealthy service and must return HTTP 503.
       if (path === "/api/health" && request.method === "GET") {
-        if (!env.DB) return healthResponse(false, false, "2026.11.05");
+        if (!env.DB) return healthResponse(false, false, env.COMMIT_SHA || "unknown");
         try {
           await env.DB.prepare("SELECT 1 AS ok").first();
-          return healthResponse(true, true, "2026.11.05");
+          return healthResponse(true, true, env.COMMIT_SHA || "unknown");
         } catch {
-          return healthResponse(true, false, "2026.11.05");
+          return healthResponse(true, false, env.COMMIT_SHA || "unknown");
         }
       }
 
