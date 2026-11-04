@@ -1,6 +1,7 @@
 // Yanımda Türkiye places.ts — strict-null-safe production build
 import type {Env,Place} from '../lib/types';
-import {isCentralDistrict,trSlug} from '../../src/text';
+import {isCentralDistrict,trSlug,resolveName} from '../../src/text';
+import {districtMap,districtsFor} from '../../src/turkeyDistricts';
 import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery';
 
 type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
@@ -86,9 +87,15 @@ async function reverseArea(lat:number,lon:number):Promise<{province:string;distr
     if(!r.ok)return null;
     const x=await r.json() as {address?:Record<string,string>};
     const a=x.address||{};
-    const province=a.province||a.state||a.region||'';
-    const district=a.city_district||a.district||a.county||a.municipality||a.town||'';
-    return province?{province,district}:null;
+    const knownProvinces=Object.keys(districtMap);
+    const province=[a.province,a.state,a.city,a.county,a.region].map(v=>v?resolveName(v,knownProvinces):undefined).find(Boolean)||'';
+    if(!province)return null;
+    const options=districtsFor(province);
+    const candidates=[a.city_district,a.district,a.county,a.town,a.municipality,a.city].filter((v):v is string=>Boolean(v));
+    let district='';
+    for(const candidate of candidates){const hit=resolveName(candidate,options);if(hit){district=hit;break;}}
+    if(!district&&candidates.some(v=>slug(v)===slug(province))&&options.some(v=>slug(v)==='merkez'))district='Merkez';
+    return {province,district};
   }catch{return null}
 }
 
