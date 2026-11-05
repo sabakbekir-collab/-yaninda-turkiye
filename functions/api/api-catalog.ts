@@ -1,5 +1,5 @@
 import type { Env } from "../lib/types";
-import { validSession } from "../lib/auth.ts";
+import { strictSameOrigin, validSession } from "../lib/auth.ts";
 
 type ApiEntry = {
   id: string;
@@ -29,6 +29,7 @@ export async function onRequestGet({ request, env }: { request: Request; env: En
 }
 
 export async function onRequestPost({ request, env }: { request: Request; env: Env }) {
+  if (!strictSameOrigin(request)) return json({ error: "forbidden", detail: "İstek aynı kaynaktan gelmelidir." }, 403);
   if (!(await validSession(request, env))) return json({ error: "unauthorized" }, 401);
   let body: { id?: unknown };
   try { body = await request.json() as { id?: unknown }; } catch { return json({ error: "bad_request" }, 400); }
