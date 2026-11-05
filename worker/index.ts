@@ -6,7 +6,6 @@ import { onRequestPost as postSubmissions } from "../functions/api/submissions";
 import { onRequestPost as postReports } from "../functions/api/reports";
 import { onRequestPost as postAiChat } from "../functions/api/ai";
 import { onRequestPost as postAdminAi } from "../functions/api/admin-ai";
-import { onRequestGet as getApiCatalog, onRequestPost as testApiCatalog } from "../functions/api/api-catalog";
 import type { Env } from "../functions/lib/types";
 import { ensureSchema } from "../functions/lib/schema";
 import { validSession } from "../functions/lib/auth";
@@ -116,14 +115,6 @@ export default {
             { status: 503, headers: { "Cache-Control": "no-store" } },
           );
         }
-      }
-
-      if (path === "/api/admin/api-catalog" && request.method === "GET") {
-        return await getApiCatalog({ request, env });
-      }
-
-      if (path === "/api/admin/api-catalog" && request.method === "POST") {
-        return await testApiCatalog({ request, env });
       }
 
       if (path === "/api/admin/ai" && request.method === "POST") {
