@@ -13,7 +13,6 @@ import {getCurrentLocation,getLocationPermissionState,LocationError} from './loc
 import type {Place,Position} from './types';
 import ChatWidget from './ChatWidget';
 import AdminAI from './AdminAI';
-import AdminApiExplorer from './AdminApiExplorer';
 import FavoritesPage from './FavoritesPage';
 import CalendarPage from './CalendarPage';
 import EnhancedPlaceCard from './PlaceCard';
@@ -717,7 +716,6 @@ function Admin(){
     </form>
     {ads.length?ads.map(ad=><div className="ad-row" key={ad.id}>{ad.image_url&&<img src={ad.image_url} alt=""/>}<div><b>{ad.title}</b><small>{ad.placement} · {ad.status==='active'?'Yayında':'Duraklatıldı'}</small></div><button type="button" onClick={()=>{setEditingId(ad.id);setAdForm({title:ad.title,text:ad.text||'',image_url:ad.image_url||'',target_url:ad.target_url||'',placement:ad.placement||'home_top'})}}>Düzenle</button><button type="button" disabled={loading} onClick={()=>void action({action:'toggle_ad',id:ad.id})}>{ad.status==='active'?'Duraklat':'Yayınla'}</button><button type="button" disabled={loading} onClick={()=>{if(window.confirm('Bu reklam silinsin mi?'))void action({action:'delete_ad',id:ad.id})}}>Sil</button></div>):<p>Henüz kayıtlı reklam yok.</p>}
    </div>
-   <AdminApiExplorer/>
    <div className="panel"><h2>İşletme Başvuruları</h2>{(data?.submissions||[]).length?(data?.submissions||[]).map(item=><div className="ad-row" key={item.id}><div><b>{item.name}</b><small>{item.category} · {item.province}/{item.district} · {item.phone}</small><small>{item.address} · {item.status}</small></div>{item.status==='pending'&&<><button disabled={loading} onClick={()=>void action({action:'approve_submission',id:item.id})}>Onayla</button><button disabled={loading} onClick={()=>void action({action:'reject_submission',id:item.id})}>Reddet</button></>}</div>):<p>Bekleyen veya kayıtlı başvuru yok.</p>}</div>
    <div className="panel"><h2>Hatalı Bilgi Bildirimleri</h2>{(data?.reports||[]).length?(data?.reports||[]).map(item=><div className="ad-row" key={item.id}><div><b>{item.place_name}</b><small>{item.reason} · {item.details||'Açıklama yok'}</small></div><button disabled={loading} onClick={()=>void action({action:'resolve_report',id:item.id})}>Çözüldü</button></div>):<p>Açık bildirim yok.</p>}</div>
   </section></main>;
