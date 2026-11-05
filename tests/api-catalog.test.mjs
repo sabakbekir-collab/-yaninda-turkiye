@@ -1,3 +1,4 @@
+/* global Headers, Request, Response, URL */
 import test from "node:test";
 import assert from "node:assert/strict";
 import { isIP } from "node:net";
