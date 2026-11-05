@@ -23,6 +23,54 @@ function json(body: unknown, status = 200) {
   return Response.json(body, { status, headers: { "Cache-Control": "no-store" } });
 }
 
+const MAX_RESPONSE_BYTES = 64 * 1024;
+
+async function readLimitedBody(response: Response, limit = MAX_RESPONSE_BYTES) {
+  const declared = Number(response.headers.get("content-length") || 0);
+  let truncated = Number.isFinite(declared) && declared > limit;
+  if (!response.body) return { text: "", truncated };
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (total < limit) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const remaining = limit - total;
+      if (value.byteLength > remaining) {
+        chunks.push(value.slice(0, remaining));
+        total += remaining;
+        truncated = true;
+        await reader.cancel("response_limit");
+        break;
+      }
+      chunks.push(value);
+      total += value.byteLength;
+    }
+    if (total >= limit && !truncated) {
+      const next = await reader.read();
+      if (!next.done) {
+        truncated = true;
+        await reader.cancel("response_limit");
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return { text: new TextDecoder().decode(bytes), truncated };
+}
+
+function providerError(status: number) {
+  if (status === 403) return "Sağlayıcı erişim iznini reddetti (403).";
+  if (status === 404) return "Sağlayıcı uç noktası bulunamadı (404).";
+  if (status === 429) return "Sağlayıcı istek sınırına ulaşıldığını bildirdi (429).";
+  if (status >= 500) return "Sağlayıcı geçici bir sunucu hatası verdi.";
+  return "Sağlayıcı HTTP hata durumu döndürdü.";
+}
+
 export async function onRequestGet({ request, env }: { request: Request; env: Env }) {
   if (!(await validSession(request, env))) return json({ error: "unauthorized" }, 401);
   return json({ apis: CATALOG.map(({ testUrl: _testUrl, ...entry }) => ({ ...entry, testable: true })) });
@@ -48,11 +96,24 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
       return json({ id: entry.id, ok: false, httpStatus: response.status, latencyMs: Date.now() - started, checkedAt: new Date().toISOString(), error: "redirect_blocked", detail: "Güvenlik nedeniyle yönlendirme engellendi." });
     }
     const contentType = response.headers.get("content-type") || "";
-    const bodyText = await response.text();
-    let validJson = false;
-    if (contentType.includes("json") || bodyText.trim().startsWith("{") || bodyText.trim().startsWith("[")) {
-      try { JSON.parse(bodyText); validJson = true; } catch { validJson = false; }
+    const { text: bodyText, truncated } = await readLimitedBody(response);
+    if (!response.ok) {
+      return json({
+        id: entry.id, ok: false, httpStatus: response.status,
+        latencyMs: Date.now() - started, checkedAt: new Date().toISOString(),
+        contentType, truncated, detail: providerError(response.status),
+      });
     }
+    if (truncated) {
+      return json({
+        id: entry.id, ok: false, httpStatus: response.status,
+        latencyMs: Date.now() - started, checkedAt: new Date().toISOString(),
+        contentType, truncated: true, error: "response_too_large",
+        detail: "Sağlayıcı yanıtı 64 KiB sınırını aştı; güvenlik için kesildi.",
+      });
+    }
+    let validJson = false;
+    try { JSON.parse(bodyText); validJson = true; } catch { validJson = false; }
     return json({
       id: entry.id,
       ok: response.ok && validJson,
@@ -60,7 +121,9 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
       latencyMs: Date.now() - started,
       checkedAt: new Date().toISOString(),
       contentType,
-      detail: response.ok ? (validJson ? "API yanıt verdi ve JSON geçerli." : "HTTP yanıtı geldi ancak JSON doğrulanamadı.") : "API HTTP hata durumu döndürdü.",
+      truncated: false,
+      error: validJson ? undefined : "invalid_json",
+      detail: validJson ? "API yanıt verdi ve JSON geçerli." : "Sağlayıcı geçerli JSON döndürmedi.",
     });
   } catch (error) {
     return json({
@@ -68,7 +131,8 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
       ok: false,
       latencyMs: Date.now() - started,
       checkedAt: new Date().toISOString(),
-      detail: error instanceof Error && error.name === "TimeoutError" ? "Test zaman aşımına uğradı." : "API bağlantısı kurulamadı.",
+      error: error instanceof Error && error.name === "TimeoutError" ? "timeout" : "provider_unavailable",
+      detail: error instanceof Error && error.name === "TimeoutError" ? "Sağlayıcı 7 saniye içinde yanıt vermedi." : "Sağlayıcıya bağlanılamadı veya yanıt okunamadı.",
     }, 502);
   }
 }
