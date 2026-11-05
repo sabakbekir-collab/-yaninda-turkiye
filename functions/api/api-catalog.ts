@@ -1,5 +1,5 @@
 import type { Env } from "../lib/types";
-import { strictSameOrigin, validSession } from "../lib/auth.ts";
+import { strictSameOrigin, validSession } from "../lib/auth";
 
 type ApiEntry = {
   id: string;
