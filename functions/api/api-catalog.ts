@@ -11,7 +11,7 @@ type ApiEntry = {
   testUrl: string;
 };
 
-const CATALOG: ApiEntry[] = [
+export const CATALOG: ApiEntry[] = [
   { id: "open-meteo", name: "Open-Meteo", category: "Hava Durumu", description: "Saatlik ve günlük hava tahmini; hava durumu ekranları ve uyarılar için.", docsUrl: "https://open-meteo.com/en/docs", termsNote: "Ücretsiz kullanım koşulları ve ticari kullanım şartları entegrasyondan önce kontrol edilmeli.", testUrl: "https://api.open-meteo.com/v1/forecast?latitude=38.7432&longitude=41.5064&current=temperature_2m" },
   { id: "nominatim", name: "OpenStreetMap Nominatim", category: "Harita ve Adres", description: "Adres arama ve koordinattan adres bulma (geocoding).", docsUrl: "https://nominatim.org/release-docs/latest/api/Overview/", termsNote: "Kamu sunucusu sıkı kullanım politikası uygular: en fazla 1 istek/sn, uygun User-Agent, önbellek ve atıf gerekir; yoğun kullanım için kendi servisiniz veya sağlayıcı tercih edin.", testUrl: "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=Mus%2C%20Turkiye" },
   { id: "rest-countries", name: "REST Countries", category: "Kamu Verileri", description: "Ülke, başkent, para birimi ve bölge bilgileri.", docsUrl: "https://restcountries.com/", termsNote: "Servis kullanılabilirliği ve lisans koşulları kontrol edilmeli.", testUrl: "https://restcountries.com/v3.1/name/turkey?fields=name,capital,currencies" },
