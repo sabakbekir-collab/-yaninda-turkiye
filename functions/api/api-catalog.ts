@@ -40,8 +40,12 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
   try {
     const response = await fetch(entry.testUrl, {
       headers: { Accept: "application/json", "User-Agent": "YanimdaTurkiye-ApiCatalog/1.0" },
+      redirect: "manual",
       signal: AbortSignal.timeout(7000),
     });
+    if (response.status >= 300 && response.status < 400) {
+      return json({ id: entry.id, ok: false, httpStatus: response.status, latencyMs: Date.now() - started, checkedAt: new Date().toISOString(), error: "redirect_blocked", detail: "Güvenlik nedeniyle yönlendirme engellendi." });
+    }
     const contentType = response.headers.get("content-type") || "";
     const bodyText = await response.text();
     let validJson = false;
