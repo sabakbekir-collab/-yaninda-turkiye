@@ -388,7 +388,7 @@ function Nearby(){
    if(!submitted)return;
    let cancelled=false;
    setLoading(true);setErr('');
-   findPlaces(submitted.category,submitted.pos,submitted.province,submitted.district,{radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts})
+   findPlaces(submitted.category,submitted.pos,submitted.province,submitted.district,{radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts,anchor:submitted.pos?'gps':'area'})
      .then(r=>{if(!cancelled)setPlaces(r)})
      .catch((error:unknown)=>{if(!cancelled){setPlaces([]);setErr(error instanceof Error&&error.message.trim()?error.message:'Nöbetçi eczane verisi alınamadı. Kaynak yanıtı doğrulanamadı; lütfen daha sonra tekrar deneyin.')}})
      .finally(()=>{if(!cancelled)setLoading(false)});
