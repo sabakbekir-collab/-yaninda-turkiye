@@ -5,6 +5,7 @@ import {resolveName} from './text';
 export type PlaceSearchOptions={
   radiusKm?:number;
   nearbyDistricts?:boolean;
+  anchor?:'gps'|'area';
 };
 
 export type ResolvedLocationArea={province:string;district:string};
@@ -36,6 +37,7 @@ export async function findPlaces(
 ):Promise<Place[]>{
   const p=new URLSearchParams({category});
   if(position){p.set('lat',String(position.lat));p.set('lon',String(position.lon));}
+  p.set('anchor',options.anchor||(position?'gps':'area'));
   if(province)p.set('province',province);
   if(district)p.set('district',district);
   p.set('radius',String(options.radiusKm??5));
