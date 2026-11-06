@@ -1,21 +1,39 @@
-# Bulgu 6 — Kadın destek numaraları doğrulama raporu
+# Bulgu 6 — Kadın destek numaraları kaynak alıntıları
 
-**Kapsam:** Yalnızca kaynak doğrulaması. Bu rapor kapsamında uygulama kodu, numara listesi veya kullanıcı arayüzü değiştirilmemiştir.
+**Kapsam:** Yalnızca rapor. Bu bulgu için uygulama kodu veya arayüz değiştirilmedi.
 
-Kontrol tarihi: 2026-11-06
+## 1) ALO 183 — Aile ve Sosyal Hizmetler Bakanlığı
 
-| Numara | Sonuç | Doğrulanan bilgi | Kaynak |
-|---|---|---|---|
-| 183 | DOĞRULANDI | Aile ve Sosyal Hizmetler Bakanlığı ALO 183 Şiddetle Mücadele / Sosyal Destek Hattı; 7 gün 24 saat hizmet verir. | https://www.aile.gov.tr/alo-183/alo183pages/alo-183-hizmeti/ |
-| 0212 656 96 96 | DOĞRULANDI | Türkiye Kadın Dernekleri Federasyonu Aile İçi Şiddet Acil Yardım Hattı numarası. | https://tkdf.org.tr/acil-yardim-hatti?lang=tr |
-| 0549 656 96 96 | DOĞRULANDI | Aynı TKDF hattının yayımladığı ikinci telefon numarası. | https://tkdf.org.tr/acil-yardim-hatti?lang=tr |
+Kaynak: https://www.aile.gov.tr/alo-183/alo183pages/alo-183-hizmeti/
 
-## Kaynak notları
+Sayfadaki numarayı ve hizmeti doğrudan belirten alıntı:
 
-- Bakanlığın ALO 183 sayfası, hattın 7/24 kesintisiz çalıştığını ve yurt içinden aramaların ücretsiz olduğunu belirtiyor: https://www.aile.gov.tr/alo-183/alo183pages/alo-183-hizmeti/
-- TKDF'nin kendi resmî sayfası 0212 656 96 96 ve 0 549 656 96 96 numaralarını doğrudan yayımlıyor: https://tkdf.org.tr/acil-yardim-hatti?lang=tr
-- Adalet Bakanlığının aile içi şiddet bilgilendirme sayfası da 0212 656 96 96 / 0549 656 96 96 numaralarını Aile İçi Şiddet Acil Yardım Hattı olarak listeliyor: https://evicisiddet.adalet.gov.tr/Ne_Yapabilirim.html
+> “Alo 183 Hattı 7 gün 24 saat kesintisiz hizmet vermektedir.”
 
-## Sonuç
+Sayfa başlığı: “Alo 183 Hizmeti”. Bakanlık sayfasında ALO 183 hattının 7/24 hizmet verdiği açıkça yazıyor.
 
-İstenen üç numaranın tamamı resmî kurum/hat sahibi kaynaklarıyla doğrulandı. Bu iş kapsamında kod değişikliği yapılmadı. Numaraların canlı arama testi yapılmadı; doğrulama, yayımlanmış kaynak kayıtlarına dayanır.
+## 2) 0212 656 96 96 — Türkiye Kadın Dernekleri Federasyonu (TKDF)
+
+Kaynak: https://tkdf.org.tr/sss?lang=tr
+
+Sayfada numaranın geçtiği satırın kelimesi kelimesine alıntısı:
+
+> “Acil yardım hattımızın 0212 656 96 96 -0 549 656 96 96 numaralı telefonunu arayan kişilere telefonun ucunda sosyal hizmetler ya da Psikolog cevap vermekte.”
+
+Bu satır 0212 656 96 96 numarasını TKDF'nin acil yardım hattına bağlıyor.
+
+## 3) 0549 656 96 96 — Türkiye Kadın Dernekleri Federasyonu (TKDF)
+
+Kaynak: https://tkdf.org.tr/sss?lang=tr
+
+Aynı satırda ikinci numara da aynen geçiyor:
+
+> “Acil yardım hattımızın 0212 656 96 96 -0 549 656 96 96 numaralı telefonunu arayan kişilere telefonun ucunda sosyal hizmetler ya da Psikolog cevap vermekte.”
+
+Ayrıca aynı sayfanın “Şiddete Uğrarsam Ne Yapmalıyım?” bölümündeki satır:
+
+> “Türkiye Kadın Dernekleri Federasyonu Ev İçi Şiddet Acil Yardım Hattı (0212 656 96 96 ya da 0549 656 96 96)”
+
+## Doğrulama sınırı
+
+Üç numara da sayfada görünen yazılı kaynak metninde yer alıyor. Bu, yayımlanmış numara kaydının doğrulanmasıdır; canlı arama bağlantısı veya hattın o anda cevap verdiği test edilmemiştir.
