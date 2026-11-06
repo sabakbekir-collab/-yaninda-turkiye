@@ -523,7 +523,7 @@ function Nearby(){
      <span>Seçimler otomatik kaydedilir</span>
    </div>
 
-   {err&&!pharmacyLiveWidget&&<div className="error nearby-error">{err} {pharmacyMode&&<a href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">Resmî e-Devlet nöbetçi eczane sorgusunu aç</a>}</div>}
+   {err&&!pharmacyLiveWidget&&<div className="error nearby-error" role="alert">{err} {pharmacyMode&&<div className="duty-error-links"><a href={officialPharmacyUrl} target="_blank" rel="noreferrer">Resmî e-Devlet nöbetçi eczane sorgusunu aç <ExternalLink/></a>{dutyLink&&<a href={dutyLink.url} target="_blank" rel="noopener noreferrer">{dutyLink.button} · {dutyLink.title} <ExternalLink/></a>}</div>}</div>}
 
    {pharmacyLiveWidget?
     <section className="pharmacy-live-widget" aria-label="İlçe bazlı canlı nöbetçi eczane listesi">
