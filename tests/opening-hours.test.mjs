@@ -8,7 +8,7 @@ test("real ATM record preserves all known rules and flags skipped uncertainty",(
     "atm"
   ),{
     label:"Şube saatleri",
-    value:"Pzt-Cum 09:00-12:30, 13:30-17:00 · Cmt-Paz kapalı · Resmî tatillerde kapalı · Saatler eksik olabilir"
+    value:"Pzt-Cum 09:00-12:30, 13:30-17:00 · Cmt-Paz kapalı · Resmî tatillerde kapalı · Resmî tatil arifesi 09:00-12:30"
   });
 });
 
