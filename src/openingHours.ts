@@ -4,7 +4,7 @@ const days:Record<string,string>={
   Mo:"Pzt",Tu:"Sal",We:"Çar",Th:"Per",Fr:"Cum",Sa:"Cmt",Su:"Paz"
 };
 const dayToken="(?:Mo|Tu|We|Th|Fr|Sa|Su)";
-const timeToken="(?:[01]\d|2[0-4]):[0-5]\d";
+const timeToken="(?:[01]\\d|2[0-4]):[0-5]\\d";
 
 function translateDaySpec(value:string):string|null{
   const parts=value.split(",");
@@ -72,7 +72,7 @@ export function formatOpeningHours(raw:string|undefined,category:string):Opening
       continue;
     }
 
-    const dayRule=new RegExp("^("+dayToken+"(?:-"+dayToken+")?(?:,"+dayToken+"(?:-"+dayToken+")?)*)\s+(.+)$").exec(clause);
+    const dayRule=new RegExp("^("+dayToken+"(?:-"+dayToken+")?(?:,"+dayToken+"(?:-"+dayToken+")?)*)\\s+(.+)$").exec(clause);
     if(!dayRule){skipped=true;continue;}
     const day=translateDaySpec(dayRule[1]);
     if(!day){skipped=true;continue;}
