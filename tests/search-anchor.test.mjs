@@ -1,27 +1,59 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { resolveSearchAnchor } from "../functions/api/places.ts";
+import { chooseSearchCenter, placesCacheKey, resolveSearchAnchor } from "../functions/lib/searchAnchor.ts";
+import { parseTurkeyCoordinates } from "../functions/lib/locationValidation.ts";
 
-test("explicit GPS anchor is preserved for province-wide labels", () => {
-  assert.equal(resolveSearchAnchor("gps", true, true), "gps");
-  // A resolved district label such as Muş / Merkez must not silently turn GPS into area mode.
-  assert.equal(resolveSearchAnchor("gps", true, true), "gps");
+const capital = { lat: 38.7432, lon: 41.5064 };
+const gps = { lat: 38.7432, lon: 41.5235 }; // Muş merkezden yaklaşık 1,5 km doğuda
+
+test("REGRESSION: explicit GPS at Muş Merkez stays at device coordinates", () => {
+  // Before the fix, province-wide/Merkez selection replaced this GPS point with capital.
+  // The previous implementation's effective output was {lat: capital.lat, lon: capital.lon}.
+  const result = chooseSearchCenter({
+    anchor: "gps", hasPosition: true, ...gps, capital, province: "Muş", district: "Merkez",
+  });
+  assert.deepEqual(result, { ...gps, source: "gps" });
+  assert.notDeepEqual({ lat: capital.lat, lon: capital.lon }, { lat: result.lat, lon: result.lon });
 });
 
-test("manual area anchor stays distinct from GPS even when coordinates are supplied", () => {
-  assert.equal(resolveSearchAnchor("area", true, true), "area");
-  assert.notEqual(resolveSearchAnchor("gps", true, true), resolveSearchAnchor("area", true, true));
+test("explicit area + Merkez uses provincial capital even if GPS was sent", () => {
+  assert.deepEqual(chooseSearchCenter({
+    anchor: "area", hasPosition: true, ...gps, capital, province: "Muş", district: "Merkez",
+  }), { ...capital, source: "capital" });
 });
 
-test("legacy clients retain the legacy decision and invalid coordinate pairs are rejected", () => {
-  assert.equal(resolveSearchAnchor(null, true, true), "legacy");
-  assert.equal(resolveSearchAnchor(null, false, false), "legacy");
-  assert.equal(resolveSearchAnchor(null, true, false), null);
+test("explicit area + Varto uses geocoded district centre", () => {
+  const geocode = { lat: 39.17, lon: 41.45 };
+  assert.deepEqual(chooseSearchCenter({
+    anchor: "area", hasPosition: true, ...gps, capital: null, province: "Muş", district: "Varto", geocode,
+  }), { ...geocode, source: "geocode" });
+});
+
+test("legacy whole-province + GPS temporarily preserves historical capital behavior", () => {
+  assert.deepEqual(chooseSearchCenter({
+    anchor: "legacy", hasPosition: true, ...gps, capital, province: "Muş", district: "",
+  }), { ...capital, source: "capital" });
+});
+
+test("half coordinates and coordinates outside Türkiye are rejected", () => {
   assert.equal(resolveSearchAnchor("gps", true, false), null);
-  assert.equal(resolveSearchAnchor("area", false, true), null);
+  assert.equal(resolveSearchAnchor("gps", false, true), null);
+  assert.equal(parseTurkeyCoordinates("38.7432", ""), null);
+  assert.equal(parseTurkeyCoordinates("51.5072", "-0.1276"), null);
+  assert.deepEqual(parseTurkeyCoordinates("38.7432", "41.5064"), { latitude: 38.7432, longitude: 41.5064 });
 });
 
-test("unknown anchor values are rejected", () => {
+test("anchor participates in the cache key for otherwise identical searches", () => {
+  const gpsKey = placesCacheKey("atm", "gps", "38.7432", "41.5064", "Muş", "Merkez");
+  const areaKey = placesCacheKey("atm", "area", "38.7432", "41.5064", "Muş", "Merkez");
+  assert.notEqual(gpsKey, areaKey);
+  assert.match(gpsKey, /:gps:/);
+  assert.match(areaKey, /:area:/);
+});
+
+test("invalid anchor and unmatched coordinate pairs are rejected", () => {
   assert.equal(resolveSearchAnchor("device", true, true), null);
   assert.equal(resolveSearchAnchor("", false, false), null);
+  assert.equal(resolveSearchAnchor(null, true, false), null);
+  assert.equal(resolveSearchAnchor(null, false, false), "legacy");
 });
