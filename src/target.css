@@ -109,7 +109,7 @@
 .nearby-place-card footer a,.nearby-place-card footer button{min-height:38px;border:1px solid var(--line);background:#fff;border-radius:10px;padding:0 10px;display:flex;align-items:center;justify-content:center;gap:5px;white-space:nowrap;font-size:10px;font-weight:900}
 .nearby-place-card footer a:first-child{color:var(--red)}
 .nearby-place-card footer svg{width:14px}
-.no-phone{min-height:38px;display:flex;align-items:center;color:#87929a;font-size:10px;font-weight:800;padding:0 3px}
+.no-phone{min-height:38px;display:flex;align-items:center;color:#59636d;background:#eef1f3;border:1px solid #dfe4e8;border-radius:9px;font-size:10px;font-weight:800;padding:0 9px}
 .nearby-skeleton{height:150px;border-radius:16px;background:linear-gradient(100deg,#edf1f2 30%,#f9fafb 50%,#edf1f2 70%);background-size:300%;animation:nearbyShimmer 1.2s infinite}
 @keyframes nearbyShimmer{to{background-position:-300%}}
 .nearby-empty{border:1px dashed #cfd9de;border-radius:16px;background:#fff;padding:28px 16px;min-height:260px}
@@ -454,3 +454,8 @@ html[data-theme="dark"]{color-scheme:light;filter:none;background:#fff7fb}
 .duty-source-link p{margin:0;font-size:13px;line-height:1.5;color:#52616d}
 .duty-source-link .duty-source-empty{color:#12202b;font-weight:600}
 .duty-source-link a{align-self:flex-start;min-height:44px;display:inline-flex;align-items:center;gap:6px;padding:0 16px;border-radius:12px;border:1px solid #dbe2e8;font-weight:700;font-size:14px;color:#12202b;text-decoration:none}
+
+/* Card-hours and mobile AI launcher spacing */
+.place-opening-hours{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;color:#596773;font-size:10px;line-height:1.4}
+.place-opening-hours b{font-weight:800;color:#344451}
+@media(max-width:760px){body{padding-bottom:132px}}
