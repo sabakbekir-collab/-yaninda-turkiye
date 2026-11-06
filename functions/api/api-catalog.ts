@@ -1,5 +1,4 @@
 import type { Env } from "../lib/types";
-// @ts-expect-error Node native type stripping requires the explicit .ts extension in tests.
 import { strictSameOrigin, validSession } from "../lib/auth.ts";
 
 type ApiEntry = {
