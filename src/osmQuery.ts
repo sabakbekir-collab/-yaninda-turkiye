@@ -12,7 +12,7 @@ export const OSM_FILTERS:Record<string,string>={
  gardener:'["craft"="gardener"]',other:'["craft"]',service:'["craft"]'
 };
 const EXTRA_FILTERS:Record<string,string[]>={
- atm:['["amenity"="bank"]["atm"="yes"]'],
+ atm:['["amenity"="bank"]["atm"="yes"]','["atm"="yes"]','["atm"="designated"]'],
  // Many Turkish public hospitals are tagged with healthcare=hospital rather
  // than amenity=hospital; include both schemas to avoid incomplete results.
  hospital:['["healthcare"="hospital"]']

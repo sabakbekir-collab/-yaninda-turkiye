@@ -120,3 +120,9 @@
  .modern-service-list{grid-template-columns:1fr}
  .modern-service-card:nth-child(1),.modern-service-card:nth-child(2){grid-column:auto}
 }
+
+/* Keep the official pharmacy fallback links visible in the error state. */
+.duty-error-links{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.duty-error-links a{display:inline-flex;align-items:center;gap:6px;font-weight:800;text-decoration:underline;text-underline-offset:3px}
+.duty-error-links svg{width:15px;height:15px;flex:0 0 auto}
+@media(max-width:600px){.duty-error-links{display:grid;grid-template-columns:1fr}.duty-error-links a{min-height:40px}}
