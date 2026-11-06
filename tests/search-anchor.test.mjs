@@ -57,3 +57,25 @@ test("invalid anchor and unmatched coordinate pairs are rejected", () => {
   assert.equal(resolveSearchAnchor(null, true, false), null);
   assert.equal(resolveSearchAnchor(null, false, false), "legacy");
 });
+
+
+// places.ts passes `capital` only when isWholeProvince(district, province) is true
+// (it folds diacritics/case, e.g. "MUS" === "Muş"). chooseSearchCenter must trust
+// that and must not repeat the check with different string rules.
+test("a supplied capital is authoritative: diacritic/case variants of the province name still use it", () => {
+  assert.deepEqual(chooseSearchCenter({
+    anchor: "area", hasPosition: true, ...gps, capital, province: "Muş", district: "MUS",
+  }), { ...capital, source: "capital" });
+  assert.deepEqual(chooseSearchCenter({
+    anchor: "legacy", hasPosition: true, ...gps, capital, province: "Muş", district: "Mus",
+  }), { ...capital, source: "capital" });
+});
+
+test("without a capital, legacy keeps GPS and area asks for a geocode", () => {
+  assert.deepEqual(chooseSearchCenter({
+    anchor: "legacy", hasPosition: true, ...gps, capital: null, province: "Muş", district: "Varto",
+  }), { ...gps, source: "gps" });
+  assert.equal(chooseSearchCenter({
+    anchor: "area", hasPosition: true, ...gps, capital: null, province: "Muş", district: "Varto",
+  }), null);
+});

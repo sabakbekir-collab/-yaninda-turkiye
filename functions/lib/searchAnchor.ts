@@ -17,15 +17,18 @@ export function resolveSearchAnchor(raw: string | null, hasLat: boolean, hasLon:
   return raw === 'gps' || raw === 'area' ? raw : null;
 }
 
+/**
+ * Picks the coordinates a nearby search is centred on.
+ *
+ * `capital` must be non-null only when the caller has already decided the
+ * request is province-wide / central-district (places.ts uses isWholeProvince,
+ * which folds case and diacritics). This function trusts that and does not
+ * repeat the check with different string rules.
+ */
 export function chooseSearchCenter(input: SearchCenterInput): SearchCenter | null {
-  const { anchor, hasPosition, lat, lon, capital, geocode, province, district } = input;
-  const wholeProvince = !district || district.toLocaleLowerCase('tr-TR') === 'merkez' ||
-    district.toLocaleLowerCase('tr-TR') === province.toLocaleLowerCase('tr-TR') ||
-    district.toLocaleLowerCase('tr-TR') === 'tüm ilçeler';
-  const useCapital = Boolean(capital) && wholeProvince && (anchor === 'area' || anchor === 'legacy');
+  const { anchor, hasPosition, lat, lon, capital, geocode } = input;
   if (anchor === 'gps') return hasPosition ? { lat, lon, source: 'gps' } : null;
-  if (useCapital && capital) return { ...capital, source: 'capital' };
-  if (anchor === 'legacy' && hasPosition && wholeProvince) return capital ? { ...capital, source: 'capital' } : { lat, lon, source: 'gps' };
+  if (capital && (anchor === 'area' || anchor === 'legacy')) return { ...capital, source: 'capital' };
   if (anchor === 'area' || !hasPosition) return geocode ? { ...geocode, source: 'geocode' } : null;
   return { lat, lon, source: 'gps' };
 }
