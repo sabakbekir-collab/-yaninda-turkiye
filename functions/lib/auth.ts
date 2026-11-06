@@ -30,6 +30,14 @@ export function cookieHeader(token:string){
   return `yt_admin=${encodeURIComponent(token)}; Path=/api/admin; Max-Age=604800; HttpOnly; Secure; SameSite=Lax`;
 }
 export function clearCookie(){return 'yt_admin=; Path=/api/admin; Max-Age=0; HttpOnly; Secure; SameSite=Lax';}
+/** Strict CSRF guard: require matching Origin, or explicit same-origin Fetch Metadata. */
+export function strictSameOrigin(request:Request){
+  const origin=request.headers.get('Origin');
+  if(origin){
+    try{return new URL(origin).origin===new URL(request.url).origin}catch{return false}
+  }
+  return request.headers.get('Sec-Fetch-Site')==='same-origin';
+}
 export function sameOrigin(request:Request){
   const origin=request.headers.get('Origin');
   if(!origin)return true;
