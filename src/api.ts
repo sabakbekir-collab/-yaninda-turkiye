@@ -1,6 +1,7 @@
 import type {Place,Position} from './types';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName} from './text';
+import { locationValidationErrorMessage } from './searchErrors';
 
 export type PlaceSearchOptions={
   radiusKm?:number;
@@ -57,6 +58,13 @@ export async function findPlaces(
   let data:unknown;
   try { data=await r.json(); } catch { data=undefined; }
   if(!r.ok){
+    if(r.status===400 && data && typeof data==='object' && 'error' in data){
+      const code=(data as {error?:unknown}).error;
+      if(typeof code==='string'){
+        const message=locationValidationErrorMessage(code);
+        if(message)throw new Error(message);
+      }
+    }
     if(data&&typeof data==='object'&&'error' in data&&(data as {error?:unknown}).error==='location_geocode_failed'){
       throw new Error('Seçilen il / ilçe haritada konumlandırılamadı. İl ve ilçe seçimini kontrol et. İstersen isteğe bağlı Konumumu Kullan düğmesini deneyebilirsin.');
     }
