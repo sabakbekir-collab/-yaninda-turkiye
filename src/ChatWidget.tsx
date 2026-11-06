@@ -1,17 +1,19 @@
 import {useEffect,useRef,useState} from "react";
 import {MessageCircle,Send,X,LocateFixed,Navigation} from "lucide-react";
-import {getCurrentLocation,LocationError} from "./location";
+import {getCurrentLocation,getLocationPermissionState,LocationError} from "./location";
 import "./chat.css";
 
 type Msg={role:"user"|"assistant";content:string};
 type Place={name:string;address?:string;phone?:string;lat?:number;lon?:number;distance?:number;isDuty?:boolean};
 type Reply={reply?:string;places?:Place[];route?:{url:string;label:string}};
+type SelectedArea={province?:string;district?:string};
+function readSelectedArea():SelectedArea{try{const value=JSON.parse(localStorage.getItem("yt-nearby-selection-v5")||"{}") as SelectedArea;return {province:typeof value.province==="string"?value.province:"",district:typeof value.district==="string"?value.district:""};}catch{return {};}}
 const distanceText=(km?:number)=>typeof km==="number"&&Number.isFinite(km)?(km<1?Math.round(km*1000)+" m":new Intl.NumberFormat("tr-TR",{maximumFractionDigits:1}).format(km)+" km"):"";
 
 export default function ChatWidget(){
  const [open,setOpen]=useState(false),[input,setInput]=useState(""),[loading,setLoading]=useState(false),[location,setLocation]=useState<{lat:number;lon:number}>();
  const [locationBusy,setLocationBusy]=useState(false),[locationError,setLocationError]=useState("");
- const [messages,setMessages]=useState<Msg[]>([{role:"assistant",content:"Merhaba 👋 Ben Yanımda AI. Yakınındaki hizmetleri bulabilir, yol tarifi konusunda yardımcı olabilir ve site içinde seni doğru yere yönlendirebilirim. Örneğin “Beyoğlu'na nasıl gidilir?” veya “yakınımdaki nöbetçi eczaneyi bul” diyebilirsin."}]);
+ const [messages,setMessages]=useState<Msg[]>([{role:"assistant",content:"Merhaba 👋 Ben Yanımda AI. Seçtiğin il ve ilçedeki hizmetleri bulabilir, yol tarifi konusunda yardımcı olabilir ve site içinde seni doğru yere yönlendirebilirim. Konum izni vermen gerekmez. Örneğin “Beyoğlu'na nasıl gidilir?” veya “yakınımdaki nöbetçi eczaneyi bul” diyebilirsin."}]);
  const [results,setResults]=useState<Place[]>([]);
  const [route,setRoute]=useState<Reply["route"]>();
  const end=useRef<HTMLDivElement>(null);
@@ -26,8 +28,16 @@ export default function ChatWidget(){
    setLocation(current);
    return current;
   }catch(error){
-   const denied=error instanceof LocationError&&error.code==="permission_denied";
-   setLocationError(denied?"Konum izni kapalı. iPhone Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri → Safari yolundan izin ver.":"Konum alınamadı. Tekrar deneyebilir veya il/ilçe seçerek devam edebilirsin.");
+   const code=error instanceof LocationError?error.code:"unknown";
+   setLocationError(
+    code==="permission_denied"
+     ?"Konum izni reddedildi. iPhone Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri → Safari bölümünü kontrol et."
+     :code==="timeout"
+      ?"Konum isteği zaman aşımına uğradı. Açık alanda tekrar dene veya il/ilçe seç."
+      :code==="unavailable"
+       ?"GPS kapalı veya cihaz konumu alınamıyor. Konum Servisleri'ni aç ya da il/ilçe seç."
+       :"Konum hizmeti kullanılamıyor. İl/ilçe seçerek devam edebilirsin."
+   );
    return undefined;
   }finally{setLocationBusy(false)}
  }
@@ -38,9 +48,17 @@ export default function ChatWidget(){
   const next=[...messages,{role:"user" as const,content:text}].slice(-12);
   setMessages(m=>[...m,{role:"user",content:text}]);setLoading(true);
   try{
-   const asksNearby=/yakınım|yakınımdaki|en yakın|yakında|eczane|hastane|market|restoran|atm|akaryakıt|fırın|taksi|otel|polis|itfaiye|kargo/i.test(text);
-   const current=asksNearby?await ensureLocation():location;
-   const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({messages:next,location:current})});
+   // Manual area remains the default. For nearby queries, silently reuse GPS
+   // only when permission is already granted; never trigger a permission prompt.
+   const area=readSelectedArea();
+   const asksNearby=/yakınım|yakınımd|en yakın|çevremde|civarımda/i.test(text);
+   let currentLocation=location;
+   if(asksNearby&&!currentLocation){
+    try{
+     if(await getLocationPermissionState()==="granted")currentLocation=await ensureLocation();
+    }catch{/* Manual province/district search remains available. */}
+   }
+   const r=await fetch("/api/ai/chat",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({messages:next,location:currentLocation,area})});
    const d=await r.json().catch(()=>({})) as Reply;
    setMessages(m=>[...m,{role:"assistant",content:typeof d.reply==="string"?d.reply:"Şu anda cevap veremiyorum. Lütfen tekrar deneyin."}]);
    if(Array.isArray(d.places))setResults(d.places);

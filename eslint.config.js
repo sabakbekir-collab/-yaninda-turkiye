@@ -38,6 +38,14 @@ export default tseslint.config(
     },
   },
   {
+    files: ['tests/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.node,
+      },
+    },
+  },
+  {
     files: ['public/sw.js'],
     languageOptions: {
       globals: {

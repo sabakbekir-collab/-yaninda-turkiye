@@ -9,6 +9,7 @@ import { onRequestPost as postAdminAi } from "../functions/api/admin-ai";
 import type { Env } from "../functions/lib/types";
 import { ensureSchema } from "../functions/lib/schema";
 import { validSession } from "../functions/lib/auth";
+import { healthResponse } from "../functions/lib/health";
 
 type RuntimeEnv = Env & {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -30,17 +31,15 @@ export default {
     const path = url.pathname;
 
     try {
-      // Health must be independent of schema initialization so a broken/missing D1
-      // binding reports a useful 503 instead of being hidden by ensureSchema().
+      // Health must be independent of schema initialization. Missing or
+      // unreachable D1 is an unhealthy service and must return HTTP 503.
       if (path === "/api/health" && request.method === "GET") {
-        if (!env.DB) {
-          return Response.json({ ok: true, database: false, version: "2026.10.03" });
-        }
+        if (!env.DB) return healthResponse(false, false, env.COMMIT_SHA || "unknown");
         try {
           await env.DB.prepare("SELECT 1 AS ok").first();
-          return Response.json({ ok: true, database: true, version: "2026.10.03" });
+          return healthResponse(true, true, env.COMMIT_SHA || "unknown");
         } catch {
-          return Response.json({ ok: false, database: false, version: "2026.10.03" }, { status: 503 });
+          return healthResponse(true, false, env.COMMIT_SHA || "unknown");
         }
       }
 
@@ -107,7 +106,15 @@ export default {
 
       // Schema first so rate limiting (api_cache) also works on the very first AI/admin call.
       if (path.startsWith("/api/") && env.DB) {
-        try { await ensureSchema(env); } catch (e) { console.error("ensureSchema failed", e); }
+        try {
+          await ensureSchema(env);
+        } catch (error) {
+          console.error("ensureSchema failed", error);
+          return Response.json(
+            { error: "database_schema_unavailable" },
+            { status: 503, headers: { "Cache-Control": "no-store" } },
+          );
+        }
       }
 
       if (path === "/api/admin/ai" && request.method === "POST") {

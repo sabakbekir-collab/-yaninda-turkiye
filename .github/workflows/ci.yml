@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, fix/security-health-admin-ai]
     paths-ignore:
       - 'yaninda-turkiye-fixed*.zip'
   pull_request:
@@ -22,5 +22,7 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - run: npm test
+      - run: npx tsc -b
       - run: npm run lint
       - run: npm run build
