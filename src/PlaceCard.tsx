@@ -6,6 +6,7 @@ import {categoryIcon,cleanCardAddress,formatDistance} from './placeUtils';
 import {useFavorites} from './favorites';
 import {mapsLink,shareText} from './share';
 import {track} from './api';
+import {formatOpeningHours} from './openingHours';
 
 const reasons:[string,string][]=[['wrong_info','Bilgiler yanlış'],['wrong_phone','Telefon yanlış'],['wrong_address','Adres yanlış'],['closed','Kapalı / artık yok']];
 
@@ -18,6 +19,7 @@ export default function PlaceCard({p}:{p:Place}){
   const [details,setDetails]=useState('');
   const [busy,setBusy]=useState(false);
   const isFav=has(p.id);
+  const openingHours=formatOpeningHours(p.openingHours,p.category);
   const directions='https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon;
   const onFav=()=>{if(!isFav)track('favorite_click',{category:p.category});toggle(p)};
   const onShare=async()=>{
@@ -43,7 +45,7 @@ export default function PlaceCard({p}:{p:Place}){
       <small className="place-meta-line">{typeof p.distance==='number'&&<><Navigation/> <b>{formatDistance(p.distance)}</b> · Kuş uçuşu · </>}<ShieldCheck/> {p.source}</small>
       {p.district&&<small className="place-district">İlçe: {p.district}</small>}
       {p.isDuty&&<small className="place-source-note">Üçüncü taraf kaynağından alınmıştır; resmî kurum doğrulaması değildir. Gitmeden telefonla teyit et. {p.verifiedAt&&'Veri tarihi: '+p.verifiedAt} {p.officialUrl&&<a href={p.officialUrl} target="_blank" rel="noreferrer">Resmî e-Devlet sorgusu</a>}</small>}
-      {p.openingHours&&<small className="place-district">Saatler: {p.openingHours}</small>}
+      {openingHours&&<small className="place-opening-hours"><b>{openingHours.label}:</b> {openingHours.value}</small>}
       <footer>
         {p.phone?<a href={'tel:'+p.phone} onClick={()=>track('phone_click',{category:p.category})}><Phone/>Ara</a>:<span className="no-phone">Telefon bilgisi yok</span>}
         <a target="_blank" rel="noreferrer" href={directions} onClick={()=>track('directions_click',{category:p.category})}><Navigation/>Yol Tarifi</a>
