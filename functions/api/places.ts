@@ -1,6 +1,7 @@
 // Yanımda Türkiye places.ts — strict-null-safe production build
 import type {Env,Place} from '../lib/types';
 import {provinceCenter,isWholeProvince} from '../lib/provinceCenters';
+import {resolveSearchAnchor,chooseSearchCenter,placesCacheKey} from '../lib/searchAnchor';
 import {isCentralDistrict,trSlug,resolveName} from '../../src/text';
 import {districtMap,districtsFor} from '../../src/turkeyDistricts';
 import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery';
@@ -25,13 +26,6 @@ const slug=trSlug;
 const areaQuery=(district:string,province:string)=>[district&&!isCentralDistrict(district)?district:'',province,'Türkiye'].filter(Boolean).join(', ');
 const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
 const cacheKey=(...parts:string[])=>'places:v17:'+parts.join(':');
-
-export type SearchAnchor='gps'|'area'|'legacy';
-export function resolveSearchAnchor(raw:string|null,hasLat:boolean,hasLon:boolean):SearchAnchor|null{
-  if(hasLat!==hasLon)return null;
-  if(raw===null)return 'legacy';
-  return raw==='gps'||raw==='area'?raw:null;
-}
 
 function tidyAddress(tags:Record<string,string>,fallback?:string){
   const full=tags['addr:full']||tags['contact:address'];
@@ -448,7 +442,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
 
   // Never label an OSM pharmacy as "nöbetçi". Official duty integration is deliberately
   // disabled until a structured, current official feed is available.
-  const key=cacheKey(category,anchor,lat.toFixed(4),lon.toFixed(4),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
+  const key=placesCacheKey(category,anchor,lat.toFixed(4),lon.toFixed(4),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
   const cached=debug?null:await dbCacheGet(env,key);
   if(Array.isArray(cached))return jsonResponse(cached,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'cache'}});
 
