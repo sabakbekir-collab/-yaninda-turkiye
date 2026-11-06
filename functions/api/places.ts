@@ -24,7 +24,14 @@ const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').replace
 const slug=trSlug;
 const areaQuery=(district:string,province:string)=>[district&&!isCentralDistrict(district)?district:'',province,'Türkiye'].filter(Boolean).join(', ');
 const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
-const cacheKey=(...parts:string[])=>'places:v16:'+parts.join(':');
+const cacheKey=(...parts:string[])=>'places:v17:'+parts.join(':');
+
+export type SearchAnchor='gps'|'area'|'legacy';
+export function resolveSearchAnchor(raw:string|null,hasLat:boolean,hasLon:boolean):SearchAnchor|null{
+  if(hasLat!==hasLon)return null;
+  if(raw===null)return 'legacy';
+  return raw==='gps'||raw==='area'?raw:null;
+}
 
 function tidyAddress(tags:Record<string,string>,fallback?:string){
   const full=tags['addr:full']||tags['contact:address'];
@@ -403,23 +410,36 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
 
   if(!filters[category])return jsonResponse([]);
 
+  const rawLat=u.searchParams.get('lat'),rawLon=u.searchParams.get('lon');
+  const hasLat=rawLat!==null&&rawLat.trim()!=='',hasLon=rawLon!==null&&rawLon.trim()!=='';
+  const anchor=resolveSearchAnchor(u.searchParams.get('anchor'),hasLat,hasLon);
+  if(!anchor)return jsonResponse({error:'invalid_anchor_or_coordinates'},{status:400,headers:{'Cache-Control':'no-store'}});
   const numParam=(name:string)=>{const raw=u.searchParams.get(name);return raw!==null&&raw.trim()!==''?Number(raw):NaN};
   let lat=numParam('lat'),lon=numParam('lon');
-  const hasPosition=Number.isFinite(lat)&&Number.isFinite(lon);
+  const hasPosition=hasLat&&hasLon&&Number.isFinite(lat)&&Number.isFinite(lon);
+  if(hasLat&&hasLon&&!hasPosition)return jsonResponse({error:'invalid_coordinates'},{status:400,headers:{'Cache-Control':'no-store'}});
+  if(anchor==='gps'&&!hasPosition)return jsonResponse({error:'gps_coordinates_required'},{status:400,headers:{'Cache-Control':'no-store'}});
   const wholeProvince=!!province&&isWholeProvince(district,province);
   const capital=wholeProvince?provinceCenter(province):null;
-  // An explicit "all districts" search is anchored to the provincial capital,
-  // even when the client also sends the device's GPS coordinates.
-  if(capital){
-    lat=capital.lat;lon=capital.lon;
+  // Explicit GPS always wins, including when the resolved label is "Merkez" or "Tüm ilçeler".
+  // Explicit area searches ignore device coordinates and use the selected area's centre.
+  // Legacy clients keep the previous rule: province-wide + coordinates uses the capital.
+  const useArea=anchor==='area'||(anchor==='legacy'&&Boolean(capital));
+  if(useArea){
+    if(capital){lat=capital.lat;lon=capital.lon;}
+    else{
+      if(!province)return jsonResponse([]);
+      const point=await geocode(env,areaQuery(district,province));
+      if(!point)return jsonResponse({error:'location_geocode_failed',area:areaQuery(district,province),category},{status:503,headers:{'Cache-Control':'no-store'}});
+      lat=point.lat;lon=point.lon;
+    }
   }else if(!hasPosition){
     if(!province)return jsonResponse([]);
-    const area=areaQuery(district,province);
-    const point=await geocode(env,area);
-    if(!point)return jsonResponse({error:'location_geocode_failed',area,category},{status:503,headers:{'Cache-Control':'no-store'}});
+    const point=await geocode(env,areaQuery(district,province));
+    if(!point)return jsonResponse({error:'location_geocode_failed',area:areaQuery(district,province),category},{status:503,headers:{'Cache-Control':'no-store'}});
     lat=point.lat;lon=point.lon;
   }
-  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<35||lat>43||lon<25||lon>46)return jsonResponse([]);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<35||lat>43||lon<25||lon>46)return jsonResponse({error:'invalid_coordinates'},{status:400,headers:{'Cache-Control':'no-store'}});
 
   // Manual district searches are centered on the district and always honor the selected
   // radius. If nearby districts are enabled, broaden that radius by at least 1.5x.
@@ -428,7 +448,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
 
   // Never label an OSM pharmacy as "nöbetçi". Official duty integration is deliberately
   // disabled until a structured, current official feed is available.
-  const key=cacheKey(category,lat.toFixed(3),lon.toFixed(3),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
+  const key=cacheKey(category,anchor,lat.toFixed(4),lon.toFixed(4),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
   const cached=debug?null:await dbCacheGet(env,key);
   if(Array.isArray(cached))return jsonResponse(cached,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'cache'}});
 
