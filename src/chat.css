@@ -12,3 +12,27 @@
  .yai-launcher span{display:none!important}
  .yai-launcher svg{width:22px;height:22px}
 }
+
+
+/* iPhone safe-area: keep the floating assistant above the fixed five-tab bar. */
+@media(max-width:760px){
+ .mobile-nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:1000;
+  min-height:calc(68px + env(safe-area-inset-bottom));
+  padding:7px 8px calc(7px + env(safe-area-inset-bottom));
+  background:rgba(255,255,255,.97);backdrop-filter:blur(16px);
+  border-top:1px solid #e5e7eb;
+ }
+ .mobile-nav a{min-width:0}
+ .yai-launcher{
+  bottom:calc(82px + env(safe-area-inset-bottom))!important;
+  right:16px!important;
+ }
+ body{padding-bottom:env(safe-area-inset-bottom)}
+}
+.yai-overlay{padding-bottom:env(safe-area-inset-bottom)}
+@media(max-width:760px){
+ .yai-panel{height:calc(100dvh - env(safe-area-inset-top));min-height:0}
+ .yai-panel header{flex-shrink:0}
+ .yai-input{padding-bottom:calc(12px + env(safe-area-inset-bottom))}
+}
