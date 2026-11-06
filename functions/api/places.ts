@@ -411,6 +411,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   let lat=numParam('lat'),lon=numParam('lon');
   const hasPosition=hasLat&&hasLon&&Number.isFinite(lat)&&Number.isFinite(lon);
   if(hasLat&&hasLon&&!hasPosition)return jsonResponse({error:'invalid_coordinates'},{status:400,headers:{'Cache-Control':'no-store'}});
+  if(hasPosition&&(lat<35||lat>43||lon<25||lon>46))return jsonResponse({error:'invalid_coordinates'},{status:400,headers:{'Cache-Control':'no-store'}});
   if(anchor==='gps'&&!hasPosition)return jsonResponse({error:'gps_coordinates_required'},{status:400,headers:{'Cache-Control':'no-store'}});
   const wholeProvince=!!province&&isWholeProvince(district,province);
   const capital=wholeProvince?provinceCenter(province):null;
