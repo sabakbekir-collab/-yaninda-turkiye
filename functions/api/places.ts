@@ -25,7 +25,6 @@ const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').replace
 const slug=trSlug;
 const areaQuery=(district:string,province:string)=>[district&&!isCentralDistrict(district)?district:'',province,'Türkiye'].filter(Boolean).join(', ');
 const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
-const cacheKey=(...parts:string[])=>'places:v17:'+parts.join(':');
 
 function tidyAddress(tags:Record<string,string>,fallback?:string){
   const full=tags['addr:full']||tags['contact:address'];
@@ -415,24 +414,17 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   if(anchor==='gps'&&!hasPosition)return jsonResponse({error:'gps_coordinates_required'},{status:400,headers:{'Cache-Control':'no-store'}});
   const wholeProvince=!!province&&isWholeProvince(district,province);
   const capital=wholeProvince?provinceCenter(province):null;
-  // Explicit GPS always wins, including when the resolved label is "Merkez" or "Tüm ilçeler".
-  // Explicit area searches ignore device coordinates and use the selected area's centre.
-  // Legacy clients keep the previous rule: province-wide + coordinates uses the capital.
-  const useArea=anchor==='area'||(anchor==='legacy'&&Boolean(capital));
-  if(useArea){
-    if(capital){lat=capital.lat;lon=capital.lon;}
-    else{
-      if(!province)return jsonResponse([]);
-      const point=await geocode(env,areaQuery(district,province));
-      if(!point)return jsonResponse({error:'location_geocode_failed',area:areaQuery(district,province),category},{status:503,headers:{'Cache-Control':'no-store'}});
-      lat=point.lat;lon=point.lon;
-    }
-  }else if(!hasPosition){
+  // Explicit GPS always wins. Explicit area uses the capital for Merkez/whole-province,
+  // otherwise the geocoded district. Legacy clients retain the historic capital rule.
+  let center=chooseSearchCenter({anchor,hasPosition,lat,lon,capital,province,district,geocode:null});
+  if(!center){
     if(!province)return jsonResponse([]);
     const point=await geocode(env,areaQuery(district,province));
     if(!point)return jsonResponse({error:'location_geocode_failed',area:areaQuery(district,province),category},{status:503,headers:{'Cache-Control':'no-store'}});
-    lat=point.lat;lon=point.lon;
+    center=chooseSearchCenter({anchor,hasPosition,lat,lon,capital,province,district,geocode:point});
   }
+  if(!center)return jsonResponse({error:'location_geocode_failed',area:areaQuery(district,province),category},{status:503,headers:{'Cache-Control':'no-store'}});
+  lat=center.lat;lon=center.lon;
   if(!Number.isFinite(lat)||!Number.isFinite(lon)||lat<35||lat>43||lon<25||lon>46)return jsonResponse({error:'invalid_coordinates'},{status:400,headers:{'Cache-Control':'no-store'}});
 
   // Manual district searches are centered on the district and always honor the selected
