@@ -141,7 +141,7 @@ test("API catalog truncates responses above 64 KiB", async () => {
 });
 
 test("API catalog reports provider timeout without throwing", async () => {
-  await withFetch(async () => { throw new DOMException("timed out", "TimeoutError"); }, async () => {
+  await withFetch(async () => { throw Object.assign(new Error("timed out"), { name: "TimeoutError" }); }, async () => {
     const response = await onRequestPost({ request: await postRequest(), env });
     const body = await response.json();
     assert.equal(response.status, 502);
