@@ -455,7 +455,7 @@ html[data-theme="dark"]{color-scheme:light;filter:none;background:#fff7fb}
 .duty-source-link .duty-source-empty{color:#12202b;font-weight:600}
 .duty-source-link a{align-self:flex-start;min-height:44px;display:inline-flex;align-items:center;gap:6px;padding:0 16px;border-radius:12px;border:1px solid #dbe2e8;font-weight:700;font-size:14px;color:#12202b;text-decoration:none}
 
-/* Card-hours and mobile AI launcher spacing */
+/* Card-hours and reserved footprint for the compact mobile AI control */
 .place-opening-hours{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;color:#596773;font-size:10px;line-height:1.4}
 .place-opening-hours b{font-weight:800;color:#344451}
-@media(max-width:760px){body{padding-bottom:132px}}
+@media(max-width:760px){.nearby-place-card .place-body{padding-right:64px}}
