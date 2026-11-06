@@ -19,6 +19,7 @@ import EnhancedPlaceCard from './PlaceCard';
 import {getTheme,applyTheme,saveTheme} from './theme';
 import {shareText,mapsLink} from './share';
 import {provinceCenter} from '../functions/lib/provinceCenters';
+import { dutyLinkFor } from './dutyLink';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
@@ -459,6 +460,7 @@ function Nearby(){
  const pharmacyLiveWidget=false;
  const pharmacyWidgetSlug=pharmacyDistrictSlug?pharmacyProvinceSlug+'-'+pharmacyDistrictSlug:pharmacyProvinceSlug;
  const pharmacyWidgetUrl='https://www.eczaneler.gen.tr/nobetci-'+pharmacyWidgetSlug;
+ const dutyLink=pharmacyMode&&hasSearched?dutyLinkFor(province,places.length>0):null;
 
  return <main className="inner nearby-page">
    <div className="page-title nearby-title">
@@ -554,11 +556,17 @@ function Nearby(){
             <p>{hasSearched ? (pharmacyMode ? 'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl ve ilçe seçip Yakınındakileri Bul’a bas. Konum izni gerekmez.'}</p>
             {hasSearched&&<button onClick={search}><Search/>Tekrar Ara</button>}
             {hasSearched && pharmacyMode && <a className="official-duty-link" href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">e-Devlet’te resmî sorgula <ExternalLink /></a>}
-            {hasSearched && pharmacyMode && normalizeSearchText(province) === 'mus' && <a className="official-duty-link" href="https://www.batmaneczaciodasi.org.tr/nobetci-eczaneler/mus" target="_blank" rel="noreferrer">Muş Eczacı Odası nöbet listesini aç <ExternalLink /></a>}
+
           </div>
         )}
       </div>
      }
+     {dutyLink&&<section className="duty-source-link" aria-label={dutyLink.title}>
+       <b>{dutyLink.title}</b>
+       {dutyLink.empty&&<p className="duty-source-empty">{dutyLink.empty}</p>}
+       <p>{dutyLink.note}</p>
+       <a href={dutyLink.url} target="_blank" rel="noopener noreferrer">{dutyLink.button} <ExternalLink /></a>
+     </section>}
    </>
    }
  </main>
