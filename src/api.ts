@@ -1,10 +1,12 @@
 import type {Place,Position} from './types';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName} from './text';
+import { mapPlacesError } from './searchErrors';
 
 export type PlaceSearchOptions={
   radiusKm?:number;
   nearbyDistricts?:boolean;
+  anchor?:'gps'|'area';
 };
 
 export type ResolvedLocationArea={province:string;district:string};
@@ -36,6 +38,7 @@ export async function findPlaces(
 ):Promise<Place[]>{
   const p=new URLSearchParams({category});
   if(position){p.set('lat',String(position.lat));p.set('lon',String(position.lon));}
+  p.set('anchor',options.anchor||(position?'gps':'area'));
   if(province)p.set('province',province);
   if(district)p.set('district',district);
   p.set('radius',String(options.radiusKm??5));
@@ -55,6 +58,8 @@ export async function findPlaces(
   let data:unknown;
   try { data=await r.json(); } catch { data=undefined; }
   if(!r.ok){
+    const locationMessage=mapPlacesError(r.status,data);
+    if(locationMessage)throw new Error(locationMessage);
     if(data&&typeof data==='object'&&'error' in data&&(data as {error?:unknown}).error==='location_geocode_failed'){
       throw new Error('Seçilen il / ilçe haritada konumlandırılamadı. İl ve ilçe seçimini kontrol et. İstersen isteğe bağlı Konumumu Kullan düğmesini deneyebilirsin.');
     }
