@@ -21,7 +21,7 @@ import {shareText,mapsLink} from './share';
 import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor } from './dutyLink';
 import { shouldShowEmpty } from './searchErrors';
-import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory } from './searchPlan';
+import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning } from './searchPlan';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
@@ -298,6 +298,7 @@ function Nearby(){
  const[hasSearched,setHasSearched]=useState(false);
  const[pos,setPos]=useState<Position|undefined>();
  const[locationState,setLocationState]=useState<'unknown'|'granted'|'denied'|'prompt'|'unsupported'>('unknown');
+ const[locationNotice,setLocationNotice]=useState('');
  const manualAreaChosenRef=useRef(false);
  const[submitted,setSubmitted]=useState<{category:string;province:string;district:string;radius:number;nearbyDistricts:boolean;pos?:Position;anchor:'gps'|'area';forceRefresh?:boolean}|null>(null);
  const submittedRef=useRef<typeof submitted>(null);
@@ -431,23 +432,49 @@ function Nearby(){
    return()=>{cancelled=true};
  },[submitted]);
 
- const search=(forceRefresh=false,categoryOverride=cat)=>{
-   setErr('');setPlaces([]);setLoading(true);
+ const search=async(forceRefresh=false,categoryOverride=cat)=>{
+   setErr('');setLocationNotice('');setPlaces([]);setLoading(true);
    track('search',{category:categoryOverride,province:canonProvince,district:canonDistrict});
-   if(!province.trim()&&!pos){setLoading(false);setErr('Arama için konumunu kullan veya il seç.');return;}
-   if(province.trim()&&!validProvince){setLoading(false);setErr('İl adını listeden seç.');return;}
-   if(province.trim()&&!validDistrict){setLoading(false);setErr('İlçeyi listeden seç veya “Tüm ilçeler” olarak bırak.');return;}
-   const plan=choosePlan({pos,province:canonProvince,district:canonDistrict,manualAreaChosen:manualAreaChosenRef.current});
-   if(canonProvince!==province)setProvince(canonProvince);
-   if(canonDistrict!==district)setDistrict(canonDistrict);
+   let searchPosition=pos;
+   let searchProvince=canonProvince;
+   let searchDistrict=canonDistrict;
+   if(needsGpsRequest({pos:searchPosition,permission:locationState,userGesture:true})){
+     try{
+       // This call is deliberately the first asynchronous operation after the tap:
+       // iOS Safari and embedded browsers may require transient user activation.
+       const fresh=await getCurrentLocation({forceFresh:true});
+       searchPosition=fresh;
+       setPos(fresh);
+       setLocationState('granted');
+       manualAreaChosenRef.current=false;
+       try{
+         const area=await resolveLocationArea(fresh);
+         searchProvince=area.province;searchDistrict=area.district;
+         setProvince(area.province);setDistrict(area.district);
+       }catch{/* GPS coordinates remain authoritative even if reverse geocoding fails. */}
+     }catch(error){
+       const denied=error instanceof LocationError&&error.code==='permission_denied';
+       const unsupported=error instanceof LocationError&&error.code==='unsupported';
+       if(denied)setLocationState('denied');
+       else if(unsupported)setLocationState('unsupported');
+       else setLocationState('prompt');
+       const fallbackArea=searchDistrict||searchProvince||'seçili bölge';
+       setLocationNotice('Konum alınamadı; mesafeler '+fallbackArea+' merkezine göre. Siteyi Safari\'de açmayı dene.');
+     }
+   }
+   if(!searchProvince.trim()&&!searchPosition){setLoading(false);setErr('Arama için konumunu kullan veya il seç.');return;}
+   if(searchProvince.trim()&&!provinces.includes(resolveName(searchProvince,provinces)||searchProvince)){setLoading(false);setErr('İl adını listeden seç.');return;}
+   const searchDistricts=districtsFor(searchProvince);
+   if(searchDistrict.trim()&&!searchDistricts.includes(resolveName(searchDistrict,searchDistricts)||searchDistrict)){setLoading(false);setErr('İlçeyi listeden seç veya “Tüm ilçeler” olarak bırak.');return;}
+   const plan=choosePlan({pos:searchPosition,province:searchProvince,district:searchDistrict,manualAreaChosen:manualAreaChosenRef.current});
    setHasSearched(true);
-   setSubmitted({category:categoryOverride,province:canonProvince,district:canonDistrict,radius,nearbyDistricts,pos:plan.usePos?pos:undefined,anchor:plan.anchor,forceRefresh});
+   setSubmitted({category:categoryOverride,province:searchProvince,district:searchDistrict,radius,nearbyDistricts,pos:plan.usePos?searchPosition:undefined,anchor:plan.anchor,forceRefresh});
  };
 
  const locate=async()=>{
    if(loading)return;
    try{
-     setErr('');
+     setErr('');setLocationNotice('');
      setLoading(true);
      // The button must always request a fresh device position. Never reuse
      // an old cached coordinate when the user explicitly taps "Konumumu Kullan".
@@ -539,8 +566,8 @@ function Nearby(){
      </div>
 
      <div className="category-chips" aria-label="Kategori">
-       {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>{setCat(c.id);setPlaces([]);setHasSearched(false);setErr('');setSubmitted(null);if(c.id!=='pharmacy'){if(pos||validProvince)search(false,c.id);else{setHasSearched(false);setErr('ATM ve diğer hizmetleri aramak için konumunu kullan veya il seç.')}}}}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
-       {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);setPlaces([]);setHasSearched(false);setErr('');setSubmitted(null);if(pos||validProvince)search(false,id);else{setHasSearched(false);setErr('Bu hizmeti aramak için konumunu kullan veya il seç.')}}}><Icon/><span>{label}</span></button>})}
+       {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>{setCat(c.id);setPlaces([]);setHasSearched(false);setErr('');setSubmitted(null);if(c.id!=='pharmacy')void search(false,c.id);}}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
+       {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);setPlaces([]);setHasSearched(false);setErr('');setSubmitted(null);void search(false,id);}}><Icon/><span>{label}</span></button>})}
      </div>
 
      {!pharmacyMode&&<div className="search-options">
@@ -549,10 +576,14 @@ function Nearby(){
      </div>}
 
      <div className="action-row">
-       <button className="search-filter primary-search" onClick={()=>search()} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
+       <button className="search-filter primary-search" onClick={()=>void search()} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
+       <button type="button" className="search-filter location-search" onClick={()=>void locate()} disabled={loading}><LocateFixed/> Konumumu kullan</button>
      </div>
    </div>
 
+   {locationNotice&&<div className="location-fallback-note" role="status">{locationNotice}</div>}
+   {submitted?.anchor==='gps'&&accuracyWarning(submitted.pos?.accuracyM)&&<div className="location-accuracy-warning" role="status">{accuracyWarning(submitted.pos?.accuracyM)}</div>}
+   {submitted?.anchor==='area'&&!locationNotice&&<div className="location-fallback-note" role="status">Mesafeler {submitted.district||submitted.province} merkezine göre. Gerçek mesafe için konumunu kullan. <button type="button" onClick={()=>void locate()}>Konumumu kullan</button></div>}
    <div className="selection-note">
      <span>{pharmacyLiveWidget?(canonProvince+' · Eczaneler.gen.tr canlı listesi'):province?(district?province+' / '+district:province+' — tüm ilçeler'):pos?'GPS konumu alındı':'Konum veya il / ilçe seçebilirsin'}{!pharmacyMode&&submitted?' · '+distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):''}{pharmacyMode&&!pharmacyLiveWidget?' · İlçe kapsamındaki tüm nöbetçi eczaneler':!pharmacyMode?' · '+effectiveRadius+' km yarıçap':''}</span>
      <span>Seçimler otomatik kaydedilir</span>
@@ -588,7 +619,7 @@ function Nearby(){
           <div className="empty nearby-empty">
             <MapPin />
             <h3>{hasSearched ? (pharmacyMode ? 'Bu konumda güncel nöbetçi eczane kaydı bulunamadı' : 'Bu bölgede kayıt bulunamadı') : 'Arama yapmaya hazır'}</h3>
-            <p>{hasSearched ? (pharmacyMode ? 'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl ve ilçe seçip Yakınındakileri Bul’a bas. Konum izni gerekmez.'}</p>
+            <p>{hasSearched ? (pharmacyMode ? 'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl ve ilçe seçip Yakınındakileri Bul’a bas. Konumunu kullanabilir veya il / ilçe seçebilirsin.'}</p>
             {hasSearched&&<button onClick={()=>search(true)}><Search/>Tekrar Ara</button>}
             {hasSearched && pharmacyMode && <a className="official-duty-link" href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">e-Devlet’te resmî sorgula <ExternalLink /></a>}
 
