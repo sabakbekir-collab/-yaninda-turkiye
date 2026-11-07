@@ -23,8 +23,11 @@ export function pharmacyResultsView(input: PharmacyResultsInput): PharmacyResult
   if (nearbyCount > 0 && input.nearbyStatus === 'success') {
     return { list: 'nearby', note: 'unverified', message: null, showRedBanner };
   }
-  if (input.nearbyStatus === 'loading' || input.nearbyStatus === 'idle') {
+  if (input.nearbyStatus === 'loading') {
     return { list: 'none', note: null, message: 'loading', showRedBanner };
+  }
+  if (input.nearbyStatus === 'idle') {
+    return { list: 'none', note: null, message: null, showRedBanner };
   }
   if (input.nearbyStatus === 'error') {
     return { list: 'none', note: null, message: 'error', showRedBanner };
