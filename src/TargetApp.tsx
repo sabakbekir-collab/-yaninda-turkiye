@@ -20,6 +20,7 @@ import {getTheme,applyTheme,saveTheme} from './theme';
 import {shareText,mapsLink} from './share';
 import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor } from './dutyLink';
+import { splitPharmacyPlaces, showDutyCount } from './pharmacyView';
 import { shouldShowEmpty } from './searchErrors';
 import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory } from './searchPlan';
 
@@ -495,7 +496,9 @@ function Nearby(){
  const pharmacyWidgetSlug=pharmacyDistrictSlug?pharmacyProvinceSlug+'-'+pharmacyDistrictSlug:pharmacyProvinceSlug;
  const pharmacyWidgetUrl='https://www.eczaneler.gen.tr/nobetci-'+pharmacyWidgetSlug;
  const visiblePlaces=resultsForCategory(places,submitted?.category,cat);
- const dutyLink=pharmacyMode&&hasSearched?dutyLinkFor(province,visiblePlaces.length>0):null;
+ const pharmacySections=splitPharmacyPlaces(visiblePlaces);
+ const SHOW_NEARBY_NON_DUTY_PHARMACIES=true;
+ const dutyLink=pharmacyMode&&hasSearched?dutyLinkFor(province,pharmacySections.duty.length>0):null;
 
  return <main className="inner nearby-page">
    <div className="page-title nearby-title">
@@ -503,10 +506,16 @@ function Nearby(){
      <div><small>CANLI HİZMET ARAMA</small><h1>Yakınındaki Hizmetler</h1></div>
    </div>
 
-   {pharmacyMode&&<div className="pharmacy-warning">
-     <div><Info/><div><b>Nöbetçi eczaneler</b><span>Sonuçlar güncel nöbet verisinden alınır. Resmî teyit için TİTCK / e-Devlet bağlantısı da burada. Yola çıkmadan önce telefonla teyit et.</span></div></div>
-     <a href={officialPharmacyUrl} target="_blank" rel="noreferrer">Resmî TİTCK / e-Devlet <ExternalLink/></a>
+   {pharmacyMode&&<div className="pharmacy-warning" role="status">
+     <div><Info/><div><b>Nöbetçi eczaneler</b><span>{hasSearched&&!pharmacySections.duty.length?'Güncel nöbetçi kaydı doğrulanamadı. Aşağıdaki yakın eczaneler nöbetçi değildir. Gitmeden önce resmî listeden ve telefonla teyit et.':'Nöbetçi kayıtları güncel kaynaklardan doğrulanır. Yola çıkmadan önce telefonla teyit et.'}</span></div></div>
+     <a href={officialPharmacyUrl} target="_blank" rel="noopener noreferrer">Resmî TİTCK / e-Devlet <ExternalLink/></a>
    </div>}
+   {dutyLink&&<section className="duty-source-link duty-source-link-top" aria-label={dutyLink.title}>
+     <b>{dutyLink.title}</b>
+     {dutyLink.empty&&<p className="duty-source-empty">{dutyLink.empty}</p>}
+     <p>{dutyLink.note}</p>
+     <a href={dutyLink.url} target="_blank" rel="noopener noreferrer">{dutyLink.button} <ExternalLink /></a>
+   </section>}
 
 
 
@@ -558,7 +567,7 @@ function Nearby(){
      <span>Seçimler otomatik kaydedilir</span>
    </div>
 
-   {err&&!pharmacyLiveWidget&&<div className="error nearby-error">{err} {pharmacyMode&&<a href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">Resmî e-Devlet nöbetçi eczane sorgusunu aç</a>}</div>}
+   {err&&!pharmacyLiveWidget&&!pharmacyMode&&<div className="error nearby-error">{err}</div>}
 
    {pharmacyLiveWidget?
     <section className="pharmacy-live-widget" aria-label="İlçe bazlı canlı nöbetçi eczane listesi">
@@ -575,15 +584,24 @@ function Nearby(){
    :
    <>
     <div className="result-head">
-     <b>{activeLabel} <span>{loading?'…':places.length}</span></b>
+     <b>{activeLabel} {loading?<span>…</span>:pharmacyMode?(showDutyCount(pharmacySections.duty.length)?<span>{pharmacySections.duty.length}</span>:null):<span>{visiblePlaces.length}</span>}</b>
      <div><button className={view==='list'?'active':''} onClick={()=>setView('list')}><List/>Liste</button><button className={view==='map'?'active':''} onClick={()=>setView('map')}><MapIcon/>Harita</button></div>
     </div>
 
     {loading?<div className="results skeleton-results">{[1,2,3].map(i=><div className="nearby-skeleton" key={i}/>)}</div>:
      view==='map'&&visiblePlaces[0]?<div className="map"><MapContainer center={[visiblePlaces[0].lat,visiblePlaces[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{visiblePlaces.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:
       <div className="results">
-        {places.length > 0 ? (
-          visiblePlaces.map(p => <EnhancedPlaceCard key={p.id} p={p} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)
+        {pharmacyMode ? (
+          <>
+            {pharmacySections.duty.map(p=><EnhancedPlaceCard key={p.id} p={p} distanceLabel="Konumuna göre, kuş uçuşu" />)}
+            {SHOW_NEARBY_NON_DUTY_PHARMACIES&&pharmacySections.nearby.length>0&&<section className="nearby-pharmacy-section" aria-label="Nöbetçi olmayan yakın eczaneler">
+              <header><b>Yakın Eczaneler</b><span>NÖBETÇİ DEĞİL</span></header>
+              {pharmacySections.nearby.map(p=><EnhancedPlaceCard key={p.id} p={p} distanceLabel="Kuş uçuşu" />)}
+            </section>}
+            {!pharmacySections.duty.length&&!pharmacySections.nearby.length&&shouldShowEmpty({status:loading?'loading':err?'error':hasSearched?'success':'idle',forCategory:submitted?.category||'',currentCategory:cat,resultCount:visiblePlaces.length})&&<div className="empty nearby-empty"><MapPin/><h3>Güncel nöbetçi eczane kaydı bulunamadı</h3><p>Yanlış eczaneyi nöbetçi göstermemek için doğrulanmamış kayıt sunulmuyor.</p></div>}
+          </>
+        ) : visiblePlaces.length > 0 ? (
+          visiblePlaces.map(p => <EnhancedPlaceCard key={p.id} p={p} distanceLabel={submitted?.anchor==='area'?'Kuş uçuşu':submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)
         ) : shouldShowEmpty({status:loading?'loading':err?'error':hasSearched?'success':'idle',forCategory:submitted?.category||'',currentCategory:cat,resultCount:visiblePlaces.length}) ? (
           <div className="empty nearby-empty">
             <MapPin />
@@ -598,12 +616,6 @@ function Nearby(){
         )}
       </div>
      }
-     {dutyLink&&<section className="duty-source-link" aria-label={dutyLink.title}>
-       <b>{dutyLink.title}</b>
-       {dutyLink.empty&&<p className="duty-source-empty">{dutyLink.empty}</p>}
-       <p>{dutyLink.note}</p>
-       <a href={dutyLink.url} target="_blank" rel="noopener noreferrer">{dutyLink.button} <ExternalLink /></a>
-     </section>}
    </>
    }
  </main>
