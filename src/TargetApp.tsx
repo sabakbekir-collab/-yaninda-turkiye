@@ -531,13 +531,11 @@ function Nearby(){
      <div><small>CANLI HİZMET ARAMA</small><h1>Yakınındaki Hizmetler</h1></div>
    </div>
 
-   {pharmacyMode&&<div className="pharmacy-warning">
-     <div><Info/><div><b>Resmî nöbetçi eczane listesi</b><span>Nöbet durumu yalnızca güncel ve tarihli kaynakla doğrulanır. Yola çıkmadan önce telefonla teyit et.</span></div></div>
-     <a href={officialPharmacyUrl} target="_blank" rel="noreferrer">Resmî TİTCK / e-Devlet <ExternalLink/></a>
-   </div>}
 
 
 
+
+   {dutyLink&&pharmacyMode&&<section className="duty-source-link" aria-label={dutyLink.title}><b>{dutyLink.title}</b>{dutyLink.empty&&<p className="duty-source-empty">{dutyLink.empty}</p>}<p>{dutyLink.note}</p><a href={dutyLink.url} target="_blank" rel="noopener noreferrer">{dutyLink.button} <ExternalLink /></a></section>}
    <div className="nearby-filters">
      <div className="filter-line">
        <label className="location-autocomplete">
@@ -607,7 +605,7 @@ function Nearby(){
    :
    <>
     <div className="result-head">
-     <b>{activeLabel} <span>{loading?'…':places.length}</span></b>
+     <b>{activeLabel}{(!pharmacyMode||!err)&&<span>{loading?'…':places.length}</span>}</b>
      <div><button className={view==='list'?'active':''} onClick={()=>setView('list')}><List/>Liste</button><button className={view==='map'?'active':''} onClick={()=>setView('map')}><MapIcon/>Harita</button></div>
     </div>
 
@@ -630,12 +628,7 @@ function Nearby(){
         )}
       </div>
      }
-     {dutyLink&&<section className="duty-source-link" aria-label={dutyLink.title}>
-       <b>{dutyLink.title}</b>
-       {dutyLink.empty&&<p className="duty-source-empty">{dutyLink.empty}</p>}
-       <p>{dutyLink.note}</p>
-       <a href={dutyLink.url} target="_blank" rel="noopener noreferrer">{dutyLink.button} <ExternalLink /></a>
-     </section>}
+
      {pharmacyMode&&<section className="nearby-non-duty-pharmacies" aria-labelledby="non-duty-pharmacies-title">
        <h2 id="non-duty-pharmacies-title">Yakındaki eczaneler</h2>
        <p><strong>NÖBETÇİ DEĞİL</strong>, nöbet durumu doğrulanmadı; gitmeden telefonla teyit edin.</p>
