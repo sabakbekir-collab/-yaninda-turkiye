@@ -21,7 +21,7 @@ import {shareText,mapsLink} from './share';
 import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor } from './dutyLink';
 import { shouldShowEmpty } from './searchErrors';
-import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory } from './searchPlan';
+import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest } from './searchPlan';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
@@ -348,7 +348,7 @@ function Nearby(){
    void getLocationPermissionState().then(permission=>{
      if(!active)return;
      setLocationState(permission);
-     if(permission!=='granted')return;
+     if(!needsGpsRequest({permissionState:permission,hasPosition:Boolean(pos),manualAreaChosen:manualAreaChosenRef.current}))return;
      void getCurrentLocation().then(async current=>{
        const area=await resolveLocationArea(current);
        if(!active||manualAreaChosenRef.current)return;
@@ -451,6 +451,7 @@ function Nearby(){
      setLoading(true);
      // The button must always request a fresh device position. Never reuse
      // an old cached coordinate when the user explicitly taps "Konumumu Kullan".
+     if(!needsGpsRequest({permissionState:locationState,hasPosition:false,manualAreaChosen:false,force:true}))return;
      const current=await getCurrentLocation({forceFresh:true});
      // Resolve GPS coordinates to the same province/district fields used by
      // manual selection, so the same live duty-pharmacy widget is selected.
@@ -549,14 +550,16 @@ function Nearby(){
      </div>}
 
      <div className="action-row">
+       <button className="location-search" onClick={()=>void locate()} disabled={loading}><LocateFixed/> {loading?'Konum alınıyor…':'Konumumu kullan'}</button>
        <button className="search-filter primary-search" onClick={()=>search()} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
      </div>
    </div>
 
    <div className="selection-note">
-     <span>{pharmacyLiveWidget?(canonProvince+' · Eczaneler.gen.tr canlı listesi'):province?(district?province+' / '+district:province+' — tüm ilçeler'):pos?'GPS konumu alındı':'Konum veya il / ilçe seçebilirsin'}{!pharmacyMode&&submitted?' · '+distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):''}{pharmacyMode&&!pharmacyLiveWidget?' · İlçe kapsamındaki tüm nöbetçi eczaneler':!pharmacyMode?' · '+effectiveRadius+' km yarıçap':''}</span>
+     <span>{pharmacyLiveWidget?(canonProvince+' · Eczaneler.gen.tr canlı listesi'):province?(district?province+' / '+district:province+' — tüm ilçeler'):pos?'GPS konumu alındı':'Konum veya il / ilçe seçebilirsin'}{pharmacyMode&&!pharmacyLiveWidget?' · İlçe kapsamındaki tüm nöbetçi eczaneler':!pharmacyMode?' · '+effectiveRadius+' km yarıçap':''}</span>
      <span>Seçimler otomatik kaydedilir</span>
    </div>
+   {!pharmacyMode&&submitted?.anchor==='area'&&<p className="distance-basis-warning" role="note">Mesafeler {distanceBasisLabel('area',submitted.district?submitted.province+' / '+submitted.district:submitted.province)}.</p>}
 
    {err&&!pharmacyLiveWidget&&<div className="error nearby-error">{err} {pharmacyMode&&<a href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">Resmî e-Devlet nöbetçi eczane sorgusunu aç</a>}</div>}
 
@@ -583,7 +586,7 @@ function Nearby(){
      view==='map'&&visiblePlaces[0]?<div className="map"><MapContainer center={[visiblePlaces[0].lat,visiblePlaces[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{visiblePlaces.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:
       <div className="results">
         {places.length > 0 ? (
-          visiblePlaces.map(p => <EnhancedPlaceCard key={p.id} p={p} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)
+          visiblePlaces.map(p => <EnhancedPlaceCard key={p.id} p={p} distanceLabel={submitted?.anchor==='area'?'Kuş uçuşu':submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)
         ) : shouldShowEmpty({status:loading?'loading':err?'error':hasSearched?'success':'idle',forCategory:submitted?.category||'',currentCategory:cat,resultCount:visiblePlaces.length}) ? (
           <div className="empty nearby-empty">
             <MapPin />

@@ -15,3 +15,10 @@ export function shouldShowEmpty(input: EmptyStateInput): boolean {
 export type GpsRerunInput = { gpsArrived: boolean; lastAnchor: SearchAnchor | null | undefined; manualAreaChosen: boolean; hasSearched: boolean; alreadyRerun: boolean };
 export function shouldRerunWithGps(input: GpsRerunInput): boolean { return input.gpsArrived && input.lastAnchor === 'area' && !input.manualAreaChosen && input.hasSearched && !input.alreadyRerun; }
 export function resultsForCategory<T>(places: T[], resultsCategory: string | null | undefined, currentCategory: string): T[] { return resultsCategory === currentCategory ? places : []; }
+
+
+export type GpsRequestInput = { permissionState: "unknown" | "granted" | "denied" | "prompt" | "unsupported"; hasPosition: boolean; manualAreaChosen: boolean; force?: boolean };
+export function needsGpsRequest(input: GpsRequestInput): boolean {
+  if (input.force === true) return true;
+  return input.permissionState === "granted" && !input.hasPosition && !input.manualAreaChosen;
+}
