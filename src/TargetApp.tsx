@@ -505,26 +505,26 @@ function Nearby(){
            placeholder="İl yazın (ör. Muş)" inputMode="text"/>
          {provinceOpen&&provinceOptions.length>0&&<div className="autocomplete-options" role="listbox">
            {provinceOptions.map(p=><button type="button" role="option" aria-selected={province===p} className="autocomplete-option" key={p}
-             onMouseDown={e=>e.preventDefault()} onClick={()=>{manualAreaChosenRef.current=true;setManualAreaChosen(true);setProvince(p);setDistrict('');setProvinceOpen(false)}}>{p}</button>)}
+             onMouseDown={e=>e.preventDefault()} onClick={()=>{manualAreaChosenRef.current=true;setProvince(p);setDistrict('');setProvinceOpen(false)}}>{p}</button>)}
          </div>}
        </label>
        <label className="location-autocomplete">
          <span>İlçe</span>
          <input role="combobox" aria-autocomplete="list" aria-expanded={districtOpen&&districtOptions.length>0} autoComplete="off"
            value={district} onFocus={()=>{if(province)setDistrictOpen(true)}}
-           onChange={e=>{manualAreaChosenRef.current=true;setManualAreaChosen(true);setDistrict(e.target.value);setDistrictOpen(true)}}
+           onChange={e=>{manualAreaChosenRef.current=true;setDistrict(e.target.value);setDistrictOpen(true)}}
            onBlur={()=>window.setTimeout(()=>setDistrictOpen(false),120)}
            placeholder={province?'İlçe yazın veya tüm ilçeler':'Önce il seçin'} disabled={!province}/>
          {districtOpen&&province&&districtOptions.length>0&&<div className="autocomplete-options" role="listbox">
            {districtOptions.map(d=><button type="button" role="option" aria-selected={district===d} className="autocomplete-option" key={d}
-             onMouseDown={e=>e.preventDefault()} onClick={()=>{manualAreaChosenRef.current=true;setManualAreaChosen(true);setDistrict(d);setDistrictOpen(false)}}>{d}</button>)}
+             onMouseDown={e=>e.preventDefault()} onClick={()=>{manualAreaChosenRef.current=true;setDistrict(d);setDistrictOpen(false)}}>{d}</button>)}
          </div>}
        </label>
      </div>
 
      <div className="category-chips" aria-label="Kategori">
        {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>{setCat(c.id);if(c.id!=='pharmacy'){if(pos||validProvince)search(false,c.id);else{setPlaces([]);setHasSearched(false);setErr('ATM ve diğer hizmetleri aramak için konumunu kullan veya il seç.')}}}}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
-       {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);if(id!=='pharmacy'){if(pos||validProvince)search(false,id);else{setPlaces([]);setHasSearched(false);setErr('Bu hizmeti aramak için konumunu kullan veya il seç.')}}}}><Icon/><span>{label}</span></button>})}
+       {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);if(pos||validProvince)search(false,id);else{setPlaces([]);setHasSearched(false);setErr('Bu hizmeti aramak için konumunu kullan veya il seç.')}}}><Icon/><span>{label}</span></button>})}
      </div>
 
      {!pharmacyMode&&<div className="search-options">
