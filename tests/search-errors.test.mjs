@@ -41,3 +41,11 @@ test("mapPlacesError: 200 and malformed payloads give null", () => {
   assert.equal(mapPlacesError(400, "invalid_coordinates"), null);
   assert.equal(mapPlacesError(400, { error: 42 }), null);
 });
+
+import { shouldShowNoResults } from "../src/searchErrors.ts";
+
+test("only a successful zero-result response displays the no-records state", () => {
+  assert.equal(shouldShowNoResults(0, ""), true);
+  assert.equal(shouldShowNoResults(0, "Harita veri sağlayıcıları şu anda yanıt vermiyor."), false);
+  assert.equal(shouldShowNoResults(2, ""), false);
+});
