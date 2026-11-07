@@ -21,7 +21,7 @@ import {shareText,mapsLink} from './share';
 import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor, officialLinkFor } from './dutyLink';
 import { shouldShowEmpty } from './searchErrors';
-import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning, nonDutySectionState, isPositionFresh, shouldRequestGpsOnEntry, homeEntryOutcome, canStartEntry } from './searchPlan';
+import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning, isPositionFresh, shouldRequestGpsOnEntry, homeEntryOutcome, canStartEntry } from './searchPlan';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
@@ -324,7 +324,6 @@ function Nearby(){
  const[nearbyDistricts,setNearbyDistricts]=useState(params.get('nearbyDistricts')==='1'||Boolean(memory.nearbyDistricts));
  const[places,setPlaces]=useState<Place[]>([]);
  const[nearbyPharmacies,setNearbyPharmacies]=useState<Place[]>([]);
- const[nonDutyStatus,setNonDutyStatus]=useState<'idle'|'loading'|'success'|'error'>('idle');
  const[loading,setLoading]=useState(false);
  const[view,setView]=useState<'list'|'map'>(params.get('view')==='map'?'map':'list');
  const[err,setErr]=useState('');
@@ -621,7 +620,7 @@ function Nearby(){
 
      <div className="category-chips" aria-label="Kategori">
        {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>{setCat(c.id);setPlaces([]);setNearbyPharmacies([]);setHasSearched(false);setErr('');setSubmitted(null);if(c.id!=='pharmacy')void search(false,c.id);}}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
-       {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);setPlaces([]);setNearbyPharmacies([]);setNonDutyStatus('idle');setHasSearched(false);setErr('');setSubmitted(null);void search(false,id);}}><Icon/><span>{label}</span></button>})}
+       {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);setPlaces([]);setNearbyPharmacies([]);setHasSearched(false);setErr('');setSubmitted(null);void search(false,id);}}><Icon/><span>{label}</span></button>})}
      </div>
 
      {!pharmacyMode&&<div className="search-options">
