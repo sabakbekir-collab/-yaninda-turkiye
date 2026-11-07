@@ -463,7 +463,6 @@ html[data-theme="dark"]{color-scheme:light;filter:none;background:#fff7fb}
 
 /* Pharmacy result separation: one warning, explicit non-duty section */
 .duty-source-link-top{margin:10px 0 14px}
-.pharmacy-no-duty{margin:10px 0;padding:12px;border:1px solid #f0d9b7;border-radius:12px;background:#fff9ef;color:#76521c;font-size:13px;font-weight:700}
 .nearby-pharmacy-section{margin-top:16px;padding-top:12px;border-top:2px solid #eadff1}
 .nearby-pharmacy-section>header{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 10px}
 .nearby-pharmacy-section>header b{font-size:15px;color:var(--ink)}

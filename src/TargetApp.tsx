@@ -594,7 +594,6 @@ function Nearby(){
         {pharmacyMode ? (
           <>
             {pharmacySections.duty.map(p=><EnhancedPlaceCard key={p.id} p={p} distanceLabel="Konumuna göre, kuş uçuşu" />)}
-            {!pharmacySections.duty.length&&hasSearched&&<div className="pharmacy-no-duty" role="status">Bugün için doğrulanmış nöbetçi eczane kaydı bulunamadı.</div>}
             {SHOW_NEARBY_NON_DUTY_PHARMACIES&&pharmacySections.nearby.length>0&&<section className="nearby-pharmacy-section" aria-label="Nöbetçi olmayan yakın eczaneler">
               <header><b>Yakın Eczaneler</b><span>NÖBETÇİ DEĞİL</span></header>
               {pharmacySections.nearby.map(p=><EnhancedPlaceCard key={p.id} p={p} distanceLabel="Kuş uçuşu" />)}
