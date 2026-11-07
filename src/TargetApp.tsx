@@ -452,7 +452,7 @@ function Nearby(){
        setErr('Kategori bulundu. Arama yapmak için il ve ilçe seç.');
      }
    }
- },[location.key]);
+  // Consume each navigation-state snapshot once; avoid rerunning this transition for its own state updates.\n  // eslint-disable-next-line react-hooks/exhaustive-deps\n },[location.key]);
 
  useEffect(()=>{
    if(!submitted)return;
