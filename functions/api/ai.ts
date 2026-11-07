@@ -80,7 +80,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
        if(fallbackResponse.ok&&Array.isArray(fallbackData)&&fallbackData.length){
          pharmacyFallback=true;
          places.push(...(fallbackData as Place[]).slice(0,5).map(p=>({...p,isDuty:undefined})));
-         context="YAKINDAKİ ECZANELER — NÖBET DURUMU DOĞRULANMADI:\\n"+places.map(p=>`${p.name} — ${p.address||"adres yok"}${p.phone?" — "+p.phone:""} — nöbetçi olduğu doğrulanmadı; telefonla teyit edilmeli`).join("\n");
+         context=["YAKINDAKİ ECZANELER — NÖBET DURUMU DOĞRULANMADI:",...places.map(p=>`${p.name} — ${p.address||"adres yok"}${p.phone?" — "+p.phone:""} — nöbetçi olduğu doğrulanmadı; telefonla teyit edilmeli`)].join(String.fromCharCode(10));
        }else{
          context="VERİ DURUMU: Güncel nöbetçi eczane listesi doğrulanamadı ve yakındaki eczane kaydı da alınamadı. Eczane veya telefon UYDURMA; kullanıcıyı resmî sorguya yönlendir.";
        }
