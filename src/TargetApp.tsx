@@ -292,6 +292,7 @@ function Nearby(){
  const[radius,setRadius]=useState(Number(params.get('radius')||memory.radius||5));
  const[nearbyDistricts,setNearbyDistricts]=useState(params.get('nearbyDistricts')==='1'||Boolean(memory.nearbyDistricts));
  const[places,setPlaces]=useState<Place[]>([]);
+ const[nearbyPharmacies,setNearbyPharmacies]=useState<Place[]>([]);
  const[loading,setLoading]=useState(false);
  const[view,setView]=useState<'list'|'map'>(params.get('view')==='map'?'map':'list');
  const[err,setErr]=useState('');
@@ -531,7 +532,7 @@ function Nearby(){
    </div>
 
    {pharmacyMode&&<div className="pharmacy-warning">
-     <div><Info/><div><b>Nöbetçi eczaneler</b><span>Sonuçlar güncel nöbet verisinden alınır. Resmî teyit için TİTCK / e-Devlet bağlantısı da burada. Yola çıkmadan önce telefonla teyit et.</span></div></div>
+     <div><Info/><div><b>Resmî nöbetçi eczane listesi</b><span>Nöbet durumu yalnızca güncel ve tarihli kaynakla doğrulanır. Yola çıkmadan önce telefonla teyit et.</span></div></div>
      <a href={officialPharmacyUrl} target="_blank" rel="noreferrer">Resmî TİTCK / e-Devlet <ExternalLink/></a>
    </div>}
 
@@ -634,6 +635,12 @@ function Nearby(){
        {dutyLink.empty&&<p className="duty-source-empty">{dutyLink.empty}</p>}
        <p>{dutyLink.note}</p>
        <a href={dutyLink.url} target="_blank" rel="noopener noreferrer">{dutyLink.button} <ExternalLink /></a>
+     </section>}
+     {pharmacyMode&&<section className="nearby-non-duty-pharmacies" aria-labelledby="non-duty-pharmacies-title">
+       <h2 id="non-duty-pharmacies-title">Yakındaki eczaneler</h2>
+       <p><strong>NÖBETÇİ DEĞİL</strong>, nöbet durumu doğrulanmadı; gitmeden telefonla teyit edin.</p>
+       {nearbyPharmacies.map(p=><EnhancedPlaceCard key={p.id} p={{...p,isDuty:undefined}} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'}/>)}
+       {!nearbyPharmacies.length&&!loading&&<small>Yakındaki genel eczane kaydı bulunamadı veya harita kaynağı yanıt vermedi.</small>}
      </section>}
    </>
    }
