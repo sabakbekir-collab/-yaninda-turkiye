@@ -21,3 +21,9 @@ export function mapPlacesError(status: number, data: unknown): string | null {
 export function shouldShowNoResults(resultCount: number, error: string): boolean {
   return resultCount === 0 && error.trim().length === 0;
 }
+
+
+/** A successful zero-result response is shown only for the currently selected category. */
+export function shouldShowEmpty(input: { status: "idle" | "loading" | "success" | "error"; forCategory: string; currentCategory: string; resultCount: number }): boolean {
+  return input.status === "success" && input.forCategory === input.currentCategory && input.resultCount === 0;
+}
