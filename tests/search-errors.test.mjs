@@ -73,3 +73,22 @@ test("empty state is shown only for a completed zero-result search of the curren
   assert.equal(shouldShowEmpty({ status: "error", forCategory: "atm", currentCategory: "atm", resultCount: 0 }), false);
   assert.equal(shouldShowEmpty({ status: "success", forCategory: "atm", currentCategory: "atm", resultCount: 2 }), false);
 });
+
+
+import { shouldRerunWithGps, resultsForCategory } from "../src/searchPlan.ts";
+
+test("GPS arrival reruns an area search exactly once unless the user chose an area", () => {
+  const base = { gpsArrived: true, lastAnchor: "area", manualAreaChosen: false, hasSearched: true, alreadyRerun: false };
+  assert.equal(shouldRerunWithGps({ ...base, gpsArrived: false }), false);
+  assert.equal(shouldRerunWithGps({ ...base, lastAnchor: "gps" }), false);
+  assert.equal(shouldRerunWithGps({ ...base, manualAreaChosen: true }), false);
+  assert.equal(shouldRerunWithGps({ ...base, hasSearched: false }), false);
+  assert.equal(shouldRerunWithGps({ ...base, alreadyRerun: true }), false);
+  assert.equal(shouldRerunWithGps(base), true);
+});
+
+test("resultsForCategory hides results belonging to a different category", () => {
+  const places = [{ id: "atm-1" }, { id: "atm-2" }];
+  assert.deepEqual(resultsForCategory(places, "atm", "pharmacy"), []);
+  assert.deepEqual(resultsForCategory(places, "atm", "atm"), places);
+});

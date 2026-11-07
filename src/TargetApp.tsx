@@ -21,7 +21,7 @@ import {shareText,mapsLink} from './share';
 import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor } from './dutyLink';
 import { shouldShowEmpty } from './searchErrors';
-import { choosePlan, distanceBasisLabel } from './searchPlan';
+import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory } from './searchPlan';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
@@ -300,6 +300,17 @@ function Nearby(){
  const[locationState,setLocationState]=useState<'unknown'|'granted'|'denied'|'prompt'|'unsupported'>('unknown');
  const manualAreaChosenRef=useRef(false);
  const[submitted,setSubmitted]=useState<{category:string;province:string;district:string;radius:number;nearbyDistricts:boolean;pos?:Position;anchor:'gps'|'area';forceRefresh?:boolean}|null>(null);
+ const submittedRef=useRef<typeof submitted>(null);
+ const hasSearchedRef=useRef(false);
+ const gpsRerunDoneRef=useRef(false);
+ const currentCategoryRef=useRef(cat);
+ const currentRadiusRef=useRef(radius);
+ const currentNearbyDistrictsRef=useRef(nearbyDistricts);
+ submittedRef.current=submitted;
+ hasSearchedRef.current=hasSearched;
+ currentCategoryRef.current=cat;
+ currentRadiusRef.current=radius;
+ currentNearbyDistrictsRef.current=nearbyDistricts;
 
  const canonProvince=useMemo(()=>resolveName(province,provinces)??province,[province]);
  const ds=useMemo(()=>districtsFor(canonProvince),[canonProvince]);
@@ -344,6 +355,10 @@ function Nearby(){
        setPos(current);
        setProvince(area.province);
        setDistrict(area.district);
+       if(shouldRerunWithGps({gpsArrived:true,lastAnchor:submittedRef.current?.anchor,manualAreaChosen:manualAreaChosenRef.current,hasSearched:hasSearchedRef.current,alreadyRerun:gpsRerunDoneRef.current})){
+         gpsRerunDoneRef.current=true;
+         setSubmitted({category:currentCategoryRef.current,province:area.province,district:area.district,radius:currentRadiusRef.current,nearbyDistricts:currentNearbyDistrictsRef.current,pos:current,anchor:'gps'});
+       }
      }).catch(()=>undefined);
    }).catch(()=>undefined);
    return()=>{active=false};
@@ -479,7 +494,8 @@ function Nearby(){
  const pharmacyLiveWidget=false;
  const pharmacyWidgetSlug=pharmacyDistrictSlug?pharmacyProvinceSlug+'-'+pharmacyDistrictSlug:pharmacyProvinceSlug;
  const pharmacyWidgetUrl='https://www.eczaneler.gen.tr/nobetci-'+pharmacyWidgetSlug;
- const dutyLink=pharmacyMode&&hasSearched?dutyLinkFor(province,places.length>0):null;
+ const visiblePlaces=resultsForCategory(places,submitted?.category,cat);
+ const dutyLink=pharmacyMode&&hasSearched?dutyLinkFor(province,visiblePlaces.length>0):null;
 
  return <main className="inner nearby-page">
    <div className="page-title nearby-title">
@@ -523,8 +539,8 @@ function Nearby(){
      </div>
 
      <div className="category-chips" aria-label="Kategori">
-       {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>{setCat(c.id);if(c.id!=='pharmacy'){if(pos||validProvince)search(false,c.id);else{setPlaces([]);setHasSearched(false);setErr('ATM ve diğer hizmetleri aramak için konumunu kullan veya il seç.')}}}}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
-       {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);if(pos||validProvince)search(false,id);else{setPlaces([]);setHasSearched(false);setErr('Bu hizmeti aramak için konumunu kullan veya il seç.')}}}><Icon/><span>{label}</span></button>})}
+       {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>{setCat(c.id);setPlaces([]);setHasSearched(false);setErr('');setSubmitted(null);if(c.id!=='pharmacy'){if(pos||validProvince)search(false,c.id);else{setHasSearched(false);setErr('ATM ve diğer hizmetleri aramak için konumunu kullan veya il seç.')}}}}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
+       {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);setPlaces([]);setHasSearched(false);setErr('');setSubmitted(null);if(pos||validProvince)search(false,id);else{setHasSearched(false);setErr('Bu hizmeti aramak için konumunu kullan veya il seç.')}}}><Icon/><span>{label}</span></button>})}
      </div>
 
      {!pharmacyMode&&<div className="search-options">
@@ -564,11 +580,11 @@ function Nearby(){
     </div>
 
     {loading?<div className="results skeleton-results">{[1,2,3].map(i=><div className="nearby-skeleton" key={i}/>)}</div>:
-     view==='map'&&places[0]?<div className="map"><MapContainer center={[places[0].lat,places[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{places.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:
+     view==='map'&&visiblePlaces[0]?<div className="map"><MapContainer center={[visiblePlaces[0].lat,visiblePlaces[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{visiblePlaces.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:
       <div className="results">
         {places.length > 0 ? (
-          places.map(p => <EnhancedPlaceCard key={p.id} p={p} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)
-        ) : shouldShowEmpty({status:loading?'loading':err?'error':hasSearched?'success':'idle',forCategory:submitted?.category||'',currentCategory:cat,resultCount:places.length}) ? (
+          visiblePlaces.map(p => <EnhancedPlaceCard key={p.id} p={p} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)
+        ) : shouldShowEmpty({status:loading?'loading':err?'error':hasSearched?'success':'idle',forCategory:submitted?.category||'',currentCategory:cat,resultCount:visiblePlaces.length}) ? (
           <div className="empty nearby-empty">
             <MapPin />
             <h3>{hasSearched ? (pharmacyMode ? 'Bu konumda güncel nöbetçi eczane kaydı bulunamadı' : 'Bu bölgede kayıt bulunamadı') : 'Arama yapmaya hazır'}</h3>
