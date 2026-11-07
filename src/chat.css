@@ -12,3 +12,9 @@
  .yai-launcher span{display:none!important}
  .yai-launcher svg{width:22px;height:22px}
 }
+
+/* Keep the mobile AI launcher clear of the measured fixed bottom navigation. */
+@media(max-width:850px){
+ .yai-launcher{right:16px!important;bottom:calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 12px)!important;width:48px!important;height:48px!important;min-height:48px!important;padding:0!important;border-radius:50%!important;justify-content:center}
+ .yai-launcher span{display:none!important}
+}
