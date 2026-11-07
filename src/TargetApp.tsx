@@ -659,7 +659,7 @@ function Nearby(){
        {nearbyPharmacies.map(p=><EnhancedPlaceCard key={p.id} p={{...p,isDuty:undefined}} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'}/>)}
        {nonDutyView==='loading'&&<div className="results skeleton-results" aria-label="Yakındaki eczaneler yükleniyor">{[1,2].map(i=><div className="nearby-skeleton" key={i}/>)}</div>}
        {nonDutyView==='empty'&&<small>Yakında genel eczane kaydı bulunamadı.</small>}
-       {nonDutyView==='error'&&<div role="alert"><small>Harita kaynağı yanıt vermedi.</small> <button type="button" onClick={()=>{if(submitted)setSubmitted({...submitted,forceRefresh:true})}}>Tekrar Ara</button></div>}
+       {nonDutyView==='error'&&<div role="alert"><small>Harita kaynağı yanıt vermedi.</small> <button type="button" onClick={()=>{if(submitted)setSubmitted({...submitted,forceRefresh:!submitted.forceRefresh})}}>Tekrar Ara</button></div>}
      </section>}
    </>
    }
