@@ -469,15 +469,14 @@ function Nearby(){
    if(!submitted||submitted.category!=='pharmacy')return;
    let cancelled=false;
    setNearbyPharmacies([]);
-   setNonDutyStatus('loading');
    findPlaces('pharmacy',submitted.pos,submitted.province,submitted.district,{
      radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts,
      anchor:submitted.anchor,forceRefresh:submitted.forceRefresh,
      includeNonDutyPharmacies:true
    }).then(rows=>{
-     if(!cancelled){setNearbyPharmacies(rows.map(p=>({...p,isDuty:undefined})));setNonDutyStatus('success');}
+     if(!cancelled)setNearbyPharmacies(rows.map(p=>({...p,isDuty:undefined})));
    }).catch(()=>{
-     if(!cancelled){setNearbyPharmacies([]);setNonDutyStatus('error');}
+     if(!cancelled)setNearbyPharmacies([]);
    });
    return()=>{cancelled=true;};
  },[submitted]);
@@ -579,7 +578,6 @@ function Nearby(){
  const displayPlaces=pharmacyMode&&visiblePlaces.length===0?nearbyPharmacies:visiblePlaces;
  const dutyLink=pharmacyMode&&hasSearched?dutyLinkFor(province,visiblePlaces.length>0):null;
  const officialLink=pharmacyMode?officialLinkFor(province):null;
- const nonDutyView=nonDutySectionState({status:nonDutyStatus,count:nearbyPharmacies.length});
 
  return <main className="inner nearby-page">
    <div className="page-title nearby-title">
@@ -622,7 +620,7 @@ function Nearby(){
      </div>
 
      <div className="category-chips" aria-label="Kategori">
-       {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>{setCat(c.id);setPlaces([]);setNearbyPharmacies([]);setNonDutyStatus('idle');setHasSearched(false);setErr('');setSubmitted(null);if(c.id!=='pharmacy')void search(false,c.id);}}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
+       {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>{setCat(c.id);setPlaces([]);setNearbyPharmacies([]);setHasSearched(false);setErr('');setSubmitted(null);if(c.id!=='pharmacy')void search(false,c.id);}}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
        {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);setPlaces([]);setNearbyPharmacies([]);setNonDutyStatus('idle');setHasSearched(false);setErr('');setSubmitted(null);void search(false,id);}}><Icon/><span>{label}</span></button>})}
      </div>
 
