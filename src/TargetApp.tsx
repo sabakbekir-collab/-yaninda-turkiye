@@ -538,7 +538,7 @@ function Nearby(){
 
 
 
-   {dutyLink&&pharmacyMode&&<section className="duty-source-link" aria-label={dutyLink.title}><b>{dutyLink.title}</b>{dutyLink.empty&&<p className="duty-source-empty">{dutyLink.empty}</p>}<p>{dutyLink.note}</p><a href={dutyLink.url} target="_blank" rel="noopener noreferrer">{dutyLink.button} <ExternalLink /></a></section>}
+   {dutyLink&&pharmacyMode&&<section className="duty-source-link" aria-label={dutyLink.title}><b>{dutyLink.title}</b><p>{dutyLink.note}</p><a href={dutyLink.url} target="_blank" rel="noopener noreferrer">{dutyLink.button} <ExternalLink /></a></section>}
    <div className="nearby-filters">
      <div className="filter-line">
        <label className="location-autocomplete">
