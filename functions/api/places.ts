@@ -6,6 +6,8 @@ import {isCentralDistrict,trSlug,resolveName} from '../../src/text';
 import {districtMap,districtsFor} from '../../src/turkeyDistricts';
 import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery';
 import {activeDutyDates,dutyDateKey,isActiveDutyDate} from '../lib/dutyDates';
+import {classifyOverpassBody} from '../lib/overpassBody';
+import {cachePolicyFor} from '../lib/placesCachePolicy';
 
 type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
 
@@ -259,7 +261,7 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
   }
 }
 
-type PoiResult={places:Place[];ok:boolean;attempts?:string[];raw?:number;local?:boolean};
+type PoiResult={places:Place[];ok:boolean;attempts?:string[];raw?:number;local?:boolean;partial?:boolean};
 
 // D1-backed OSM snapshot. It is used only after the import marker exists;
 // absent metadata means "not imported", never an authoritative empty result.
@@ -291,8 +293,8 @@ async function getPois(env:Env,category:string,lat:number,lon:number,radiusKm:nu
   if(local?.places.length)return local;
   const live=await overpass(category,lat,lon,radiusKm);
   if(live.ok&&live.places.length)return live;
-  // Keep useful imported records if the live providers are temporarily down.
-  if(local)return local;
+  // An empty imported snapshot is not evidence that the area has no POIs.
+  // If live providers fail, preserve that failure instead of converting it to a false zero.
   return live;
 }
 
@@ -305,37 +307,33 @@ async function overpass(category:string,lat:number,lon:number,radiusKm:number):P
     'https://overpass.openstreetmap.fr/api/interpreter',
     'https://lz4.overpass-api.de/api/interpreter',
   ];
-  const ask=async(endpoint:string):Promise<OsmEl[]>=>{
+  const ask=async(endpoint:string):Promise<{elements:OsmEl[];partial:boolean}>=>{
     const r=await fetch(endpoint,{method:'POST',headers:{Accept:'application/json','Content-Type':'application/x-www-form-urlencoded','User-Agent':OSM_UA},body:'data='+encodeURIComponent(query),signal:AbortSignal.timeout(9000)});
     if(!r.ok)throw new Error('overpass_'+r.status);
-    const data=await r.json() as {elements?:OsmEl[]};
-    if(!Array.isArray(data.elements))throw new Error('overpass_bad_body');
-    return data.elements;
+    const classification=classifyOverpassBody(await r.json());
+    if(classification.kind==='error')throw new Error(classification.reason);
+    if(classification.kind==='empty')throw new Error('overpass_empty');
+    return {elements:classification.elements as OsmEl[],partial:classification.kind==='partial'};
   };
-  const askNonEmpty=async(endpoint:string)=>{
-    const elements=await ask(endpoint);
-    if(!elements.length)throw new Error('overpass_empty');
-    return elements;
-  };
-  const runRound=()=>Promise.any(endpoints.map(askNonEmpty));
+  const runRound=()=>Promise.any(endpoints.map(ask));
   try{
-    let elements:OsmEl[];
-    try{elements=await runRound();}
+    let response:{elements:OsmEl[];partial:boolean};
+    try{response=await runRound();}
     catch(first){
       await new Promise(resolve=>setTimeout(resolve,1500));
-      try{elements=await runRound();}
+      try{response=await runRound();}
       catch(second){
         const errors=[...(first instanceof AggregateError?first.errors:[first]),...(second instanceof AggregateError?second.errors:[second])];
         const attempts=errors.map(x=>x instanceof Error?x.message:String(x));
-        // Empty from every replica is a genuine no-record result, not a transport outage.
+        // Only a remarkless empty response from every replica is a genuine zero.
         if(attempts.length&&attempts.every(x=>x==='overpass_empty'))return {ok:true,places:[],raw:0,attempts};
         return {ok:false,places:[],attempts:attempts.slice(0,10)};
       }
     }
     const mapped:Place[]=[];
-    for(const x of elements){const p=osmPlace(x,category,lat,lon);if(p!==null)mapped.push(p)}
+    for(const x of response.elements){const p=osmPlace(x,category,lat,lon);if(p!==null)mapped.push(p)}
     mapped.sort((a,b)=>(a.distance??999)-(b.distance??999));
-    return {ok:true,places:mapped,raw:elements.length};
+    return {ok:true,places:mapped,raw:response.elements.length,partial:response.partial};
   }catch(e){
     const attempts=e instanceof AggregateError?e.errors.map(x=>x instanceof Error?x.message:String(x)):[e instanceof Error?e.message:'overpass_error'];
     return {ok:false,places:[],attempts};
@@ -437,7 +435,15 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   // disabled until a structured, current official feed is available.
   const key=placesCacheKey(category,anchor,lat.toFixed(4),lon.toFixed(4),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
   const cached=debug?null:await dbCacheGet(env,key);
-  if(Array.isArray(cached))return jsonResponse(cached,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':'cache'}});
+  if(cached&&typeof cached==='object'&&!Array.isArray(cached)&&Array.isArray((cached as {places?:unknown}).places)){
+    const snapshot=cached as {places:Place[];partial?:boolean};
+    const policy=cachePolicyFor({ok:true,resultCount:snapshot.places.length,partial:snapshot.partial});
+    return jsonResponse(snapshot.places,{headers:{'Cache-Control':policy.cacheControl,'X-Data-Source':'cache'}});
+  }
+  if(Array.isArray(cached)){
+    const policy=cachePolicyFor({ok:true,resultCount:cached.length});
+    return jsonResponse(cached,{headers:{'Cache-Control':policy.cacheControl,'X-Data-Source':'cache'}});
+  }
 
   // Eczane kategorisi yalnızca güncel nöbet verisini kullanır.
   // OSM'deki genel eczaneler nöbetçi gibi gösterilmez.
@@ -504,7 +510,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     places=fallback.places;
     // A successful empty provider response is a valid zero-result response;
     // only report upstream failure when every source failed.
-    if(fallback.ok)upstreamOk=true;
+    if(fallback.places.length)upstreamOk=true;
   }
 
   let approved:Place[]=[];
@@ -531,6 +537,8 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     .slice(0,40);
 
   if(!result.length&&!upstreamOk)return jsonResponse({error:'upstream_unavailable',attempts,center:{lat,lon}},{status:503,headers:{'Cache-Control':'no-store'}});
-  await dbCachePut(env,key,result,result.length?15*60*1000:5*60*1000);
-  return jsonResponse(result,{headers:{'Cache-Control':'public,max-age=300','X-Data-Source':primary.local?'OpenStreetMap (D1 yerel kopya)':'OpenStreetMap','X-Upstream-Raw':String(rawCount??'')}});
+  const partial=Boolean(primary.partial);
+  const policy=cachePolicyFor({ok:true,resultCount:result.length,partial});
+  if(policy.shouldCache)await dbCachePut(env,key,{places:result,partial},policy.ttlMs);
+  return jsonResponse(result,{headers:{'Cache-Control':policy.cacheControl,'X-Data-Source':primary.local?'OpenStreetMap (D1 yerel kopya)':'OpenStreetMap','X-Upstream-Raw':String(rawCount??'')}});
 }
