@@ -1,3 +1,5 @@
+import { nonDutySectionState } from './searchPlan';
+
 export type PharmacyDutyStatus = 'ok' | 'stale' | 'error';
 export type NearbyPharmacyStatus = 'idle' | 'loading' | 'success' | 'error';
 export type PharmacyResultsInput = {
@@ -23,13 +25,14 @@ export function pharmacyResultsView(input: PharmacyResultsInput): PharmacyResult
   if (nearbyCount > 0 && input.nearbyStatus === 'success') {
     return { list: 'nearby', note: 'unverified', message: null, showRedBanner };
   }
-  if (input.nearbyStatus === 'loading') {
+  const nearbyState = nonDutySectionState({ status: input.nearbyStatus, count: nearbyCount });
+  if (nearbyState === 'loading') {
     return { list: 'none', note: null, message: 'loading', showRedBanner };
   }
-  if (input.nearbyStatus === 'idle') {
+  if (nearbyState === 'idle') {
     return { list: 'none', note: null, message: null, showRedBanner };
   }
-  if (input.nearbyStatus === 'error') {
+  if (nearbyState === 'error') {
     return { list: 'none', note: null, message: 'error', showRedBanner };
   }
   return { list: 'none', note: null, message: 'empty', showRedBanner };
