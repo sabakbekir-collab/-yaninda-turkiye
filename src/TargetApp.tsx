@@ -325,6 +325,8 @@ function Nearby(){
  const[nearbyDistricts,setNearbyDistricts]=useState(params.get('nearbyDistricts')==='1'||Boolean(memory.nearbyDistricts));
  const[places,setPlaces]=useState<Place[]>([]);
  const[nearbyPharmacies,setNearbyPharmacies]=useState<Place[]>([]);
+ const[nearbyStatus,setNearbyStatus]=useState<'idle'|'loading'|'success'|'error'>('idle');
+ const[dutyStatus,setDutyStatus]=useState<'ok'|'stale'|'error'>('stale');
  const[loading,setLoading]=useState(false);
  const[view,setView]=useState<'list'|'map'>(params.get('view')==='map'?'map':'list');
  const[err,setErr]=useState('');
@@ -458,9 +460,10 @@ function Nearby(){
    if(!submitted)return;
    let cancelled=false;
    setLoading(true);setErr('');
+   if(submitted.category==='pharmacy')setDutyStatus('stale');
    findPlaces(submitted.category,submitted.pos,submitted.province,submitted.district,{radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts,anchor:submitted.anchor,forceRefresh:submitted.forceRefresh})
-     .then(r=>{if(!cancelled)setPlaces(r)})
-     .catch((error:unknown)=>{if(!cancelled){setPlaces([]);setErr(error instanceof Error&&error.message.trim()?error.message:'Nöbetçi eczane verisi alınamadı. Kaynak yanıtı doğrulanamadı; lütfen daha sonra tekrar deneyin.')}})
+     .then(r=>{if(!cancelled){setPlaces(r);if(submitted.category==='pharmacy')setDutyStatus(r.length?'ok':'stale')}})
+     .catch((error:unknown)=>{if(!cancelled){const message=error instanceof Error&&error.message.trim()?error.message:'Nöbetçi eczane verisi alınamadı. Kaynak yanıtı doğrulanamadı; lütfen daha sonra tekrar deneyin.';setPlaces([]);setErr(message);if(submitted.category==='pharmacy')setDutyStatus(message.startsWith('Kaynaktaki nöbet listesi güncel değil')?'stale':'error')}})
      .finally(()=>{if(!cancelled)setLoading(false)});
    return()=>{cancelled=true};
  },[submitted]);
@@ -468,15 +471,15 @@ function Nearby(){
  useEffect(()=>{
    if(!submitted||submitted.category!=='pharmacy')return;
    let cancelled=false;
-   setNearbyPharmacies([]);
+   setNearbyPharmacies([]);setNearbyStatus('loading');
    findPlaces('pharmacy',submitted.pos,submitted.province,submitted.district,{
      radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts,
      anchor:submitted.anchor,forceRefresh:submitted.forceRefresh,
      includeNonDutyPharmacies:true
    }).then(rows=>{
-     if(!cancelled)setNearbyPharmacies(rows.map(p=>({...p,isDuty:undefined})));
+     if(!cancelled){setNearbyPharmacies(rows.map(p=>({...p,isDuty:undefined})));setNearbyStatus('success')}
    }).catch(()=>{
-     if(!cancelled)setNearbyPharmacies([]);
+     if(!cancelled){setNearbyPharmacies([]);setNearbyStatus('error')}
    });
    return()=>{cancelled=true;};
  },[submitted]);
@@ -575,7 +578,8 @@ function Nearby(){
  const pharmacyWidgetUrl='https://www.eczaneler.gen.tr/nobetci-'+pharmacyWidgetSlug;
  const visiblePlaces=resultsForCategory(places,submitted?.category,cat);
  // When today's duty roster cannot be verified, show nearby pharmacies in the primary result area.
- const displayPlaces=pharmacyMode&&visiblePlaces.length===0?nearbyPharmacies:visiblePlaces;
+ const pharmacyView=pharmacyResultsView({dutyStatus,dutyCount:visiblePlaces.length,nearbyStatus,nearbyCount:nearbyPharmacies.length});
+ const displayPlaces=pharmacyMode?(pharmacyView.list==='duty'?visiblePlaces:pharmacyView.list==='nearby'?nearbyPharmacies:[]):visiblePlaces;
  const dutyLink=pharmacyMode&&hasSearched?dutyLinkFor(province,visiblePlaces.length>0):null;
  const officialLink=pharmacyMode?officialLinkFor(province):null;
 
@@ -669,7 +673,7 @@ function Nearby(){
       <div className="results">
         {displayPlaces.length > 0 ? (
           <>
-          {pharmacyMode&&visiblePlaces.length===0&&<p className="pharmacy-results-note">Nöbet durumu doğrulanamadı. Bu eczaneler nöbetçi olarak işaretlenmemiştir; gitmeden önce telefonla teyit edin.</p>}
+          {pharmacyMode&&pharmacyView.note==='unverified'&&<p className="pharmacy-results-note">Nöbet durumu doğrulanamadı. Bu eczaneler nöbetçi olarak işaretlenmemiştir; gitmeden önce telefonla teyit edin.</p>}
           {displayPlaces.map(p => <EnhancedPlaceCard key={p.id} p={{...p,isDuty:visiblePlaces.length>0?p.isDuty:undefined}} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)}
           </>
         ) : pharmacyMode&&pharmacyView.message ? (
