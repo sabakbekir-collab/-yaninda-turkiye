@@ -16,3 +16,8 @@ export function mapPlacesError(status: number, data: unknown): string | null {
   const code = (data as { error?: unknown }).error;
   return typeof code === "string" ? locationValidationErrorMessage(code) : null;
 }
+
+/** A zero-results state is valid only when the request completed without an error. */
+export function shouldShowNoResults(resultCount: number, error: string): boolean {
+  return resultCount === 0 && error.trim().length === 0;
+}
