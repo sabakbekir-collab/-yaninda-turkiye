@@ -21,7 +21,7 @@ import {shareText,mapsLink} from './share';
 import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor, officialLinkFor } from './dutyLink';
 import { shouldShowEmpty } from './searchErrors';
-import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning, nonDutySectionState } from './searchPlan';
+import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning, nonDutySectionState, isPositionFresh, shouldRequestGpsOnEntry } from './searchPlan';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
@@ -184,7 +184,30 @@ function Home(){
    void load();
    return()=>{active=false};
  },[locationLabel]);
- const go=(id:string)=>id==='emergency'?nav('/emergency'):nav('/nearby',{state:{category:id,...(readNearbyMemory().position?{position:readNearbyMemory().position,province:readNearbyMemory().province,district:readNearbyMemory().district}:{})}});
+ const go=async(id:string)=>{
+  if(id==='emergency'){nav('/emergency');return;}
+  const saved=readNearbyMemory();
+  const hasFreshPosition=isPositionFresh({savedAt:saved.positionSavedAt,now:Date.now(),maxAgeMs:5*60*1000});
+  if(shouldRequestGpsOnEntry({incomingCategory:id,permission:'unknown',hasFreshPosition})){
+    // Start GPS synchronously in the category tap handler to preserve iOS user activation.
+    try{
+      const position=await getCurrentLocation({forceFresh:true});
+      const area=await resolveLocationArea(position);
+      writeNearbyMemory({...saved,position,positionSavedAt:Date.now(),province:area.province,district:area.district});
+      nav('/nearby',{state:{category:id,position,province:area.province,district:area.district}});
+      return;
+    }catch(error){
+      const message=error instanceof LocationError&&error.code==='permission_denied'
+        ?'Konum izni verilmedi. İl ve ilçe seçerek devam edebilirsin.'
+        :error instanceof LocationError&&error.code==='unsupported'
+          ?'Bu cihazda konum kullanılamıyor. İl ve ilçe seçerek devam edebilirsin.'
+          :'Güncel konum alınamadı. İl ve ilçe seçerek devam edebilirsin.';
+      nav('/nearby',{state:{category:id,...(saved.province?{province:saved.province,district:saved.district}:{}),locationError:message}});
+      return;
+    }
+  }
+  nav('/nearby',{state:{category:id,...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}});
+};
 
  const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){track('search',{source:'home'});const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
  const cards=[
@@ -238,7 +261,7 @@ function Home(){
    </button>
  </main>
 }
-type NearbyMemory={category?:string;province?:string;district?:string;radius?:number;nearbyDistricts?:boolean;position?:Position};
+type NearbyMemory={category?:string;province?:string;district?:string;radius?:number;nearbyDistricts?:boolean;position?:Position;positionSavedAt?:number};
 function cleanNearbyMemory(value:NearbyMemory):NearbyMemory{
   const province=typeof value.province==='string'?value.province:'';
   const rawDistrict=typeof value.district==='string'?value.district:'';
