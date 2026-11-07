@@ -53,3 +53,19 @@ export function shouldRequestGpsOnEntry(input: GpsEntryInput): boolean {
     input.permission !== "denied" &&
     input.permission !== "unsupported";
 }
+
+export type HomeEntryGps = "ok" | "denied" | "unsupported" | "error";
+export type HomeEntryOutcomeInput = { gps: HomeEntryGps; area: "ok" | "error" };
+export type HomeEntryOutcome =
+  | { navigate: "withArea" }
+  | { navigate: "positionOnly" }
+  | { navigate: "withSavedArea"; message: string };
+export function homeEntryOutcome(input: HomeEntryOutcomeInput): HomeEntryOutcome {
+  if (input.gps === "ok") return { navigate: input.area === "ok" ? "withArea" : "positionOnly" };
+  if (input.gps === "denied") return { navigate: "withSavedArea", message: "Konum izni verilmedi. İl ve ilçe seçerek devam edebilirsin." };
+  if (input.gps === "unsupported") return { navigate: "withSavedArea", message: "Bu cihazda konum kullanılamıyor. İl ve ilçe seçerek devam edebilirsin." };
+  return { navigate: "withSavedArea", message: "Güncel konum alınamadı. İl ve ilçe seçerek devam edebilirsin." };
+}
+export function canStartEntry(input: { locating: boolean }): boolean {
+  return !input.locating;
+}
