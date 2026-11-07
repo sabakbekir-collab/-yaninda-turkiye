@@ -120,3 +120,11 @@
  .modern-service-list{grid-template-columns:1fr}
  .modern-service-card:nth-child(1),.modern-service-card:nth-child(2){grid-column:auto}
 }
+
+/* Nearby search: make GPS basis and explicitly non-duty pharmacy status easy to scan. */
+.location-fallback-note,.location-accuracy-warning{margin:10px 0;padding:10px 12px;border-radius:12px;background:var(--surface-soft,#f3f5f7);color:var(--text,#263238);font-size:.88rem;line-height:1.45}
+.location-fallback-note button{margin-left:8px;border:0;background:transparent;color:var(--accent,#1769aa);font-weight:700;text-decoration:underline}
+.nearby-non-duty-pharmacies{margin:18px 0;padding:14px;border:1px solid var(--border,#dce2e8);border-radius:16px}
+.nearby-non-duty-pharmacies h2{margin:0 0 6px;font-size:1.05rem}
+.nearby-non-duty-pharmacies>p{margin:0 0 12px;font-size:.9rem;line-height:1.45}
+.nearby-non-duty-pharmacies>p strong{font-weight:800}

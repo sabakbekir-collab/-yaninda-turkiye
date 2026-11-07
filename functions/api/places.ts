@@ -8,6 +8,7 @@ import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery'
 import {activeDutyDates,dutyDateKey,isActiveDutyDate} from '../lib/dutyDates';
 import {classifyOverpassBody} from '../lib/overpassBody';
 import {cachePolicyFor} from '../lib/placesCachePolicy';
+import {haversineKm,countRecordsNearAnother} from '../lib/geoDistance';
 
 type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
 
@@ -26,7 +27,7 @@ const OSM_UA='YanimdaTurkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.de
 const clean=(s:unknown,n=300)=>typeof s==='string'?s.replace(/[<>]/g,'').replace(/\s+/g,' ').trim().slice(0,n):undefined;
 const slug=trSlug;
 const areaQuery=(district:string,province:string)=>[district&&!isCentralDistrict(district)?district:'',province,'Türkiye'].filter(Boolean).join(', ');
-const distance=(a:number,b:number,c:number,d:number)=>{const r=6371,to=(x:number)=>x*Math.PI/180,dy=to(c-a),dx=to(d-b),v=Math.sin(dy/2)**2+Math.cos(to(a))*Math.cos(to(c))*Math.sin(dx/2)**2;return 2*r*Math.asin(Math.sqrt(v))};
+const distance=haversineKm;
 
 function tidyAddress(tags:Record<string,string>,fallback?:string){
   const full=tags['addr:full']||tags['contact:address'];
@@ -433,7 +434,8 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
 
   // Never label an OSM pharmacy as "nöbetçi". Official duty integration is deliberately
   // disabled until a structured, current official feed is available.
-  const key=placesCacheKey(category,anchor,lat.toFixed(4),lon.toFixed(4),province,district,String(effectiveRadius),nearbyDistricts?'1':'0',u.searchParams.get('refresh')||'');
+  const nonDutyPharmacy=category==='pharmacy'&&u.searchParams.get('nonDuty')==='1';
+  const key=placesCacheKey(category+(nonDutyPharmacy?'-non-duty':''),anchor,lat.toFixed(4),lon.toFixed(4),province,district,String(effectiveRadius),nearbyDistricts?'1':'0',u.searchParams.get('refresh')||'');
   const cached=debug?null:await dbCacheGet(env,key);
   if(cached&&typeof cached==='object'&&!Array.isArray(cached)&&Array.isArray((cached as {places?:unknown}).places)){
     const snapshot=cached as {places:Place[];partial?:boolean};
@@ -443,6 +445,15 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   if(Array.isArray(cached)){
     const policy=cachePolicyFor({ok:true,resultCount:cached.length});
     return jsonResponse(cached,{headers:{'Cache-Control':policy.cacheControl,'X-Data-Source':'cache'}});
+  }
+
+  // General OSM pharmacies are a separate, explicitly non-duty dataset.
+  // This mode never enters the dated duty-roster path and never adds isDuty.
+  if(nonDutyPharmacy){
+    const result=await getPois(env,'pharmacy',lat,lon,effectiveRadius);
+    const places=result.places.map(place=>({...place,isDuty:undefined})).sort((a,b)=>(a.distance??999)-(b.distance??999)).slice(0,40);
+    if(!places.length&&!result.ok)return jsonResponse({error:'upstream_unavailable',attempts:result.attempts||[]},{status:503,headers:{'Cache-Control':'no-store'}});
+    return jsonResponse(places,{headers:{'Cache-Control':'no-store','X-Data-Source':'OpenStreetMap — genel eczane kayıtları; nöbet durumu doğrulanmadı'}});
   }
 
   // Eczane kategorisi yalnızca güncel nöbet verisini kullanır.
@@ -536,6 +547,10 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     .sort((a,b)=>(a.distance??999)-(b.distance??999))
     .slice(0,40);
 
+  if(debug){
+    const proximity25m=countRecordsNearAnother(result.map(place=>({lat:place.lat,lon:place.lon})),25);
+    return jsonResponse({ok:upstreamOk,category,province,district,anchor,center:{lat,lon},radiusKm:effectiveRadius,resultCount:result.length,proximity25m,records:result},{headers:{'Cache-Control':'no-store'}});
+  }
   if(!result.length&&!upstreamOk)return jsonResponse({error:'upstream_unavailable',attempts,center:{lat,lon}},{status:503,headers:{'Cache-Control':'no-store'}});
   const partial=Boolean(primary.partial);
   const policy=cachePolicyFor({ok:true,resultCount:result.length,partial});

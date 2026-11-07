@@ -19,9 +19,9 @@ import EnhancedPlaceCard from './PlaceCard';
 import {getTheme,applyTheme,saveTheme} from './theme';
 import {shareText,mapsLink} from './share';
 import {provinceCenter} from '../functions/lib/provinceCenters';
-import { dutyLinkFor } from './dutyLink';
+import { dutyLinkFor, officialLinkFor } from './dutyLink';
 import { shouldShowEmpty } from './searchErrors';
-import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory } from './searchPlan';
+import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning, nonDutySectionState } from './searchPlan';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
@@ -292,12 +292,15 @@ function Nearby(){
  const[radius,setRadius]=useState(Number(params.get('radius')||memory.radius||5));
  const[nearbyDistricts,setNearbyDistricts]=useState(params.get('nearbyDistricts')==='1'||Boolean(memory.nearbyDistricts));
  const[places,setPlaces]=useState<Place[]>([]);
+ const[nearbyPharmacies,setNearbyPharmacies]=useState<Place[]>([]);
+ const[nonDutyStatus,setNonDutyStatus]=useState<'idle'|'loading'|'success'|'error'>('idle');
  const[loading,setLoading]=useState(false);
  const[view,setView]=useState<'list'|'map'>(params.get('view')==='map'?'map':'list');
  const[err,setErr]=useState('');
  const[hasSearched,setHasSearched]=useState(false);
  const[pos,setPos]=useState<Position|undefined>();
  const[locationState,setLocationState]=useState<'unknown'|'granted'|'denied'|'prompt'|'unsupported'>('unknown');
+ const[locationNotice,setLocationNotice]=useState('');
  const manualAreaChosenRef=useRef(false);
  const[submitted,setSubmitted]=useState<{category:string;province:string;district:string;radius:number;nearbyDistricts:boolean;pos?:Position;anchor:'gps'|'area';forceRefresh?:boolean}|null>(null);
  const submittedRef=useRef<typeof submitted>(null);
@@ -431,23 +434,69 @@ function Nearby(){
    return()=>{cancelled=true};
  },[submitted]);
 
- const search=(forceRefresh=false,categoryOverride=cat)=>{
-   setErr('');setPlaces([]);setLoading(true);
+ useEffect(()=>{
+   if(!submitted||submitted.category!=='pharmacy')return;
+   let cancelled=false;
+   setNearbyPharmacies([]);
+   setNonDutyStatus('loading');
+   findPlaces('pharmacy',submitted.pos,submitted.province,submitted.district,{
+     radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts,
+     anchor:submitted.anchor,forceRefresh:submitted.forceRefresh,
+     includeNonDutyPharmacies:true
+   }).then(rows=>{
+     if(!cancelled){setNearbyPharmacies(rows.map(p=>({...p,isDuty:undefined})));setNonDutyStatus('success');}
+   }).catch(()=>{
+     if(!cancelled){setNearbyPharmacies([]);setNonDutyStatus('error');}
+   });
+   return()=>{cancelled=true;};
+ },[submitted]);
+
+ const search=async(forceRefresh=false,categoryOverride=cat)=>{
+   setErr('');setLocationNotice('');setPlaces([]);setLoading(true);
    track('search',{category:categoryOverride,province:canonProvince,district:canonDistrict});
-   if(!province.trim()&&!pos){setLoading(false);setErr('Arama için konumunu kullan veya il seç.');return;}
-   if(province.trim()&&!validProvince){setLoading(false);setErr('İl adını listeden seç.');return;}
-   if(province.trim()&&!validDistrict){setLoading(false);setErr('İlçeyi listeden seç veya “Tüm ilçeler” olarak bırak.');return;}
-   const plan=choosePlan({pos,province:canonProvince,district:canonDistrict,manualAreaChosen:manualAreaChosenRef.current});
-   if(canonProvince!==province)setProvince(canonProvince);
-   if(canonDistrict!==district)setDistrict(canonDistrict);
+   let searchPosition=pos;
+   let searchProvince=canonProvince;
+   let searchDistrict=canonDistrict;
+   if(needsGpsRequest({pos:searchPosition,permission:locationState,userGesture:true})){
+     try{
+       // This call is deliberately the first asynchronous operation after the tap:
+       // iOS Safari and embedded browsers may require transient user activation.
+       const fresh=await getCurrentLocation({forceFresh:true});
+       searchPosition=fresh;
+       setPos(fresh);
+       setLocationState('granted');
+       manualAreaChosenRef.current=false;
+       try{
+         const area=await resolveLocationArea(fresh);
+         searchProvince=area.province;searchDistrict=area.district;
+         setProvince(area.province);setDistrict(area.district);
+       }catch{/* GPS coordinates remain authoritative even if reverse geocoding fails. */}
+     }catch(error){
+       const denied=error instanceof LocationError&&error.code==='permission_denied';
+       const unsupported=error instanceof LocationError&&error.code==='unsupported';
+       if(denied)setLocationState('denied');
+       else if(unsupported)setLocationState('unsupported');
+       else setLocationState('prompt');
+       const fallbackArea=searchDistrict||searchProvince||'seçili bölge';
+       setLocationNotice('Konum alınamadı; mesafeler '+fallbackArea+' merkezine göre. Siteyi Safari\'de açmayı dene.');
+     }
+   }else if(!searchPosition&&(locationState==='denied'||locationState==='unsupported')){
+     const fallbackArea=searchDistrict||searchProvince||'seçili bölge';
+     setLocationNotice('Konum alınamadı; mesafeler '+fallbackArea+' merkezine göre. Siteyi Safari\'de açmayı dene.');
+   }
+   if(!searchProvince.trim()&&!searchPosition){setLoading(false);setErr('Arama için konumunu kullan veya il seç.');return;}
+   if(searchProvince.trim()&&!provinces.includes(resolveName(searchProvince,provinces)||searchProvince)){setLoading(false);setErr('İl adını listeden seç.');return;}
+   const searchDistricts=districtsFor(searchProvince);
+   if(searchDistrict.trim()&&!searchDistricts.includes(resolveName(searchDistrict,searchDistricts)||searchDistrict)){setLoading(false);setErr('İlçeyi listeden seç veya “Tüm ilçeler” olarak bırak.');return;}
+   const plan=choosePlan({pos:searchPosition,province:searchProvince,district:searchDistrict,manualAreaChosen:manualAreaChosenRef.current});
    setHasSearched(true);
-   setSubmitted({category:categoryOverride,province:canonProvince,district:canonDistrict,radius,nearbyDistricts,pos:plan.usePos?pos:undefined,anchor:plan.anchor,forceRefresh});
+   setSubmitted({category:categoryOverride,province:searchProvince,district:searchDistrict,radius,nearbyDistricts,pos:plan.usePos?searchPosition:undefined,anchor:plan.anchor,forceRefresh});
  };
 
  const locate=async()=>{
    if(loading)return;
    try{
-     setErr('');
+     setErr('');setLocationNotice('');
      setLoading(true);
      // The button must always request a fresh device position. Never reuse
      // an old cached coordinate when the user explicitly taps "Konumumu Kullan".
@@ -496,6 +545,8 @@ function Nearby(){
  const pharmacyWidgetUrl='https://www.eczaneler.gen.tr/nobetci-'+pharmacyWidgetSlug;
  const visiblePlaces=resultsForCategory(places,submitted?.category,cat);
  const dutyLink=pharmacyMode&&hasSearched?dutyLinkFor(province,visiblePlaces.length>0):null;
+ const officialLink=pharmacyMode?officialLinkFor(province):null;
+ const nonDutyView=nonDutySectionState({status:nonDutyStatus,count:nearbyPharmacies.length});
 
  return <main className="inner nearby-page">
    <div className="page-title nearby-title">
@@ -503,13 +554,12 @@ function Nearby(){
      <div><small>CANLI HİZMET ARAMA</small><h1>Yakınındaki Hizmetler</h1></div>
    </div>
 
-   {pharmacyMode&&<div className="pharmacy-warning">
-     <div><Info/><div><b>Nöbetçi eczaneler</b><span>Sonuçlar güncel nöbet verisinden alınır. Resmî teyit için TİTCK / e-Devlet bağlantısı da burada. Yola çıkmadan önce telefonla teyit et.</span></div></div>
-     <a href={officialPharmacyUrl} target="_blank" rel="noreferrer">Resmî TİTCK / e-Devlet <ExternalLink/></a>
-   </div>}
 
 
 
+
+   {dutyLink&&pharmacyMode&&<section className="duty-source-link" aria-label={dutyLink.title}><b>{dutyLink.title}</b><p>{dutyLink.note}</p><a href={dutyLink.url} target="_blank" rel="noopener noreferrer">{dutyLink.button} <ExternalLink /></a></section>}
+   {officialLink&&pharmacyMode&&<section className="duty-source-link" aria-label="Resmî nöbetçi eczane sorgusu"><a href={officialLink} target="_blank" rel="noopener noreferrer">Resmî nöbetçi eczane sorgusu (e-Devlet) <ExternalLink /></a></section>}
    <div className="nearby-filters">
      <div className="filter-line">
        <label className="location-autocomplete">
@@ -539,8 +589,8 @@ function Nearby(){
      </div>
 
      <div className="category-chips" aria-label="Kategori">
-       {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>{setCat(c.id);setPlaces([]);setHasSearched(false);setErr('');setSubmitted(null);if(c.id!=='pharmacy'){if(pos||validProvince)search(false,c.id);else{setHasSearched(false);setErr('ATM ve diğer hizmetleri aramak için konumunu kullan veya il seç.')}}}}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
-       {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);setPlaces([]);setHasSearched(false);setErr('');setSubmitted(null);if(pos||validProvince)search(false,id);else{setHasSearched(false);setErr('Bu hizmeti aramak için konumunu kullan veya il seç.')}}}><Icon/><span>{label}</span></button>})}
+       {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>{setCat(c.id);setPlaces([]);setNearbyPharmacies([]);setNonDutyStatus('idle');setHasSearched(false);setErr('');setSubmitted(null);if(c.id!=='pharmacy')void search(false,c.id);}}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
+       {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);setPlaces([]);setNearbyPharmacies([]);setNonDutyStatus('idle');setHasSearched(false);setErr('');setSubmitted(null);void search(false,id);}}><Icon/><span>{label}</span></button>})}
      </div>
 
      {!pharmacyMode&&<div className="search-options">
@@ -549,16 +599,20 @@ function Nearby(){
      </div>}
 
      <div className="action-row">
-       <button className="search-filter primary-search" onClick={()=>search()} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
+       <button className="search-filter primary-search" onClick={()=>void search()} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
+       <button type="button" className="search-filter location-search" onClick={()=>void locate()} disabled={loading}><LocateFixed/> Konumumu kullan</button>
      </div>
    </div>
 
+   {locationNotice&&<div className="location-fallback-note" role="status">{locationNotice}</div>}
+   {submitted?.anchor==='gps'&&accuracyWarning(submitted.pos?.accuracyM)&&<div className="location-accuracy-warning" role="status">{accuracyWarning(submitted.pos?.accuracyM)}</div>}
+   {submitted?.anchor==='area'&&!locationNotice&&<div className="location-fallback-note" role="status">Mesafeler {submitted.district||submitted.province} merkezine göre. Gerçek mesafe için konumunu kullan. <button type="button" onClick={()=>void locate()}>Konumumu kullan</button></div>}
    <div className="selection-note">
      <span>{pharmacyLiveWidget?(canonProvince+' · Eczaneler.gen.tr canlı listesi'):province?(district?province+' / '+district:province+' — tüm ilçeler'):pos?'GPS konumu alındı':'Konum veya il / ilçe seçebilirsin'}{!pharmacyMode&&submitted?' · '+distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):''}{pharmacyMode&&!pharmacyLiveWidget?' · İlçe kapsamındaki tüm nöbetçi eczaneler':!pharmacyMode?' · '+effectiveRadius+' km yarıçap':''}</span>
      <span>Seçimler otomatik kaydedilir</span>
    </div>
 
-   {err&&!pharmacyLiveWidget&&<div className="error nearby-error">{err} {pharmacyMode&&<a href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">Resmî e-Devlet nöbetçi eczane sorgusunu aç</a>}</div>}
+   {err&&!pharmacyLiveWidget&&<div className="error nearby-error" role="alert">{err}</div>}
 
    {pharmacyLiveWidget?
     <section className="pharmacy-live-widget" aria-label="İlçe bazlı canlı nöbetçi eczane listesi">
@@ -575,7 +629,7 @@ function Nearby(){
    :
    <>
     <div className="result-head">
-     <b>{activeLabel} <span>{loading?'…':places.length}</span></b>
+     <b>{activeLabel}{(!pharmacyMode||!err)&&<span>{loading?'…':places.length}</span>}</b>
      <div><button className={view==='list'?'active':''} onClick={()=>setView('list')}><List/>Liste</button><button className={view==='map'?'active':''} onClick={()=>setView('map')}><MapIcon/>Harita</button></div>
     </div>
 
@@ -588,9 +642,9 @@ function Nearby(){
           <div className="empty nearby-empty">
             <MapPin />
             <h3>{hasSearched ? (pharmacyMode ? 'Bu konumda güncel nöbetçi eczane kaydı bulunamadı' : 'Bu bölgede kayıt bulunamadı') : 'Arama yapmaya hazır'}</h3>
-            <p>{hasSearched ? (pharmacyMode ? 'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl ve ilçe seçip Yakınındakileri Bul’a bas. Konum izni gerekmez.'}</p>
+            <p>{hasSearched ? (pharmacyMode ? 'Güncel nöbet kaydı doğrulanamadı. Yanlış bilgi vermemek için nöbetçi sonucu gösterilmiyor.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl ve ilçe seçip Yakınındakileri Bul’a bas. Konumunu kullanabilir veya il / ilçe seçebilirsin.'}</p>
             {hasSearched&&<button onClick={()=>search(true)}><Search/>Tekrar Ara</button>}
-            {hasSearched && pharmacyMode && <a className="official-duty-link" href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">e-Devlet’te resmî sorgula <ExternalLink /></a>}
+
 
           </div>
         ) : (
@@ -598,11 +652,14 @@ function Nearby(){
         )}
       </div>
      }
-     {dutyLink&&<section className="duty-source-link" aria-label={dutyLink.title}>
-       <b>{dutyLink.title}</b>
-       {dutyLink.empty&&<p className="duty-source-empty">{dutyLink.empty}</p>}
-       <p>{dutyLink.note}</p>
-       <a href={dutyLink.url} target="_blank" rel="noopener noreferrer">{dutyLink.button} <ExternalLink /></a>
+
+     {pharmacyMode&&<section className="nearby-non-duty-pharmacies" aria-labelledby="non-duty-pharmacies-title">
+       <h2 id="non-duty-pharmacies-title">Yakındaki eczaneler</h2>
+       <p><strong>NÖBETÇİ DEĞİL</strong>, nöbet durumu doğrulanmadı; gitmeden telefonla teyit edin.</p>
+       {nearbyPharmacies.map(p=><EnhancedPlaceCard key={p.id} p={{...p,isDuty:undefined}} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'}/>)}
+       {nonDutyView==='loading'&&<div className="results skeleton-results" aria-label="Yakındaki eczaneler yükleniyor">{[1,2].map(i=><div className="nearby-skeleton" key={i}/>)}</div>}
+       {nonDutyView==='empty'&&<small>Yakında genel eczane kaydı bulunamadı.</small>}
+       {nonDutyView==='error'&&<div role="alert"><small>Harita kaynağı yanıt vermedi.</small> <button type="button" onClick={()=>{if(submitted)setSubmitted({...submitted,forceRefresh:!submitted.forceRefresh})}}>Tekrar Ara</button></div>}
      </section>}
    </>
    }

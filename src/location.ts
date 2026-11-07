@@ -80,7 +80,7 @@ function browserGpsPosition(enableHighAccuracy: boolean, timeout: number): Promi
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
       ({ coords }) => {
-        const position = { lat: coords.latitude, lon: coords.longitude };
+        const position = { lat: coords.latitude, lon: coords.longitude, accuracyM: Number.isFinite(coords.accuracy) ? coords.accuracy : undefined };
         if (!isValidPosition(position)) {
           reject(new LocationError('unavailable'));
           return;
@@ -171,7 +171,7 @@ async function nativeLocation(): Promise<Position> {
       timeout: 12000,
       maximumAge: 0,
     });
-    const position = { lat: result.coords.latitude, lon: result.coords.longitude };
+    const position = { lat: result.coords.latitude, lon: result.coords.longitude, accuracyM: Number.isFinite(result.coords.accuracy) ? result.coords.accuracy : undefined };
     if (!isValidPosition(position)) throw new LocationError('unavailable');
     cacheLocation(position);
     return position;
