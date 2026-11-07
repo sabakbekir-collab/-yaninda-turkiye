@@ -349,7 +349,7 @@ function Nearby(){
  const effectiveRadius=district&&nearbyDistricts?Math.min(30,Math.max(radius,radius*1.5)):radius;
 
  useEffect(()=>{
-   writeNearbyMemory({category:cat,province,district,radius,nearbyDistricts});
+   writeNearbyMemory({category:cat,province,district,radius,nearbyDistricts,position:pos||memory.position,positionSavedAt:memory.positionSavedAt});
    setParams(prev=>{
      const next=new URLSearchParams(prev);
      next.set('category',cat);
