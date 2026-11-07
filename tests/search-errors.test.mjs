@@ -49,3 +49,27 @@ test("only a successful zero-result response displays the no-records state", () 
   assert.equal(shouldShowNoResults(0, "Harita veri sağlayıcıları şu anda yanıt vermiyor."), false);
   assert.equal(shouldShowNoResults(2, ""), false);
 });
+
+
+import { choosePlan, distanceBasisLabel, shouldShowEmpty } from "../src/searchPlan.ts";
+
+test("choosePlan uses GPS unless the user manually changed the selected area", () => {
+  const pos = { lat: 38.74, lon: 41.50 };
+  assert.deepEqual(choosePlan({ pos, province: "Muş", district: "Merkez", manualAreaChosen: false }), { anchor: "gps", usePos: true });
+  assert.deepEqual(choosePlan({ pos, province: "Muş", district: "Merkez", manualAreaChosen: true }), { anchor: "area", usePos: false });
+  assert.deepEqual(choosePlan({ pos: undefined, province: "Muş", district: "Merkez", manualAreaChosen: false }), { anchor: "area", usePos: false });
+  assert.deepEqual(choosePlan({ pos: undefined, province: "", district: "", manualAreaChosen: false }), { anchor: "area", usePos: false });
+});
+
+test("distanceBasisLabel explains the actual measurement anchor", () => {
+  assert.equal(distanceBasisLabel("gps", "Muş / Merkez"), "Konumuna göre, kuş uçuşu");
+  assert.equal(distanceBasisLabel("area", "Muş / Merkez"), "Muş / Merkez merkezine göre, kuş uçuşu");
+});
+
+test("empty state is shown only for a completed zero-result search of the current category", () => {
+  assert.equal(shouldShowEmpty({ status: "success", forCategory: "atm", currentCategory: "atm", resultCount: 0 }), true);
+  assert.equal(shouldShowEmpty({ status: "loading", forCategory: "atm", currentCategory: "atm", resultCount: 0 }), false);
+  assert.equal(shouldShowEmpty({ status: "success", forCategory: "atm", currentCategory: "fuel", resultCount: 0 }), false);
+  assert.equal(shouldShowEmpty({ status: "error", forCategory: "atm", currentCategory: "atm", resultCount: 0 }), false);
+  assert.equal(shouldShowEmpty({ status: "success", forCategory: "atm", currentCategory: "atm", resultCount: 2 }), false);
+});
