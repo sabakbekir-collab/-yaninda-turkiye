@@ -21,7 +21,7 @@ import {shareText,mapsLink} from './share';
 import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor, officialLinkFor } from './dutyLink';
 import { shouldShowEmpty } from './searchErrors';
-import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning, nonDutySectionState } from './searchPlan';
+import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning, nonDutySectionState, isPositionFresh, shouldRequestGpsOnEntry, homeEntryOutcome, canStartEntry } from './searchPlan';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
@@ -105,7 +105,8 @@ function weatherLabel(code:number){
  if([95,96,99].includes(code))return 'Gök gürültülü';return 'Hava durumu';
 }
 function Home(){
- const nav=useNavigate(); const[q,setQ]=useState(''); const[locationLabel,setLocationLabel]=useState(readHeaderLocation());
+ const nav=useNavigate();
+ const[locating,setLocating]=useState(false); const entryInFlight=useRef(false); const[q,setQ]=useState(''); const[locationLabel,setLocationLabel]=useState(readHeaderLocation());
  const[weather,setWeather]=useState<HomeWeather|null>(null);
  const[weatherError,setWeatherError]=useState('');
  const[weatherLoading,setWeatherLoading]=useState(false);
@@ -184,7 +185,37 @@ function Home(){
    void load();
    return()=>{active=false};
  },[locationLabel]);
- const go=(id:string)=>id==='emergency'?nav('/emergency'):nav('/nearby',{state:{category:id,...(readNearbyMemory().position?{position:readNearbyMemory().position,province:readNearbyMemory().province,district:readNearbyMemory().district}:{})}});
+ const go=async(id:string)=>{
+  if(id==='emergency'){nav('/emergency');return;}
+  if(!canStartEntry({locating:entryInFlight.current}))return;
+  const saved=readNearbyMemory();
+  const hasFreshPosition=isPositionFresh({savedAt:saved.positionSavedAt,now:Date.now(),maxAgeMs:5*60*1000});
+  if(!shouldRequestGpsOnEntry({incomingCategory:id,permission:'unknown',hasFreshPosition})){
+    nav('/nearby',{state:{category:id,...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}});
+    return;
+  }
+  entryInFlight.current=true;
+  setLocating(true);
+  try{
+    const position=await getCurrentLocation({forceFresh:true});
+    try{
+      const area=await resolveLocationArea(position);
+      writeNearbyMemory({...saved,position,positionSavedAt:Date.now(),province:area.province,district:area.district});
+      nav('/nearby',{state:{category:id,position,province:area.province,district:area.district}});
+    }catch{
+      writeNearbyMemory({...saved,position,positionSavedAt:Date.now()});
+      nav('/nearby',{state:{category:id,position}});
+    }
+  }catch(error){
+    const gps=error instanceof LocationError&&error.code==='permission_denied'?'denied'
+      :error instanceof LocationError&&error.code==='unsupported'?'unsupported':'error';
+    const outcome=homeEntryOutcome({gps,area:'error'});
+    nav('/nearby',{state:{category:id,...(saved.province?{province:saved.province,district:saved.district}:{}),locationError:outcome.navigate==='withSavedArea'?outcome.message:undefined}});
+  }finally{
+    entryInFlight.current=false;
+    setLocating(false);
+  }
+};
 
  const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){track('search',{source:'home'});const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
  const cards=[
@@ -216,8 +247,8 @@ function Home(){
       <button onClick={()=>{if(navigator.share)navigator.share({title:'Yanımda Türkiye',text:'Yanımda Türkiye'});else void navigator.clipboard?.writeText(location.href)}}><ExternalLink/><b>Paylaş</b></button>
     </div>
    </section>
-   <section className="modern-service-list">
-    {cards.map(([id,title,text,tone,Icon,img])=><button key={id} className={"modern-service-card "+tone} onClick={()=>go(id)}>
+   <section className="modern-service-list" aria-busy={locating}>{locating&&<div className="home-locating-status" role="status" aria-live="polite">Konumun alınıyor…</div>}
+    {cards.map(([id,title,text,tone,Icon,img])=><button key={id} type="button" disabled={locating} aria-disabled={locating} className={"modern-service-card "+tone} onClick={()=>go(id)}>
       <span className="modern-service-icon"><Icon/></span><div><strong>{title}</strong><small>{text}</small></div>{img&&<img src={img} alt=""/>}<span className="modern-card-arrow"><ChevronRight/></span>
     </button>)}
    </section>
@@ -238,7 +269,7 @@ function Home(){
    </button>
  </main>
 }
-type NearbyMemory={category?:string;province?:string;district?:string;radius?:number;nearbyDistricts?:boolean;position?:Position};
+type NearbyMemory={category?:string;province?:string;district?:string;radius?:number;nearbyDistricts?:boolean;position?:Position;positionSavedAt?:number};
 function cleanNearbyMemory(value:NearbyMemory):NearbyMemory{
   const province=typeof value.province==='string'?value.province:'';
   const rawDistrict=typeof value.district==='string'?value.district:'';
@@ -326,7 +357,7 @@ function Nearby(){
  const effectiveRadius=district&&nearbyDistricts?Math.min(30,Math.max(radius,radius*1.5)):radius;
 
  useEffect(()=>{
-   writeNearbyMemory({category:cat,province,district,radius,nearbyDistricts});
+   writeNearbyMemory({category:cat,province,district,radius,nearbyDistricts,position:pos||memory.position,positionSavedAt:memory.positionSavedAt});
    setParams(prev=>{
      const next=new URLSearchParams(prev);
      next.set('category',cat);
@@ -421,7 +452,7 @@ function Nearby(){
        setErr('Kategori bulundu. Arama yapmak için il ve ilçe seç.');
      }
    }
- },[location.key]);
+ },[location.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
  useEffect(()=>{
    if(!submitted)return;

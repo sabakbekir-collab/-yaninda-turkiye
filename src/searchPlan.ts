@@ -36,3 +36,36 @@ export function nonDutySectionState(input: { status: NonDutySectionStatus; count
   if (input.status === "success") return input.count > 0 ? "results" : "empty";
   return "idle";
 }
+
+export type PositionFreshnessInput = { savedAt?: number | null; now: number; maxAgeMs: number };
+export function isPositionFresh(input: PositionFreshnessInput): boolean {
+  if (typeof input.savedAt !== "number" || !Number.isFinite(input.savedAt)) return false;
+  if (!Number.isFinite(input.now) || !Number.isFinite(input.maxAgeMs) || input.maxAgeMs < 0) return false;
+  const age = input.now - input.savedAt;
+  return age >= 0 && age <= input.maxAgeMs;
+}
+
+export type GpsEntryPermission = "granted" | "denied" | "prompt" | "unsupported" | "unknown";
+export type GpsEntryInput = { incomingCategory?: string; permission: GpsEntryPermission; hasFreshPosition: boolean };
+export function shouldRequestGpsOnEntry(input: GpsEntryInput): boolean {
+  return Boolean(input.incomingCategory?.trim()) &&
+    !input.hasFreshPosition &&
+    input.permission !== "denied" &&
+    input.permission !== "unsupported";
+}
+
+export type HomeEntryGps = "ok" | "denied" | "unsupported" | "error";
+export type HomeEntryOutcomeInput = { gps: HomeEntryGps; area: "ok" | "error" };
+export type HomeEntryOutcome =
+  | { navigate: "withArea" }
+  | { navigate: "positionOnly" }
+  | { navigate: "withSavedArea"; message: string };
+export function homeEntryOutcome(input: HomeEntryOutcomeInput): HomeEntryOutcome {
+  if (input.gps === "ok") return { navigate: input.area === "ok" ? "withArea" : "positionOnly" };
+  if (input.gps === "denied") return { navigate: "withSavedArea", message: "Konum izni verilmedi. İl ve ilçe seçerek devam edebilirsin." };
+  if (input.gps === "unsupported") return { navigate: "withSavedArea", message: "Bu cihazda konum kullanılamıyor. İl ve ilçe seçerek devam edebilirsin." };
+  return { navigate: "withSavedArea", message: "Güncel konum alınamadı. İl ve ilçe seçerek devam edebilirsin." };
+}
+export function canStartEntry(input: { locating: boolean }): boolean {
+  return !input.locating;
+}
