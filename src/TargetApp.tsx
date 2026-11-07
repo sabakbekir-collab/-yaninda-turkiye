@@ -21,6 +21,7 @@ import {shareText,mapsLink} from './share';
 import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor, officialLinkFor } from './dutyLink';
 import { shouldShowEmpty } from './searchErrors';
+import { pharmacyResultsView } from './pharmacyView';
 import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning, isPositionFresh, shouldRequestGpsOnEntry, homeEntryOutcome, canStartEntry } from './searchPlan';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
@@ -642,7 +643,7 @@ function Nearby(){
      <span>Seçimler otomatik kaydedilir</span>
    </div>
 
-   {err&&!pharmacyLiveWidget&&!pharmacyMode&&<div className="error nearby-error" role="alert">{err}</div>}
+   {err&&!pharmacyLiveWidget&&(!pharmacyMode||pharmacyView.showRedBanner)&&<div className="error nearby-error" role="alert">{err}</div>}
 
    {pharmacyLiveWidget?
     <section className="pharmacy-live-widget" aria-label="İlçe bazlı canlı nöbetçi eczane listesi">
@@ -671,6 +672,10 @@ function Nearby(){
           {pharmacyMode&&visiblePlaces.length===0&&<p className="pharmacy-results-note">Nöbet durumu doğrulanamadı. Bu eczaneler nöbetçi olarak işaretlenmemiştir; gitmeden önce telefonla teyit edin.</p>}
           {displayPlaces.map(p => <EnhancedPlaceCard key={p.id} p={{...p,isDuty:visiblePlaces.length>0?p.isDuty:undefined}} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)}
           </>
+        ) : pharmacyMode&&pharmacyView.message ? (
+          pharmacyView.message==='loading' ? <div className="results skeleton-results" aria-label="Yakındaki eczaneler yükleniyor">{[1,2,3].map(i=><div className="nearby-skeleton" key={i}/>)}</div> :
+          pharmacyView.message==='empty' ? <div className="empty nearby-empty"><MapPin/><h3>Yakında genel eczane kaydı bulunamadı</h3><p>Bu bölgede gösterilebilecek yakın eczane kaydı bulunamadı.</p><button onClick={()=>search(true)}><Search/>Tekrar Ara</button></div> :
+          <div className="error nearby-error" role="alert"><p>Harita kaynağı yanıt vermedi.</p><button onClick={()=>search(true)}>Tekrar Ara</button></div>
         ) : shouldShowEmpty({status:loading?'loading':err?'error':hasSearched?'success':'idle',forCategory:submitted?.category||'',currentCategory:cat,resultCount:visiblePlaces.length}) ? (
           <div className="empty nearby-empty">
             <MapPin />
