@@ -32,3 +32,11 @@ export function dutyLinkFor(province: string | null | undefined, hasCurrentRecor
     button: 'Resmî listeyi aç',
   };
 }
+
+export const OFFICIAL_PHARMACY_URL = 'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama';
+
+/** The generic e-Devlet link is suppressed for Muş because its dedicated chamber link is shown. */
+export function officialLinkFor(province: string | null | undefined): string | null {
+  if (!province || fold(province) === 'mus') return null;
+  return OFFICIAL_PHARMACY_URL;
+}
