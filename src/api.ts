@@ -8,6 +8,7 @@ export type PlaceSearchOptions={
   nearbyDistricts?:boolean;
   anchor?:'gps'|'area';
   forceRefresh?:boolean;
+  includeNonDutyPharmacies?:boolean;
 };
 
 export type ResolvedLocationArea={province:string;district:string};
@@ -45,6 +46,7 @@ export async function findPlaces(
   p.set('radius',String(options.radiusKm??5));
   p.set('nearbyDistricts',options.nearbyDistricts?'1':'0');
   if(options.forceRefresh)p.set('refresh',String(Date.now()));
+  if(options.includeNonDutyPharmacies)p.set('nonDuty','1');
 
   let r:Response;
   try{
@@ -101,7 +103,7 @@ export async function findPlaces(
   const cleaned=data.filter((p):p is Place=>Boolean(
     p&&typeof p.name==='string'&&p.name.trim().length>=2&&
     !/^isimsiz( açık veri kaydı)?$/i.test(p.name.trim())&&
-    (category!=='pharmacy'||p.isDuty===true)
+    (category!=='pharmacy'||options.includeNonDutyPharmacies||p.isDuty===true)
   ));
   return cleaned;
 }
