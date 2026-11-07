@@ -34,5 +34,5 @@ export function chooseSearchCenter(input: SearchCenterInput): SearchCenter | nul
 }
 
 export function placesCacheKey(category: string, anchor: SearchAnchor, ...parts: string[]): string {
-  return 'places:v18:' + [category, anchor, ...parts].join(':');
+  return 'places:v19:' + [category, anchor, ...parts].join(':');
 }

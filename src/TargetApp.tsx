@@ -20,6 +20,7 @@ import {getTheme,applyTheme,saveTheme} from './theme';
 import {shareText,mapsLink} from './share';
 import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor } from './dutyLink';
+import { shouldShowNoResults } from './searchErrors';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
@@ -296,7 +297,7 @@ function Nearby(){
  const[hasSearched,setHasSearched]=useState(false);
  const[pos,setPos]=useState<Position|undefined>();
  const[locationState,setLocationState]=useState<'unknown'|'granted'|'denied'|'prompt'|'unsupported'>('unknown');
- const[submitted,setSubmitted]=useState<{category:string;province:string;district:string;radius:number;nearbyDistricts:boolean;pos?:Position}|null>(null);
+ const[submitted,setSubmitted]=useState<{category:string;province:string;district:string;radius:number;nearbyDistricts:boolean;pos?:Position;forceRefresh?:boolean}|null>(null);
 
  const canonProvince=useMemo(()=>resolveName(province,provinces)??province,[province]);
  const ds=useMemo(()=>districtsFor(canonProvince),[canonProvince]);
@@ -389,18 +390,18 @@ function Nearby(){
    if(!submitted)return;
    let cancelled=false;
    setLoading(true);setErr('');
-   findPlaces(submitted.category,submitted.pos,submitted.province,submitted.district,{radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts,anchor:submitted.pos?'gps':'area'})
+   findPlaces(submitted.category,submitted.pos,submitted.province,submitted.district,{radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts,anchor:submitted.pos?'gps':'area',forceRefresh:submitted.forceRefresh})
      .then(r=>{if(!cancelled)setPlaces(r)})
      .catch((error:unknown)=>{if(!cancelled){setPlaces([]);setErr(error instanceof Error&&error.message.trim()?error.message:'Nöbetçi eczane verisi alınamadı. Kaynak yanıtı doğrulanamadı; lütfen daha sonra tekrar deneyin.')}})
      .finally(()=>{if(!cancelled)setLoading(false)});
    return()=>{cancelled=true};
  },[submitted]);
 
- const search=()=>{
+ const search=(forceRefresh=false)=>{
    setErr('');
    track('search',{category:cat,province:canonProvince,district:canonDistrict});
    if(!province.trim()){
-     if(pos){setHasSearched(true);setSubmitted({category:cat,province:'',district:'',radius,nearbyDistricts,pos});return;}
+     if(pos){setHasSearched(true);setSubmitted({category:cat,province:'',district:'',radius,nearbyDistricts,pos,forceRefresh});return;}
      setErr('Arama için önce il seç. Konum izni gerekmez.');return;
    }
    if(!validProvince){setErr('İl adını listeden seç.');return;}
@@ -408,7 +409,7 @@ function Nearby(){
    if(canonProvince!==province)setProvince(canonProvince);
    if(canonDistrict!==district)setDistrict(canonDistrict);
    setHasSearched(true);
-   setSubmitted({category:cat,province:canonProvince,district:canonDistrict,radius,nearbyDistricts});
+   setSubmitted({category:cat,province:canonProvince,district:canonDistrict,radius,nearbyDistricts,forceRefresh});
  };
 
  const locate=async()=>{
@@ -514,7 +515,7 @@ function Nearby(){
      </div>}
 
      <div className="action-row">
-       <button className="search-filter primary-search" onClick={search} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
+       <button className="search-filter primary-search" onClick={()=>search()} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
      </div>
    </div>
 
@@ -549,15 +550,17 @@ function Nearby(){
       <div className="results">
         {places.length > 0 ? (
           places.map(p => <EnhancedPlaceCard key={p.id} p={p} />)
-        ) : (
+        ) : shouldShowNoResults(places.length,err) ? (
           <div className="empty nearby-empty">
             <MapPin />
             <h3>{hasSearched ? (pharmacyMode ? 'Bu konumda güncel nöbetçi eczane kaydı bulunamadı' : 'Bu bölgede kayıt bulunamadı') : 'Arama yapmaya hazır'}</h3>
             <p>{hasSearched ? (pharmacyMode ? 'Güncel nöbet kaydı doğrulanamadı. Yanlış eczane göstermemek için genel eczane kayıtları listelenmez. Resmî e-Devlet sorgusunu kullanabilirsin.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl ve ilçe seçip Yakınındakileri Bul’a bas. Konum izni gerekmez.'}</p>
-            {hasSearched&&<button onClick={search}><Search/>Tekrar Ara</button>}
+            {hasSearched&&<button onClick={()=>search(true)}><Search/>Tekrar Ara</button>}
             {hasSearched && pharmacyMode && <a className="official-duty-link" href="https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama" target="_blank" rel="noreferrer">e-Devlet’te resmî sorgula <ExternalLink /></a>}
 
           </div>
+        ) : (
+          <div className="error nearby-error" role="alert">{err}</div>
         )}
       </div>
      }
