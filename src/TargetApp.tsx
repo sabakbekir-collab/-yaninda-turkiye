@@ -462,6 +462,9 @@ function Nearby(){
        const fallbackArea=searchDistrict||searchProvince||'seçili bölge';
        setLocationNotice('Konum alınamadı; mesafeler '+fallbackArea+' merkezine göre. Siteyi Safari\'de açmayı dene.');
      }
+   }else if(!searchPosition&&(locationState==='denied'||locationState==='unsupported')){
+     const fallbackArea=searchDistrict||searchProvince||'seçili bölge';
+     setLocationNotice('Konum alınamadı; mesafeler '+fallbackArea+' merkezine göre. Siteyi Safari\'de açmayı dene.');
    }
    if(!searchProvince.trim()&&!searchPosition){setLoading(false);setErr('Arama için konumunu kullan veya il seç.');return;}
    if(searchProvince.trim()&&!provinces.includes(resolveName(searchProvince,provinces)||searchProvince)){setLoading(false);setErr('İl adını listeden seç.');return;}
