@@ -515,7 +515,7 @@ function Nearby(){
      </div>}
 
      <div className="action-row">
-       <button className="search-filter primary-search" onClick={search} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
+       <button className="search-filter primary-search" onClick={()=>search()} disabled={loading}><Search/>{loading?'Aranıyor…':pharmacyMode?'Nöbetçi Eczaneleri Bul':'Yakınımdakileri Bul'}</button>
      </div>
    </div>
 
