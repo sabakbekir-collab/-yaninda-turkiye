@@ -474,6 +474,16 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
         dutyDate=secondary.date;
       }
     }
+    // General OSM pharmacy records are returned separately and are never marked as on duty.
+    const nearbyQuery=await getPois(env,'pharmacy',lat,lon,effectiveRadius);
+    const dutyKeys=new Set(dutyResult.map(place=>slug(place.name)+'|'+place.lat.toFixed(4)+'|'+place.lon.toFixed(4)));
+    const nearbyPharmacies=nearbyQuery.places
+      .filter(place=>!dutyKeys.has(slug(place.name)+'|'+place.lat.toFixed(4)+'|'+place.lon.toFixed(4)))
+      .map(place=>({...place,isDuty:false,source:'OpenStreetMap — nöbetçi değil'}));
+    if(!dutyResult.length&&nearbyPharmacies.length){
+      if(debug)return jsonResponse({ok:true,source:'OpenStreetMap',query:{category,province,district},coordinates:{lat,lon},feedDate:null,activeDutyDates:activeDutyDates(),resultCount:0,nearbyCount:nearbyPharmacies.length,reason:'no_current_duty_records',sample:nearbyPharmacies.slice(0,5)},{headers:{'Cache-Control':'no-store','X-Data-Source':'OpenStreetMap'}});
+      return jsonResponse(nearbyPharmacies.slice(0,40),{headers:{'Cache-Control':'no-store','X-Data-Source':'OpenStreetMap'}});
+    }
     if(!dutyResult.length){
       const stale=primaryDuty.reason==='stale_duty_list'||secondaryReason==='stale_duty_list';
       const failed=!primaryDuty.ok||Boolean(secondaryReason)||stale;
@@ -485,11 +495,12 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     if(debug)return jsonResponse({ok:true,source:dutySource,query:{category,province,district,normalizedProvince:slug(dutyProvince),normalizedDistrict:slug(dutyDistrict)},coordinates:{lat,lon},feedDate:dutyDate||null,activeDutyDates:activeDutyDates(),resultCount:dutyResult.length,reason:null,sample:dutyResult.slice(0,5)}, {headers:{'Cache-Control':'no-store','X-Data-Source':dutySource}});
     // Never cache an empty duty result: an upstream "today" miss must not
     // become a persistent false zero.
-    if(dutyResult.length)await dbCachePut(env,key,dutyResult,5*60*1000);
-    const headers=new Headers({'Cache-Control':dutyResult.length?'public,max-age=300':'no-store','X-Data-Source':'Eczane Adresi'});
+    const combinedDutyAndNearby=[...dutyResult,...nearbyPharmacies].slice(0,40);
+    if(combinedDutyAndNearby.length)await dbCachePut(env,key,combinedDutyAndNearby,5*60*1000);
+    const headers=new Headers({'Cache-Control':combinedDutyAndNearby.length?'public,max-age=300':'no-store','X-Data-Source':'Eczane Adresi'});
     headers.set('X-Data-Source',dutySource);
     if(dutyDate)headers.set('X-Duty-Date',dutyDate);
-    return jsonResponse(dutyResult,{headers});
+    return jsonResponse(combinedDutyAndNearby,{headers});
   }
 
   const primary=await getPois(env,category,lat,lon,effectiveRadius);
