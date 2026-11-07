@@ -298,7 +298,6 @@ function Nearby(){
  const[hasSearched,setHasSearched]=useState(false);
  const[pos,setPos]=useState<Position|undefined>();
  const[locationState,setLocationState]=useState<'unknown'|'granted'|'denied'|'prompt'|'unsupported'>('unknown');
- const[manualAreaChosen,setManualAreaChosen]=useState(false);
  const manualAreaChosenRef=useRef(false);
  const[submitted,setSubmitted]=useState<{category:string;province:string;district:string;radius:number;nearbyDistricts:boolean;pos?:Position;anchor:'gps'|'area';forceRefresh?:boolean}|null>(null);
 
@@ -399,7 +398,7 @@ function Nearby(){
      setCat(resolved);
      setHasSearched(true);
      if(province){
-       setSubmitted({category:resolved,province,district,radius,nearbyDistricts});
+       setSubmitted({category:resolved,province,district,radius,nearbyDistricts,anchor:'area'});
      }else{
        setErr('Kategori bulundu. Arama yapmak için il ve ilçe seç.');
      }
@@ -446,7 +445,7 @@ function Nearby(){
      setProvince(area.province);
      setDistrict(area.district);
      setHasSearched(true);
-     manualAreaChosenRef.current=false;setManualAreaChosen(false);
+     manualAreaChosenRef.current=false;
      setSubmitted({category:cat,province:area.province,district:area.district,radius,nearbyDistricts,pos:current,anchor:'gps'});
    }catch(e){
      const denied=e instanceof LocationError&&e.code==='permission_denied';
@@ -501,7 +500,7 @@ function Nearby(){
          <span>İl</span>
          <input role="combobox" aria-autocomplete="list" aria-expanded={provinceOpen&&provinceOptions.length>0} autoComplete="off" value={province}
            onFocus={()=>setProvinceOpen(true)}
-           onChange={e=>{manualAreaChosenRef.current=true;setManualAreaChosen(true);setProvince(e.target.value);setDistrict('');setProvinceOpen(true);setDistrictOpen(false)}}
+           onChange={e=>{manualAreaChosenRef.current=true;setProvince(e.target.value);setDistrict('');setProvinceOpen(true);setDistrictOpen(false)}}
            onBlur={()=>window.setTimeout(()=>setProvinceOpen(false),120)}
            placeholder="İl yazın (ör. Muş)" inputMode="text"/>
          {provinceOpen&&provinceOptions.length>0&&<div className="autocomplete-options" role="listbox">
