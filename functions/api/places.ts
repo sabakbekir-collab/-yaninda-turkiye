@@ -433,7 +433,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
 
   // Never label an OSM pharmacy as "nöbetçi". Official duty integration is deliberately
   // disabled until a structured, current official feed is available.
-  const key=placesCacheKey(category,anchor,lat.toFixed(4),lon.toFixed(4),province,district,String(effectiveRadius),nearbyDistricts?'1':'0');
+  const key=placesCacheKey(category,anchor,lat.toFixed(4),lon.toFixed(4),province,district,String(effectiveRadius),nearbyDistricts?'1':'0',u.searchParams.get('refresh')||'');
   const cached=debug?null:await dbCacheGet(env,key);
   if(cached&&typeof cached==='object'&&!Array.isArray(cached)&&Array.isArray((cached as {places?:unknown}).places)){
     const snapshot=cached as {places:Place[];partial?:boolean};
