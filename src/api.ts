@@ -7,6 +7,7 @@ export type PlaceSearchOptions={
   radiusKm?:number;
   nearbyDistricts?:boolean;
   anchor?:'gps'|'area';
+  forceRefresh?:boolean;
 };
 
 export type ResolvedLocationArea={province:string;district:string};
@@ -43,6 +44,7 @@ export async function findPlaces(
   if(district)p.set('district',district);
   p.set('radius',String(options.radiusKm??5));
   p.set('nearbyDistricts',options.nearbyDistricts?'1':'0');
+  if(options.forceRefresh)p.set('refresh',String(Date.now()));
 
   let r:Response;
   try{
