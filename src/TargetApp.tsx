@@ -247,7 +247,7 @@ function Home(){
       <button onClick={()=>{if(navigator.share)navigator.share({title:'Yanımda Türkiye',text:'Yanımda Türkiye'});else void navigator.clipboard?.writeText(location.href)}}><ExternalLink/><b>Paylaş</b></button>
     </div>
    </section>
-   <section className="modern-service-list" aria-busy={locating}>\n    {locating&&<div className="home-locating-status" role="status" aria-live="polite">Konumun alınıyor…</div>}
+   <section className="modern-service-list" aria-busy={locating}>{locating&&<div className="home-locating-status" role="status" aria-live="polite">Konumun alınıyor…</div>}
     {cards.map(([id,title,text,tone,Icon,img])=><button key={id} type="button" disabled={locating} aria-disabled={locating} className={"modern-service-card "+tone} onClick={()=>go(id)}>
       <span className="modern-service-icon"><Icon/></span><div><strong>{title}</strong><small>{text}</small></div>{img&&<img src={img} alt=""/>}<span className="modern-card-arrow"><ChevronRight/></span>
     </button>)}
@@ -452,7 +452,7 @@ function Nearby(){
        setErr('Kategori bulundu. Arama yapmak için il ve ilçe seç.');
      }
    }
-  // Consume each navigation-state snapshot once; avoid rerunning this transition for its own state updates.\n  // eslint-disable-next-line react-hooks/exhaustive-deps\n },[location.key]);
+ },[location.key]); // eslint-disable-line react-hooks/exhaustive-deps
 
  useEffect(()=>{
    if(!submitted)return;
