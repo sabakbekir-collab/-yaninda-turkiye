@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { needsGpsRequest, accuracyWarning } from "../src/searchPlan.ts";
-import { haversineKm, resolveDistanceOrigin } from "../functions/lib/geoDistance.ts";
+import { haversineKm, resolveDistanceOrigin, countRecordsNearAnother } from "../functions/lib/geoDistance.ts";
 
 test("a user gesture requests GPS when no position exists and permission is prompt or granted", () => {
   assert.equal(needsGpsRequest({ pos: undefined, permission: "prompt", userGesture: true }), true);
@@ -37,4 +37,14 @@ test("area searches use their area centre when GPS is not selected", () => {
   const client = { lat: 38.7432, lon: 41.5064 };
   const area = { lat: 38.7500, lon: 41.5000 };
   assert.deepEqual(resolveDistanceOrigin("area", client, area), area);
+});
+
+test("25m proximity measurement counts neighbouring records without removing duplicates", () => {
+  const points = [
+    { lat: 38.7432, lon: 41.5064 },
+    { lat: 38.7432, lon: 41.5065 },
+    { lat: 38.7500, lon: 41.5064 },
+    { lat: 38.7501, lon: 41.5064 },
+  ];
+  assert.deepEqual(countRecordsNearAnother(points, 25), { recordsWithNeighbour: 4, closePairs: 2 });
 });
