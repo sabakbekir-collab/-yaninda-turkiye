@@ -28,3 +28,11 @@ export function accuracyWarning(accuracyM?: number | null): string | null {
   if (typeof accuracyM !== "number" || !Number.isFinite(accuracyM) || accuracyM <= 150) return null;
   return "Konum doğruluğu düşük (±" + Math.round(accuracyM) + " m)";
 }
+
+export type NonDutySectionStatus = "idle" | "loading" | "success" | "error";
+export function nonDutySectionState(input: { status: NonDutySectionStatus; count: number }): "loading" | "empty" | "error" | "results" | "idle" {
+  if (input.status === "loading") return "loading";
+  if (input.status === "error") return "error";
+  if (input.status === "success") return input.count > 0 ? "results" : "empty";
+  return "idle";
+}
