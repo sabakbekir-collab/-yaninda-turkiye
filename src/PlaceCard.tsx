@@ -42,7 +42,7 @@ export default function PlaceCard({p,distanceLabel}:{p:Place;distanceLabel?:stri
     <div className="place-body">
       <div className="place-title-row"><h3>{p.name?.trim()||'İşletme adı bulunamadı'}</h3>{p.isDuty&&<span className="duty-badge">NÖBETÇİ</span>}</div>
       <p>{cleanCardAddress(p.address)}</p>
-      <small className="place-meta-line">{typeof p.distance==='number'&&<><Navigation/> <b>{formatDistance(p.distance)}</b> · {distanceLabel||'Konumuna göre, kuş uçuşu'} · </>}<ShieldCheck/> {p.source}</small>
+      <small className="place-meta-line">{typeof p.distance==='number'&&<><Navigation/> <b>{formatDistance(p.distance)}</b> · {distanceLabel||'Konumuna göre, kuş uçuşu'} · </>}<ShieldCheck/> {p.source==='OpenStreetMap'?'OpenStreetMap — eksik olabilir':p.source}</small>
       {p.district&&<small className="place-district">İlçe: {p.district}</small>}
       {p.isDuty&&<small className="place-source-note">Üçüncü taraf kaynağından alınmıştır; resmî kurum doğrulaması değildir. Gitmeden telefonla teyit et. {p.verifiedAt&&'Veri tarihi: '+p.verifiedAt} {p.officialUrl&&<a href={p.officialUrl} target="_blank" rel="noreferrer">Resmî e-Devlet sorgusu</a>}</small>}
       {openingHours&&<small className="place-opening-hours"><b>{openingHours.label}:</b> {openingHours.value}</small>}
