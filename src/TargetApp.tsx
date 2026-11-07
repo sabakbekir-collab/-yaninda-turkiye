@@ -589,8 +589,8 @@ function Nearby(){
      </div>
 
      <div className="category-chips" aria-label="Kategori">
-       {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>{setCat(c.id);setPlaces([]);setNearbyPharmacies([]);setHasSearched(false);setErr('');setSubmitted(null);if(c.id!=='pharmacy')void search(false,c.id);}}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
-       {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);setPlaces([]);setNearbyPharmacies([]);setHasSearched(false);setErr('');setSubmitted(null);void search(false,id);}}><Icon/><span>{label}</span></button>})}
+       {categoryList.slice(0,9).map(c=>{const Icon=categoryIcon(c.id);return <button key={c.id} className={cat===c.id?'active':''} onClick={()=>{setCat(c.id);setPlaces([]);setNearbyPharmacies([]);setNonDutyStatus('idle');setHasSearched(false);setErr('');setSubmitted(null);if(c.id!=='pharmacy')void search(false,c.id);}}><Icon/><span>{c.id==='pharmacy'?'Eczane':c.label.replace('En Yakın ','')}</span></button>})}
+       {services.slice(0,6).map(([id,label])=>{const Icon=categoryIcon(id);return <button key={id} className={cat===id?'active':''} onClick={()=>{setCat(id);setPlaces([]);setNearbyPharmacies([]);setNonDutyStatus('idle');setHasSearched(false);setErr('');setSubmitted(null);void search(false,id);}}><Icon/><span>{label}</span></button>})}
      </div>
 
      {!pharmacyMode&&<div className="search-options">
@@ -659,7 +659,7 @@ function Nearby(){
        {nearbyPharmacies.map(p=><EnhancedPlaceCard key={p.id} p={{...p,isDuty:undefined}} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'}/>)}
        {nonDutyView==='loading'&&<div className="results skeleton-results" aria-label="Yakındaki eczaneler yükleniyor">{[1,2].map(i=><div className="nearby-skeleton" key={i}/>)}</div>}
        {nonDutyView==='empty'&&<small>Yakında genel eczane kaydı bulunamadı.</small>}
-       {nonDutyView==='error'&&<div role="alert"><small>Harita kaynağı yanıt vermedi.</small> <button type="button" onClick={()=>{if(!submitted)return;setNonDutyStatus('loading');findPlaces('pharmacy',submitted.pos,submitted.province,submitted.district,{radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts,anchor:submitted.anchor,forceRefresh:true,includeNonDutyPharmacies:true}).then(rows=>{setNearbyPharmacies(rows.map(p=>({...p,isDuty:undefined})));setNonDutyStatus('success')}).catch(()=>setNonDutyStatus('error'))}}>Tekrar Ara</button></div>}
+       {nonDutyView==='error'&&<div role="alert"><small>Harita kaynağı yanıt vermedi.</small> <button type="button" onClick={()=>{if(submitted)setSubmitted({...submitted,forceRefresh:true})}}>Tekrar Ara</button></div>}
      </section>}
    </>
    }
