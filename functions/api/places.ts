@@ -8,7 +8,7 @@ import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery'
 import {activeDutyDates,dutyDateKey,isActiveDutyDate} from '../lib/dutyDates';
 import {classifyOverpassBody} from '../lib/overpassBody';
 import {cachePolicyFor} from '../lib/placesCachePolicy';
-import {haversineKm} from '../lib/geoDistance';
+import {haversineKm,countRecordsNearAnother} from '../lib/geoDistance';
 
 type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
 
@@ -547,6 +547,10 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     .sort((a,b)=>(a.distance??999)-(b.distance??999))
     .slice(0,40);
 
+  if(debug){
+    const proximity25m=countRecordsNearAnother(result.map(place=>({lat:place.lat,lon:place.lon})),25);
+    return jsonResponse({ok:upstreamOk,category,province,district,anchor,center:{lat,lon},radiusKm:effectiveRadius,resultCount:result.length,proximity25m,records:result},{headers:{'Cache-Control':'no-store'}});
+  }
   if(!result.length&&!upstreamOk)return jsonResponse({error:'upstream_unavailable',attempts,center:{lat,lon}},{status:503,headers:{'Cache-Control':'no-store'}});
   const partial=Boolean(primary.partial);
   const policy=cachePolicyFor({ok:true,resultCount:result.length,partial});
