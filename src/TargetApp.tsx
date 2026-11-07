@@ -21,8 +21,7 @@ import {shareText,mapsLink} from './share';
 import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor, officialLinkFor } from './dutyLink';
 import { shouldShowEmpty } from './searchErrors';
-import { pharmacyResultsView } from './pharmacyView';
-import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning, isPositionFresh, shouldRequestGpsOnEntry, homeEntryOutcome, canStartEntry } from './searchPlan';
+import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning, isPositionFresh, shouldRequestGpsOnEntry, homeEntryOutcome, canStartEntry, pharmacyResultsView } from './searchPlan';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
 
