@@ -1,4 +1,4 @@
-name: Live duty probe
+name: Live duty source coverage
 on:
   pull_request:
     paths:
@@ -7,154 +7,216 @@ on:
 permissions:
   contents: read
 jobs:
-  probe:
+  coverage:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-    env:
-      BASE: https://yaninda-turkiye.sabakbekir.workers.dev
+    timeout-minutes: 10
     steps:
-      - name: Istanbul clock
-        run: |
-          echo "TODAY=$(TZ=Europe/Istanbul date +%Y-%m-%d)" >> "$GITHUB_ENV"
-          echo "YESTERDAY=$(TZ=Europe/Istanbul date -d yesterday +%Y-%m-%d)" >> "$GITHUB_ENV"
-          echo "HOUR=$(TZ=Europe/Istanbul date +%H)" >> "$GITHUB_ENV"
-          TZ=Europe/Istanbul date
-      - name: Health
-        run: curl -sS --max-time 20 "$BASE/api/health?v=$GITHUB_SHA-$GITHUB_RUN_ID" | tee health.json
-      - name: Mus debug
-        run: |
-          curl -sS -G --max-time 40 -o mus-debug.json -w "HTTP %{http_code}\n" "$BASE/api/places" --data-urlencode "category=pharmacy" --data-urlencode "province=Muş" --data-urlencode "radius=5" --data-urlencode "anchor=area" --data-urlencode "debug=1" --data-urlencode "v=$GITHUB_RUN_ID"
-          head -c 6000 mus-debug.json
-      - name: Ankara debug
-        run: |
-          curl -sS -G --max-time 40 -o ankara-debug.json -w "HTTP %{http_code}\n" "$BASE/api/places" --data-urlencode "category=pharmacy" --data-urlencode "province=Ankara" --data-urlencode "district=Çankaya" --data-urlencode "radius=5" --data-urlencode "anchor=area" --data-urlencode "debug=1" --data-urlencode "v=$GITHUB_RUN_ID"
-          head -c 6000 ankara-debug.json
-      - name: Mus normal call
-        run: |
-          curl -sS -G --max-time 40 -D mus-headers.txt -o mus.json -w "HTTP %{http_code}\n" "$BASE/api/places" --data-urlencode "category=pharmacy" --data-urlencode "province=Muş" --data-urlencode "radius=5" --data-urlencode "anchor=area" --data-urlencode "v=$GITHUB_RUN_ID"
-          cat mus-headers.txt
-          head -c 3000 mus.json
-      - name: Ankara normal call
-        run: |
-          curl -sS -G --max-time 40 -D ankara-headers.txt -o ankara.json -w "HTTP %{http_code}\n" "$BASE/api/places" --data-urlencode "category=pharmacy" --data-urlencode "province=Ankara" --data-urlencode "district=Çankaya" --data-urlencode "radius=5" --data-urlencode "anchor=area" --data-urlencode "v=$GITHUB_RUN_ID"
-          cat ankara-headers.txt
-          head -c 3000 ankara.json
-      - name: Direct provider GET probes pass 1
-        run: |
-          probe_fail=0
-          probe() {
-            name="$1"
-            url="$2"
-            shift 2
-            echo "===== $name ====="
-            curl -sS --fail-with-body -G --max-time 30 -D "$name.headers" -o "$name.json" -w "HTTP %{http_code}\n" "$url" -H "Accept: application/json" -H "User-Agent: YanimdaTurkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)" "$@"
-            rc=$?
-            echo "CURL_EXIT=$rc"
-            if [ -f "$name.headers" ]; then
-              echo "RESPONSE_HEADERS:"
-              awk 'BEGIN { IGNORECASE=1 } /^date:|^cache-control:|^age:|^cf-cache-status:|^last-modified:|^etag:/ {print}' "$name.headers"
-            fi
-            if [ -f "$name.json" ]; then
-              echo "BODY_FIRST_3000:"
-              head -c 3000 "$name.json"
-              echo
-              if jq -e . "$name.json" >/dev/null 2>&1; then
-                echo "DATE_FIELDS:"
-                jq -r '[paths(scalars) as $p | ($p[-1] | tostring) as $k | select($k | test("date|updated|last.?update|tarih|roster"; "i")) | {path: ($p | map(tostring) | join(".")), value: getpath($p)}] | if length > 0 then .[] | "\(.path)=\(.value)" else "NO_MATCHING_DATE_FIELDS" end' "$name.json"
-                echo "TOP_LEVEL_KEYS:"
-                jq -r 'if type == "object" then keys[] else "root_type=" + type end' "$name.json"
-              else
-                echo "JSON_PARSE_FAILED"
-              fi
-            else
-              echo "BODY_FILE_MISSING"
-            fi
-            if [ "$rc" -ne 0 ]; then probe_fail=1; fi
-          }
-          probe eczane-mus-pass1 https://eczaneadresi.com/api/public/v1/duty-pharmacies --data-urlencode "city=mus" --data-urlencode "limit=200"
-          probe eczane-ankara-district-pass1 https://eczaneadresi.com/api/public/v1/duty-pharmacies --data-urlencode "city=ankara" --data-urlencode "district=cankaya" --data-urlencode "limit=200"
-          probe eczane-ankara-province-fallback-pass1 https://eczaneadresi.com/api/public/v1/duty-pharmacies --data-urlencode "city=ankara" --data-urlencode "limit=200"
-          probe turkpidya-mus-pass1 https://turkpidya.com/wp-json/turkpidya-data/v1/pharmacies/on-duty --data-urlencode "city=mus"
-          probe turkpidya-ankara-pass1 https://turkpidya.com/wp-json/turkpidya-data/v1/pharmacies/on-duty --data-urlencode "city=ankara"
-          exit "$probe_fail"
-      - name: Wait 20 seconds
-        run: sleep 20
-      - name: Direct provider GET probes pass 2 and cache bust
-        run: |
-          probe_fail=0
-          probe() {
-            name="$1"
-            url="$2"
-            shift 2
-            echo "===== $name ====="
-            curl -sS --fail-with-body -G --max-time 30 -D "$name.headers" -o "$name.json" -w "HTTP %{http_code}\n" "$url" -H "Accept: application/json" -H "User-Agent: YanimdaTurkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)" "$@"
-            rc=$?
-            echo "CURL_EXIT=$rc"
-            if [ -f "$name.headers" ]; then
-              echo "RESPONSE_HEADERS:"
-              awk 'BEGIN { IGNORECASE=1 } /^date:|^cache-control:|^age:|^cf-cache-status:|^last-modified:|^etag:/ {print}' "$name.headers"
-            fi
-            if [ -f "$name.json" ]; then
-              echo "BODY_FIRST_3000:"
-              head -c 3000 "$name.json"
-              echo
-              if jq -e . "$name.json" >/dev/null 2>&1; then
-                echo "DATE_FIELDS:"
-                jq -r '[paths(scalars) as $p | ($p[-1] | tostring) as $k | select($k | test("date|updated|last.?update|tarih|roster"; "i")) | {path: ($p | map(tostring) | join(".")), value: getpath($p)}] | if length > 0 then .[] | "\(.path)=\(.value)" else "NO_MATCHING_DATE_FIELDS" end' "$name.json"
-                echo "TOP_LEVEL_KEYS:"
-                jq -r 'if type == "object" then keys[] else "root_type=" + type end' "$name.json"
-              else
-                echo "JSON_PARSE_FAILED"
-              fi
-            else
-              echo "BODY_FILE_MISSING"
-            fi
-            if [ "$rc" -ne 0 ]; then probe_fail=1; fi
-          }
-          probe eczane-mus-pass2 https://eczaneadresi.com/api/public/v1/duty-pharmacies --data-urlencode "city=mus" --data-urlencode "limit=200"
-          probe eczane-ankara-district-pass2 https://eczaneadresi.com/api/public/v1/duty-pharmacies --data-urlencode "city=ankara" --data-urlencode "district=cankaya" --data-urlencode "limit=200"
-          probe eczane-ankara-province-fallback-pass2 https://eczaneadresi.com/api/public/v1/duty-pharmacies --data-urlencode "city=ankara" --data-urlencode "limit=200"
-          probe turkpidya-mus-pass2 https://turkpidya.com/wp-json/turkpidya-data/v1/pharmacies/on-duty --data-urlencode "city=mus"
-          probe turkpidya-ankara-pass2 https://turkpidya.com/wp-json/turkpidya-data/v1/pharmacies/on-duty --data-urlencode "city=ankara"
-          probe eczane-mus-cache-bust https://eczaneadresi.com/api/public/v1/duty-pharmacies --data-urlencode "city=mus" --data-urlencode "limit=200" --data-urlencode "v=$GITHUB_RUN_ID"
-          exit "$probe_fail"
-      - name: Upload direct provider results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: direct-provider-probe
-          path: |
-            eczane-*.json
-            eczane-*.headers
-            turkpidya-*.json
-            turkpidya-*.headers
-      - name: Assert no stale duty rows
+      - name: Measure two public API sources for all provinces
+        shell: bash
         run: |
           set -u
-          fail=0
-          for f in mus.json ankara.json; do
-            dates=$(jq -r '(if type=="array" then . else (.places // []) end) | [.[] | select(.verifiedAt != null) | (.verifiedAt|tostring)[0:10]] | unique | .[]' "$f" 2>/dev/null || true)
-            count=$(jq -r '(if type=="array" then . else (.places // []) end) | length' "$f" 2>/dev/null || echo "n/a")
-            echo "$f rows=$count dates=[$dates]"
-            for d in $dates; do
-              if [ "$d" != "$TODAY" ]; then
-                if [ "$d" = "$YESTERDAY" ] && [ "$HOUR" -lt 9 ]; then continue; fi
-                echo "STALE DATE $d in $f"
-                fail=1
+          TODAY=$(TZ=Europe/Istanbul date +%Y-%m-%d)
+          YESTERDAY=$(TZ=Europe/Istanbul date -d yesterday +%Y-%m-%d)
+          HOUR=$(TZ=Europe/Istanbul date +%H)
+          echo "Istanbul date=$TODAY hour=$HOUR"
+          cat > provinces.txt <<'PROVINCES'
+Adana|adana
+Adıyaman|adiyaman
+Afyonkarahisar|afyonkarahisar
+Ağrı|agri
+Aksaray|aksaray
+Amasya|amasya
+Ankara|ankara
+Antalya|antalya
+Ardahan|ardahan
+Artvin|artvin
+Aydın|aydin
+Balıkesir|balikesir
+Bartın|bartin
+Batman|batman
+Bayburt|bayburt
+Bilecik|bilecik
+Bingöl|bingol
+Bitlis|bitlis
+Bolu|bolu
+Burdur|burdur
+Bursa|bursa
+Çanakkale|canakkale
+Çankırı|cankiri
+Çorum|corum
+Denizli|denizli
+Diyarbakır|diyarbakir
+Düzce|duzce
+Edirne|edirne
+Elazığ|elazig
+Erzincan|erzincan
+Erzurum|erzurum
+Eskişehir|eskisehir
+Gaziantep|gaziantep
+Giresun|giresun
+Gümüşhane|gumushane
+Hakkâri|hakkari
+Hatay|hatay
+Iğdır|igdir
+Isparta|isparta
+İstanbul|istanbul
+İzmir|izmir
+Kahramanmaraş|kahramanmaras
+Karabük|karabuk
+Karaman|karaman
+Kars|kars
+Kastamonu|kastamonu
+Kayseri|kayseri
+Kilis|kilis
+Kırıkkale|kirikkale
+Kırklareli|kirklareli
+Kırşehir|kirsehir
+Kocaeli|kocaeli
+Konya|konya
+Kütahya|kutahya
+Malatya|malatya
+Manisa|manisa
+Mardin|mardin
+Mersin|mersin
+Muğla|mugla
+Muş|mus
+Nevşehir|nevsehir
+Niğde|nigde
+Ordu|ordu
+Osmaniye|osmaniye
+Rize|rize
+Sakarya|sakarya
+Samsun|samsun
+Siirt|siirt
+Sinop|sinop
+Sivas|sivas
+Şanlıurfa|sanliurfa
+Şırnak|sirnak
+Tekirdağ|tekirdag
+Tokat|tokat
+Trabzon|trabzon
+Tunceli|tunceli
+Uşak|usak
+Van|van
+Yalova|yalova
+Yozgat|yozgat
+Zonguldak|zonguldak
+PROVINCES
+          printf '%s\n' 'province,slug,ea_http,ea_date,ea_count,ea_pharmacies,ea_first_row_date,ea_today,tp_http,tp_duty_date,tp_city_duty_date,tp_count,tp_pharmacies,tp_coordinate_rows,tp_cities_served,tp_cities_blocked,tp_last_updated,tp_today' > coverage.csv
+          : > coverage.md
+          ea_today_count=0
+          tp_today_count=0
+          either_today_count=0
+          neither_count=0
+          failed=0
+          stop_code=""
+          is_today() {
+            value="$1"
+            [ -n "$value" ] || return 1
+            value="${value:0:10}"
+            [ "$value" = "$TODAY" ] && return 0
+            [ "$HOUR" -lt 9 ] && [ "$value" = "$YESTERDAY" ]
+          }
+          csv_row() {
+            jq -cn --args '$ARGS.positional | @csv' -- "$@"
+          }
+          fetch_one() {
+            provider="$1"
+            slug="$2"
+            url="$3"
+            shift 3
+            body="${provider}-${slug}.json"
+            http=$(curl -sS --connect-timeout 10 --max-time 20 -G -o "$body" -w '%{http_code}' "$url" -H 'Accept: application/json' -H 'User-Agent: YanimdaTurkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)' "$@" 2>"${provider}-${slug}.stderr")
+            curl_rc=$?
+            if [ "$curl_rc" -ne 0 ]; then
+              if [ "$curl_rc" -eq 28 ]; then echo "hata: timeout"; else echo "hata: curl-$curl_rc"; fi
+              return 1
+            fi
+            if [ "$http" = "403" ] || [ "$http" = "429" ]; then
+              stop_code="$http"
+              echo "hata: $http"
+              return 1
+            fi
+            if [ "$http" -lt 200 ] || [ "$http" -ge 300 ]; then
+              echo "hata: $http"
+              return 1
+            fi
+            if ! jq -e . "$body" >/dev/null 2>&1; then
+              echo "hata: json"
+              return 1
+            fi
+            echo "ok"
+            return 0
+          }
+          while IFS='|' read -r province slug; do
+            ea_http=""; ea_date=""; ea_count=""; ea_pharmacies=""; ea_first=""; ea_today="hayır"
+            tp_http=""; tp_date=""; tp_city_date=""; tp_count=""; tp_pharmacies=""; tp_coords=""; tp_served=""; tp_blocked=""; tp_updated=""; tp_today="hayır"
+            if [ -n "$stop_code" ]; then
+              ea_http="atlandı: $stop_code"; tp_http="atlandı: $stop_code"
+            else
+              echo "===== $province ($slug) / Eczane Adresi ====="
+              ea_status=$(fetch_one ea "$slug" 'https://eczaneadresi.com/api/public/v1/duty-pharmacies' --data-urlencode "city=$slug" --data-urlencode 'limit=200') || true
+              ea_http="$ea_status"
+              if [ "$ea_status" = "ok" ]; then
+                ea_date=$(jq -r '.date // ""' "ea-$slug.json")
+                ea_count=$(jq -r 'if .count == null then "" else (.count|tostring) end' "ea-$slug.json")
+                ea_pharmacies=$(jq -r 'if (.pharmacies|type)=="array" then (.pharmacies|length) else 0 end' "ea-$slug.json")
+                ea_first=$(jq -r '.pharmacies[0].date // ""' "ea-$slug.json")
+                if is_today "$ea_date"; then ea_today="evet"; fi
+              else
+                failed=1
               fi
-            done
-          done
-          exit $fail
-      - name: Upload raw results
+              sleep 1
+              if [ -z "$stop_code" ]; then
+                echo "===== $province ($slug) / Turkpidya ====="
+                tp_status=$(fetch_one tp "$slug" 'https://turkpidya.com/wp-json/turkpidya-data/v1/pharmacies/on-duty' --data-urlencode "city=$slug") || true
+                tp_http="$tp_status"
+                if [ "$tp_status" = "ok" ]; then
+                  tp_date=$(jq -r '.duty_date // ""' "tp-$slug.json")
+                  tp_city_date=$(jq -r --arg city "$slug" 'if (.duty_dates|type)=="object" then (.duty_dates[$city] // "") else "" end' "tp-$slug.json")
+                  tp_count=$(jq -r 'if .count == null then "" else (.count|tostring) end' "tp-$slug.json")
+                  tp_pharmacies=$(jq -r 'if (.pharmacies|type)=="array" then (.pharmacies|length) else 0 end' "tp-$slug.json")
+                  tp_coords=$(jq -r 'if (.pharmacies|type)=="array" then ([.pharmacies[] | select(.lat != null and .lat != "" and .lng != null and .lng != "")] | length) else 0 end' "tp-$slug.json")
+                  tp_served=$(jq -c '.cities_served // []' "tp-$slug.json")
+                  tp_blocked=$(jq -c '.cities_blocked // []' "tp-$slug.json")
+                  tp_updated=$(jq -r '.last_updated // ""' "tp-$slug.json")
+                  if is_today "$tp_date" || is_today "$tp_city_date"; then tp_today="evet"; fi
+                else
+                  failed=1
+                fi
+              else
+                tp_http="atlandı: $stop_code"
+              fi
+              if [ -n "$stop_code" ]; then failed=1; fi
+              sleep 1
+            fi
+            if [ "$ea_today" = "evet" ]; then ea_today_count=$((ea_today_count+1)); fi
+            if [ "$tp_today" = "evet" ]; then tp_today_count=$((tp_today_count+1)); fi
+            if [ "$ea_today" = "evet" ] || [ "$tp_today" = "evet" ]; then either_today_count=$((either_today_count+1)); else neither_count=$((neither_count+1)); fi
+            csv_row "$province" "$slug" "$ea_http" "$ea_date" "$ea_count" "$ea_pharmacies" "$ea_first" "$ea_today" "$tp_http" "$tp_date" "$tp_city_date" "$tp_count" "$tp_pharmacies" "$tp_coords" "$tp_served" "$tp_blocked" "$tp_updated" "$tp_today" >> coverage.csv
+            printf '| %s | %s | %s | %s | %s | %s | %s/%s |\n' "$province" "${ea_date:-$ea_http}" "${ea_count:-—}" "${tp_date:-$tp_http}" "${tp_count:-—}" "${tp_coords:-—}" "$ea_today" "$tp_today" >> coverage.md
+          done < provinces.txt
+          {
+            echo '# Nöbetçi eczane kaynak kapsama ölçümü'
+            echo
+            echo "İstanbul tarihi: $TODAY, saat: $HOUR (09:00 kuralı uygulandı)."
+            echo
+            echo '| İl | EA tarihi | EA sayı | TP tarihi | TP sayı | TP koordinatlı satır | Bugün mü (EA/TP) |'
+            echo '|---|---:|---:|---:|---:|---:|---|'
+            cat coverage.md
+            echo
+            echo "Bugün tarihli liste veren il sayısı: EA=$ea_today_count, TP=$tp_today_count, ikisinden biri=$either_today_count, hiçbiri=$neither_count"
+            echo
+            echo 'Hiçbiri olmayan iller:'
+            awk -F, 'NR>1 && $8!="evet" && $18!="evet" {print "- " $1}' coverage.csv
+            if [ -n "$stop_code" ]; then echo; echo "DURDURULDU: sağlayıcı HTTP $stop_code verdi; kalan iller sorgulanmadı."; fi
+            if [ "$failed" -ne 0 ]; then echo; echo 'Bir veya daha fazla sağlayıcı çağrısı hata verdi; ayrıntılar job logunda ve coverage.csv içindedir.'; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "CSV rows: $(($(wc -l < coverage.csv)-1))"
+          if [ "$failed" -ne 0 ]; then exit 1; fi
+      - name: Upload coverage CSV
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: live-duty-probe
-          path: |
-            health.json
-            mus-debug.json
-            ankara-debug.json
-            mus.json
-            ankara.json
-            mus-headers.txt
-            ankara-headers.txt
+          name: duty-source-coverage
+          path: coverage.csv
