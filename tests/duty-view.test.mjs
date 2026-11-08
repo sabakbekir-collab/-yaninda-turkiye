@@ -52,3 +52,9 @@ test('today feed cannot promote an undated pharmacy row to duty', () => {
 test('today feed filters out rows whose own date is stale', () => {
   assert.deepEqual(dutyViewState({ feedDate: today, items: [{ name: 'Eski eczane', verifiedAt: '2026-10-11' }], now: '2026-11-08T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'none', items: [] });
 });
+
+test('place action buttons wrap without horizontal clipping on narrow screens', () => {
+  const css = readFileSync(new URL('../src/target.css', import.meta.url), 'utf8');
+  assert.match(css, /\.nearby-place-card footer\.place-actions\{[^}]*flex-wrap:wrap[^}]*overflow:visible/);
+  assert.match(css, /\.nearby-place-card footer\.place-actions>a[^}]*min-width:0/);
+});
