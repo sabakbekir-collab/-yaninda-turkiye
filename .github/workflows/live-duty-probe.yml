@@ -1,0 +1,71 @@
+name: Live duty probe
+on:
+  pull_request:
+    paths:
+      - .github/workflows/live-duty-probe.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BASE: https://yaninda-turkiye.sabakbekir.workers.dev
+    steps:
+      - name: Istanbul clock
+        run: |
+          echo "TODAY=$(TZ=Europe/Istanbul date +%Y-%m-%d)" >> "$GITHUB_ENV"
+          echo "YESTERDAY=$(TZ=Europe/Istanbul date -d yesterday +%Y-%m-%d)" >> "$GITHUB_ENV"
+          echo "HOUR=$(TZ=Europe/Istanbul date +%H)" >> "$GITHUB_ENV"
+          TZ=Europe/Istanbul date
+      - name: Health
+        run: curl -sS --max-time 20 "$BASE/api/health?v=$GITHUB_SHA-$GITHUB_RUN_ID" | tee health.json
+      - name: Mus debug
+        run: |
+          curl -sS -G --max-time 40 -o mus-debug.json -w "HTTP %{http_code}\n" "$BASE/api/places" --data-urlencode "category=pharmacy" --data-urlencode "province=Muş" --data-urlencode "radius=5" --data-urlencode "anchor=area" --data-urlencode "debug=1" --data-urlencode "v=$GITHUB_RUN_ID"
+          head -c 6000 mus-debug.json
+      - name: Ankara debug
+        run: |
+          curl -sS -G --max-time 40 -o ankara-debug.json -w "HTTP %{http_code}\n" "$BASE/api/places" --data-urlencode "category=pharmacy" --data-urlencode "province=Ankara" --data-urlencode "district=Çankaya" --data-urlencode "radius=5" --data-urlencode "anchor=area" --data-urlencode "debug=1" --data-urlencode "v=$GITHUB_RUN_ID"
+          head -c 6000 ankara-debug.json
+      - name: Mus normal call
+        run: |
+          curl -sS -G --max-time 40 -D mus-headers.txt -o mus.json -w "HTTP %{http_code}\n" "$BASE/api/places" --data-urlencode "category=pharmacy" --data-urlencode "province=Muş" --data-urlencode "radius=5" --data-urlencode "anchor=area" --data-urlencode "v=$GITHUB_RUN_ID"
+          cat mus-headers.txt
+          head -c 3000 mus.json
+      - name: Ankara normal call
+        run: |
+          curl -sS -G --max-time 40 -D ankara-headers.txt -o ankara.json -w "HTTP %{http_code}\n" "$BASE/api/places" --data-urlencode "category=pharmacy" --data-urlencode "province=Ankara" --data-urlencode "district=Çankaya" --data-urlencode "radius=5" --data-urlencode "anchor=area" --data-urlencode "v=$GITHUB_RUN_ID"
+          cat ankara-headers.txt
+          head -c 3000 ankara.json
+      - name: Assert no stale duty rows
+        run: |
+          set -u
+          fail=0
+          for f in mus.json ankara.json; do
+            dates=$(jq -r '(if type=="array" then . else (.places // []) end) | [.[] | select(.verifiedAt != null) | (.verifiedAt|tostring)[0:10]] | unique | .[]' "$f" 2>/dev/null || true)
+            count=$(jq -r '(if type=="array" then . else (.places // []) end) | length' "$f" 2>/dev/null || echo "n/a")
+            echo "$f rows=$count dates=[$dates]"
+            for d in $dates; do
+              if [ "$d" != "$TODAY" ]; then
+                if [ "$d" = "$YESTERDAY" ] && [ "$HOUR" -lt 9 ]; then continue; fi
+                echo "STALE DATE $d in $f"
+                fail=1
+              fi
+            done
+          done
+          exit $fail
+      - name: Upload raw results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-duty-probe
+          path: |
+            health.json
+            mus-debug.json
+            ankara-debug.json
+            mus.json
+            ankara.json
+            mus-headers.txt
+            ankara-headers.txt
