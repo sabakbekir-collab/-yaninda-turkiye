@@ -644,20 +644,8 @@ function Nearby(){
    {pharmacyMode&&hasSearched&&!loading&&dutyView.kind==='list'&&<section className="duty-summary"><div className="result-head"><b>Bugün nöbetçi{shouldShowDutyCount(dutyItems.length)&&<span>{dutyItems.length}</span>}</b></div><div className="results">{dutyItems.map(p=><EnhancedPlaceCard key={p.id} p={{...p,isDuty:true}} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)}</div></section>}
    {pharmacyMode&&hasSearched&&!loading&&dutyView.kind==='none'&&(dutyError?<p className="duty-calm-error">Nöbetçi eczane kaynağına ulaşılamadı. <button type="button" onClick={()=>void search(true)}>Tekrar dene</button></p>:<div className="duty-calm-note"><p>Bugün için doğrulanmış nöbetçi listesi yok{dutySourceDate?' (kaynak tarihi: '+dutySourceDate+')':''}. Eski liste gösterilmiyor.</p>{officialDutyUrl&&<a href={officialDutyUrl} target="_blank" rel="noopener noreferrer">{dutyLink?.button||'Resmî nöbetçi eczane sorgusunu aç'} <ExternalLink/></a>}</div>)}
 
-   {pharmacyLiveWidget?
-    <section className="pharmacy-live-widget" aria-label="İlçe bazlı canlı nöbetçi eczane listesi">
-      <div className="result-head"><b>{canonProvince}{pharmacyDistrictSlug?' / '+canonDistrict+' İlçesi':' İli'} · Canlı nöbetçi eczaneler</b><a href={pharmacyWidgetUrl} target="_blank" rel="noreferrer">Kaynakta aç <ExternalLink/></a></div>
-      <iframe
-        src={pharmacyWidgetUrl}
-        title="Eczaneler.gen.tr ilçe bazlı canlı nöbetçi eczaneler"
-        loading="lazy"
-        referrerPolicy="strict-origin-when-cross-origin"
-        style={{width:'100%',height:420,border:0,borderRadius:14,background:'#fff'}}
-      />
-      <p className="pharmacy-widget-note"><strong>Hatırlatma:</strong> Nöbet listeleri değişebilir. Yola çıkmadan önce eczaneyi telefonla arayıp nöbetçi ve açık olduğunu teyit edin.</p>
-    </section>
-   :
    <>
+
     <div className="result-head">
      <b>{pharmacyMode?'Yakındaki eczaneler':activeLabel}{shouldShowDutyCount(displayPlaces.length)&&<span>{displayPlaces.length}</span>}</b>
      <div><button className={view==='list'?'active':''} onClick={()=>setView('list')}><List/>Liste</button><button className={view==='map'?'active':''} onClick={()=>setView('map')}><MapIcon/>Harita</button></div>
@@ -678,21 +666,20 @@ function Nearby(){
         ) : shouldShowEmpty({status:loading?'loading':err?'error':hasSearched?'success':'idle',forCategory:submitted?.category||'',currentCategory:cat,resultCount:visiblePlaces.length}) ? (
           <div className="empty nearby-empty">
             <MapPin />
-            <h3>{hasSearched ? (pharmacyMode ? 'Bu konumda güncel nöbetçi eczane kaydı bulunamadı' : 'Bu bölgede kayıt bulunamadı') : 'Arama yapmaya hazır'}</h3>
-            <p>{hasSearched ? (pharmacyMode ? 'Güncel nöbet kaydı doğrulanamadı. Yanlış bilgi vermemek için nöbetçi sonucu gösterilmiyor.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl ve ilçe seçip Yakınındakileri Bul’a bas. Konumunu kullanabilir veya il / ilçe seçebilirsin.'}</p>
+            <h3>{hasSearched ? (pharmacyMode ? 'Yakında genel eczane kaydı bulunamadı' : 'Bu bölgede kayıt bulunamadı') : 'Arama yapmaya hazır'}</h3>
+            <p>{hasSearched ? (pharmacyMode ? 'Bu bölgede gösterilebilecek yakın genel eczane kaydı bulunamadı.' : 'Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.') : 'İl ve ilçe seçip Yakınındakileri Bul’a bas. Konumunu kullanabilir veya il / ilçe seçebilirsin.'}</p>
             {hasSearched&&<button onClick={()=>search(true)}><Search/>Tekrar Ara</button>}
 
 
           </div>
         ) : (
-          {!pharmacyMode&&err?<div className="error nearby-error" role="alert">{err}</div>:null}
+          {!pharmacyMode&&err ? <div className="error nearby-error" role="alert">{err}</div> : null}
         )}
       </div>
      }
 
 
    </>
-   }
  </main>
 }
 function LegacyPlaceCard({p}:{p:Place}){
