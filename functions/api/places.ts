@@ -5,7 +5,7 @@ import {resolveSearchAnchor,chooseSearchCenter,placesCacheKey} from '../lib/sear
 import {isCentralDistrict,trSlug,resolveName} from '../../src/text';
 import {districtMap,districtsFor} from '../../src/turkeyDistricts';
 import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery';
-import {activeDutyDates,dutyDateKey,dutyRowAllowed} from '../lib/dutyDates';
+import {activeDutyDates,dutyDateKey,dutyRowAllowed,isActiveDutyDate} from '../lib/dutyDates';
 import {classifyOverpassBody} from '../lib/overpassBody';
 import {cachePolicyFor} from '../lib/placesCachePolicy';
 import {haversineKm,countRecordsNearAnother} from '../lib/geoDistance';
@@ -141,7 +141,7 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
     const rows=Array.isArray(body)?body:Array.isArray(root.pharmacies)?root.pharmacies:Array.isArray(root.data)?root.data:Array.isArray(nested.pharmacies)?nested.pharmacies:Array.isArray(nested.items)?nested.items:Array.isArray(root.results)?root.results:[];
     const rootDate=root.rosterDate??root.roster_date??root.sourceDate??root.source_date??root.date??root.tarih??nested.rosterDate??nested.roster_date??nested.date??nested.tarih;
     const sourceDate=dutyDateKey(rootDate)||undefined;
-    if(!dutyRowAllowed(undefined,rootDate))return {places:[],ok:false,date:sourceDate,reason:'stale_duty_list'};
+    if(!isActiveDutyDate(rootDate))return {places:[],ok:false,date:sourceDate,reason:'stale_duty_list'};
     const out:Place[]=[];
     for(const [i,value] of rows.entries()){
       if(!value||typeof value!=='object'||Array.isArray(value))continue;
@@ -176,7 +176,7 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
       return dutyRowAllowed(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih,rootDate);
     });
     const stale=!out.length&&Boolean(
-      (rootDate&&!dutyRowAllowed(undefined,rootDate))||
+      (rootDate&&!isActiveDutyDate(rootDate))||
       (hasDatedRows&&!hasActiveDatedRows)
     );
     return {places:out.slice(0,25),ok:!stale,date:sourceDate,reason:stale?'stale_duty_list':undefined};
@@ -188,7 +188,7 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
 
 export async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,_radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string;reason?:string;providerStatus?:number}>{
   const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string,applyDistrictFilter:boolean)=>{
-    if(!dutyRowAllowed(undefined,data.date)||!Array.isArray(data.pharmacies))return [];
+    if(!isActiveDutyDate(data.date)||!Array.isArray(data.pharmacies))return [];
     const out:Place[]=[];
     for(const [i,x] of data.pharmacies.entries()){
       // Provider JSON is untrusted: malformed null/primitive rows must not crash the whole response.
@@ -252,7 +252,7 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
     // Previously an empty October feed was incorrectly reported as a healthy
     // "no records today" response for a November lookup.
     if(!all.length&&!anyActive&&(
-      !dutyRowAllowed(undefined,data.date)||
+      !isActiveDutyDate(data.date)||
       (Array.isArray(data.pharmacies)&&data.pharmacies.length>0)
     ))return {places:[],ok:false,date:String(data.date??''),reason:'stale_duty_list'};
     return {places:all.slice(0,25),ok:true,date:data.date};
