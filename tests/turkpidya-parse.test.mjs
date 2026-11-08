@@ -6,7 +6,6 @@ import { trSlug } from '../src/text.ts';
 
 const slugify = trSlug;
 const now = new Date('2026-11-08T12:00:00+03:00');
-const active = activeDutyDates(now);
 const rows = Array.from({ length: 9 }, (_, i) => ({
   city: 'ankara',
   district: 'Cankaya',
