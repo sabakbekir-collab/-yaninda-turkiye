@@ -671,9 +671,7 @@ function Nearby(){
 
 
           </div>
-        ) : (
-          {!pharmacyMode&&err ? <div className="error nearby-error" role="alert">{err}</div> : null}
-        )}
+        ) : (!pharmacyMode&&err ? <div className="error nearby-error" role="alert">{err}</div> : null)}
       </div>
      }
 
