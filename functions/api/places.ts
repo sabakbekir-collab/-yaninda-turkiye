@@ -5,7 +5,7 @@ import {resolveSearchAnchor,chooseSearchCenter,placesCacheKey} from '../lib/sear
 import {isCentralDistrict,trSlug,resolveName} from '../../src/text';
 import {districtMap,districtsFor} from '../../src/turkeyDistricts';
 import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery';
-import {activeDutyDates,dutyDateKey,isActiveDutyDate} from '../lib/dutyDates';
+import {activeDutyDates,dutyDateKey,isActiveDutyDate,isTodayDutyDate} from '../lib/dutyDates';
 import {classifyOverpassBody} from '../lib/overpassBody';
 import {cachePolicyFor} from '../lib/placesCachePolicy';
 import {haversineKm,countRecordsNearAnother} from '../lib/geoDistance';
