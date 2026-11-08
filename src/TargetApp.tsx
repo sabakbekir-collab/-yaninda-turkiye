@@ -649,18 +649,18 @@ function Nearby(){
      <b>{pharmacyMode?'Yakındaki eczaneler':activeLabel}{shouldShowDutyCount(displayPlaces.length)&&<span>{displayPlaces.length}</span>}</b>
      <div><button className={view==='list'?'active':''} onClick={()=>setView('list')}><List/>Liste</button><button className={view==='map'?'active':''} onClick={()=>setView('map')}><MapIcon/>Harita</button></div>
     </div>
+    {pharmacyMode&&nearbyPharmacies.length>0&&<p className="pharmacy-results-note">Nöbet durumu doğrulanmadı; gitmeden telefonla teyit edin.</p>}
 
     {loading?<div className="results skeleton-results">{[1,2,3].map(i=><div className="nearby-skeleton" key={i}/>)}</div>:
      view==='map'&&displayPlaces[0]?<div className="map"><MapContainer center={[displayPlaces[0].lat,displayPlaces[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{displayPlaces.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:
       <div className="results">
         {displayPlaces.length > 0 ? (
           <>
-            {pharmacyMode&&<p className="pharmacy-results-note">Nöbet durumu doğrulanmadı; gitmeden telefonla teyit edin.</p>}
             {displayPlaces.map(p => <EnhancedPlaceCard key={p.id} p={pharmacyMode?{...p,isDuty:undefined}:p} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)}
           </>
         ) : pharmacyMode ? (
           nearbyStatus==='loading' ? <div className="results skeleton-results" aria-label="Yakındaki eczaneler yükleniyor">{[1,2,3].map(i=><div className="nearby-skeleton" key={i}/>)}</div> :
-          nearbyStatus==='error' ? <p className="duty-calm-error">Harita kaynağı yanıt vermedi. <button type="button" onClick={()=>void search(true)}>Tekrar dene</button></p> :
+          nearbyStatus==='error' ? (dutyError ? null : <p className="duty-calm-error">Harita kaynağı yanıt vermedi. <button type="button" onClick={()=>void search(true)}>Tekrar dene</button></p>) :
           <div className="empty nearby-empty"><MapPin/><h3>Yakında genel eczane kaydı bulunamadı</h3><p>Bu bölgede gösterilebilecek yakın genel eczane kaydı bulunamadı.</p><button onClick={()=>void search(true)}><Search/>Tekrar Ara</button></div>
         ) : shouldShowEmpty({status:loading?'loading':err?'error':hasSearched?'success':'idle',forCategory:submitted?.category||'',currentCategory:cat,resultCount:visiblePlaces.length}) ? (
           <div className="empty nearby-empty"><MapPin/><h3>Bu bölgede kayıt bulunamadı</h3><p>Yarıçapı artırabilir veya “Yakın ilçeleri de göster” seçeneğini açabilirsin.</p><button onClick={()=>void search(true)}><Search/>Tekrar Ara</button></div>
