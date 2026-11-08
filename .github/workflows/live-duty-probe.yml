@@ -47,7 +47,7 @@ jobs:
             url="$2"
             shift 2
             echo "===== $name ====="
-            curl -sS -G --max-time 30 -D "$name.headers" -o "$name.json" -w "HTTP %{http_code}\n" "$url" -H "Accept: application/json" -H "User-Agent: YanimdaTurkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)" "$@"
+            curl -sS --fail-with-body -G --max-time 30 -D "$name.headers" -o "$name.json" -w "HTTP %{http_code}\n" "$url" -H "Accept: application/json" -H "User-Agent: YanimdaTurkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)" "$@"
             rc=$?
             echo "CURL_EXIT=$rc"
             if [ -f "$name.headers" ]; then
@@ -87,7 +87,7 @@ jobs:
             url="$2"
             shift 2
             echo "===== $name ====="
-            curl -sS -G --max-time 30 -D "$name.headers" -o "$name.json" -w "HTTP %{http_code}\n" "$url" -H "Accept: application/json" -H "User-Agent: YanimdaTurkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)" "$@"
+            curl -sS --fail-with-body -G --max-time 30 -D "$name.headers" -o "$name.json" -w "HTTP %{http_code}\n" "$url" -H "Accept: application/json" -H "User-Agent: YanimdaTurkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)" "$@"
             rc=$?
             echo "CURL_EXIT=$rc"
             if [ -f "$name.headers" ]; then
