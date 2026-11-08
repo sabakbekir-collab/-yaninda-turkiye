@@ -38,9 +38,8 @@ function activeKeys(now: Date, tz: string): string[] {
 export function dutyViewState<T>(input: DutyViewInput<T>): DutyView<T> {
   const now = input.now instanceof Date ? input.now : new Date(input.now);
   if (!Number.isFinite(now.getTime())) return { kind: 'none', items: [] };
-  let today: string;
-  try { today = dateKey(now, input.tz) || ''; } catch { return { kind: 'none', items: [] }; }
-  const active = activeKeys(now, input.tz);
+  let active: string[];
+  try { active = activeKeys(now, input.tz); } catch { return { kind: 'none', items: [] }; }
   const feed = input.feedDate === null || input.feedDate === undefined || input.feedDate === '' ? null : dateKey(input.feedDate, input.tz);
   const feedActive = feed !== null && active.includes(feed);
   const datedItems = Array.isArray(input.items) ? input.items.filter(item => {
