@@ -16,22 +16,22 @@ test('old feed date returns none and exposes staleDate without items', () => {
   assert.deepEqual(dutyViewState({ feedDate: '2026-10-11', items, now: '2026-11-08T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'none', staleDate: '2026-10-11', items: [] });
 });
 
-test('overnight 00:30 rejects yesterday feed', () => {
-  assert.deepEqual(dutyViewState({ feedDate: today, items, now: overnightNow, tz: 'Europe/Istanbul' }), { kind: 'none', staleDate: today, items: [] });
+test('overnight 00:30 accepts yesterday feed and rows', () => {
+  assert.deepEqual(dutyViewState({ feedDate: today, items, now: overnightNow, tz: 'Europe/Istanbul' }), { kind: 'list', items });
 });
 
 test('09:30 rejects yesterday feed and exposes staleDate', () => {
   assert.deepEqual(dutyViewState({ feedDate: today, items, now: afterDutyNow, tz: 'Europe/Istanbul' }), { kind: 'none', staleDate: today, items: [] });
 });
 
-test('08:59 and 09:00 both reject yesterday feed', () => {
-  assert.deepEqual(dutyViewState({ feedDate: today, items, now: '2026-11-09T05:59:00Z', tz: 'Europe/Istanbul' }), { kind: 'none', staleDate: today, items: [] });
+test('08:59 accepts yesterday and 09:00 rejects it', () => {
+  assert.equal(dutyViewState({ feedDate: today, items, now: '2026-11-09T05:59:00Z', tz: 'Europe/Istanbul' }).kind, 'list');
   assert.deepEqual(dutyViewState({ feedDate: today, items, now: '2026-11-09T06:00:00Z', tz: 'Europe/Istanbul' }), { kind: 'none', staleDate: today, items: [] });
 });
 
-test('missing feed date never authorizes even rows dated today', () => {
+test('missing feed date accepts rows dated today', () => {
   const todayRows = [{ name: 'Eczane A', verifiedAt: '2026-11-09' }, { name: 'Eczane B', verifiedAt: '2026-11-09' }];
-  assert.deepEqual(dutyViewState({ feedDate: null, items: todayRows, now: '2026-11-09T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'none', items: [] });
+  assert.deepEqual(dutyViewState({ feedDate: null, items: todayRows, now: '2026-11-09T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'list', items: todayRows });
 });
 
 test('Istanbul date boundary changes at local midnight', () => {
