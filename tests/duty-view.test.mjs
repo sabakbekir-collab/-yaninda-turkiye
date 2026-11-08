@@ -5,6 +5,8 @@ import { dutyViewState, shouldShowDutyCount } from '../src/dutyView.ts';
 
 const today = '2026-11-08';
 const items = [{ name: 'Eczane A', verifiedAt: today }, { name: 'Eczane B', verifiedAt: today }];
+const overnightNow = '2026-11-08T21:30:00Z';
+const afterDutyNow = '2026-11-09T06:30:00Z';
 
 test('today dated feed with two pharmacies returns list', () => {
   assert.deepEqual(dutyViewState({ feedDate: today, items, now: '2026-11-08T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'list', items });
@@ -14,8 +16,26 @@ test('old feed date returns none and exposes staleDate without items', () => {
   assert.deepEqual(dutyViewState({ feedDate: '2026-10-11', items, now: '2026-11-08T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'none', staleDate: '2026-10-11', items: [] });
 });
 
-test('missing feed date never returns a duty list', () => {
-  assert.deepEqual(dutyViewState({ feedDate: null, items, now: '2026-11-08T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'none', items: [] });
+test('overnight 00:30 accepts yesterday feed and rows', () => {
+  assert.deepEqual(dutyViewState({ feedDate: today, items, now: overnightNow, tz: 'Europe/Istanbul' }), { kind: 'list', items });
+});
+
+test('09:30 rejects yesterday feed and exposes staleDate', () => {
+  assert.deepEqual(dutyViewState({ feedDate: today, items, now: afterDutyNow, tz: 'Europe/Istanbul' }), { kind: 'none', staleDate: today, items: [] });
+});
+
+test('08:59 accepts yesterday and 09:00 rejects it', () => {
+  assert.equal(dutyViewState({ feedDate: today, items, now: '2026-11-09T05:59:00Z', tz: 'Europe/Istanbul' }).kind, 'list');
+  assert.deepEqual(dutyViewState({ feedDate: today, items, now: '2026-11-09T06:00:00Z', tz: 'Europe/Istanbul' }), { kind: 'none', staleDate: today, items: [] });
+});
+
+test('missing feed date accepts rows dated today', () => {
+  const todayRows = [{ name: 'Eczane A', verifiedAt: '2026-11-09' }, { name: 'Eczane B', verifiedAt: '2026-11-09' }];
+  assert.deepEqual(dutyViewState({ feedDate: null, items: todayRows, now: '2026-11-09T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'list', items: todayRows });
+});
+
+test('missing feed date never promotes undated rows', () => {
+  assert.deepEqual(dutyViewState({ feedDate: null, items: [{ name: 'Tarihsiz eczane' }], now: '2026-11-08T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'none', items: [] });
 });
 
 test('Istanbul date boundary changes at local midnight', () => {
@@ -28,7 +48,7 @@ test('today dated but empty feed returns none', () => {
 });
 
 test('none state cannot produce a duty label', () => {
-  const state = dutyViewState({ feedDate: null, items, now: '2026-11-08T12:00:00+03:00', tz: 'Europe/Istanbul' });
+  const state = dutyViewState({ feedDate: null, items: [{ name: 'Tarihsiz eczane' }], now: '2026-11-08T12:00:00+03:00', tz: 'Europe/Istanbul' });
   assert.equal(state.kind, 'none');
   assert.equal(state.kind === 'list' ? 'NÖBETÇİ' : null, null);
 });
@@ -43,10 +63,6 @@ test('pharmacy error and stale roster messages never render role alert', () => {
 test('zero duty items do not show a numeric badge', () => {
   assert.equal(shouldShowDutyCount(0), false);
   assert.equal(shouldShowDutyCount(2), true);
-});
-
-test('today feed cannot promote an undated pharmacy row to duty', () => {
-  assert.deepEqual(dutyViewState({ feedDate: today, items: [{ name: 'Tarihsiz eczane' }], now: '2026-11-08T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'none', items: [] });
 });
 
 test('today feed filters out rows whose own date is stale', () => {
