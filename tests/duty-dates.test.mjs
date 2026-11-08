@@ -29,7 +29,8 @@ test("invalid and impossible dates are rejected", () => {
 });
 test("active duty checks use supplied clock deterministically", () => {
   const now = new Date("2026-11-04T05:00:00Z");
-  assert.equal(isActiveDutyDate("2026-11-03", now), true);
+  assert.equal(isActiveDutyDate("2026-11-03", now), false);
+  assert.equal(isActiveDutyDate("2026-11-04", now), true);
   assert.equal(isActiveDutyDate("2026-11-02", now), false);
 });
 
