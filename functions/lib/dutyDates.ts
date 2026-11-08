@@ -58,3 +58,8 @@ export function isTodayDutyDate(value: unknown, now: Date = new Date()): boolean
   const key = dutyDateKey(value);
   return key !== null && key === istanbulDay(now);
 }
+
+export function dutyRowAllowed(rowDate: unknown, feedDate: unknown, now: Date = new Date()): boolean {
+  const key = dutyDateKey(rowDate ?? feedDate);
+  return key !== null && activeDutyDates(now).includes(key);
+}
