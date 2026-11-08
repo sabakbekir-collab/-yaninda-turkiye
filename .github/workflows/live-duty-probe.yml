@@ -20,89 +20,88 @@ jobs:
           HOUR=$(TZ=Europe/Istanbul date +%H)
           echo "Istanbul date=$TODAY hour=$HOUR"
           cat > provinces.txt <<'PROVINCES'
-cat > provinces.txt <<'PROVINCES'
-Adana|adana
-Adıyaman|adiyaman
-Afyonkarahisar|afyonkarahisar
-Ağrı|agri
-Aksaray|aksaray
-Amasya|amasya
-Ankara|ankara
-Antalya|antalya
-Ardahan|ardahan
-Artvin|artvin
-Aydın|aydin
-Balıkesir|balikesir
-Bartın|bartin
-Batman|batman
-Bayburt|bayburt
-Bilecik|bilecik
-Bingöl|bingol
-Bitlis|bitlis
-Bolu|bolu
-Burdur|burdur
-Bursa|bursa
-Çanakkale|canakkale
-Çankırı|cankiri
-Çorum|corum
-Denizli|denizli
-Diyarbakır|diyarbakir
-Düzce|duzce
-Edirne|edirne
-Elazığ|elazig
-Erzincan|erzincan
-Erzurum|erzurum
-Eskişehir|eskisehir
-Gaziantep|gaziantep
-Giresun|giresun
-Gümüşhane|gumushane
-Hakkâri|hakkari
-Hatay|hatay
-Iğdır|igdir
-Isparta|isparta
-İstanbul|istanbul
-İzmir|izmir
-Kahramanmaraş|kahramanmaras
-Karabük|karabuk
-Karaman|karaman
-Kars|kars
-Kastamonu|kastamonu
-Kayseri|kayseri
-Kilis|kilis
-Kırıkkale|kirikkale
-Kırklareli|kirklareli
-Kırşehir|kirsehir
-Kocaeli|kocaeli
-Konya|konya
-Kütahya|kutahya
-Malatya|malatya
-Manisa|manisa
-Mardin|mardin
-Mersin|mersin
-Muğla|mugla
-Muş|mus
-Nevşehir|nevsehir
-Niğde|nigde
-Ordu|ordu
-Osmaniye|osmaniye
-Rize|rize
-Sakarya|sakarya
-Samsun|samsun
-Siirt|siirt
-Sinop|sinop
-Sivas|sivas
-Şanlıurfa|sanliurfa
-Şırnak|sirnak
-Tekirdağ|tekirdag
-Tokat|tokat
-Trabzon|trabzon
-Tunceli|tunceli
-Uşak|usak
-Van|van
-Yalova|yalova
-Yozgat|yozgat
-Zonguldak|zonguldak
-PROVINCES
+          Adana|adana
+          Adıyaman|adiyaman
+          Afyonkarahisar|afyonkarahisar
+          Ağrı|agri
+          Aksaray|aksaray
+          Amasya|amasya
+          Ankara|ankara
+          Antalya|antalya
+          Ardahan|ardahan
+          Artvin|artvin
+          Aydın|aydin
+          Balıkesir|balikesir
+          Bartın|bartin
+          Batman|batman
+          Bayburt|bayburt
+          Bilecik|bilecik
+          Bingöl|bingol
+          Bitlis|bitlis
+          Bolu|bolu
+          Burdur|burdur
+          Bursa|bursa
+          Çanakkale|canakkale
+          Çankırı|cankiri
+          Çorum|corum
+          Denizli|denizli
+          Diyarbakır|diyarbakir
+          Düzce|duzce
+          Edirne|edirne
+          Elazığ|elazig
+          Erzincan|erzincan
+          Erzurum|erzurum
+          Eskişehir|eskisehir
+          Gaziantep|gaziantep
+          Giresun|giresun
+          Gümüşhane|gumushane
+          Hakkâri|hakkari
+          Hatay|hatay
+          Iğdır|igdir
+          Isparta|isparta
+          İstanbul|istanbul
+          İzmir|izmir
+          Kahramanmaraş|kahramanmaras
+          Karabük|karabuk
+          Karaman|karaman
+          Kars|kars
+          Kastamonu|kastamonu
+          Kayseri|kayseri
+          Kilis|kilis
+          Kırıkkale|kirikkale
+          Kırklareli|kirklareli
+          Kırşehir|kirsehir
+          Kocaeli|kocaeli
+          Konya|konya
+          Kütahya|kutahya
+          Malatya|malatya
+          Manisa|manisa
+          Mardin|mardin
+          Mersin|mersin
+          Muğla|mugla
+          Muş|mus
+          Nevşehir|nevsehir
+          Niğde|nigde
+          Ordu|ordu
+          Osmaniye|osmaniye
+          Rize|rize
+          Sakarya|sakarya
+          Samsun|samsun
+          Siirt|siirt
+          Sinop|sinop
+          Sivas|sivas
+          Şanlıurfa|sanliurfa
+          Şırnak|sirnak
+          Tekirdağ|tekirdag
+          Tokat|tokat
+          Trabzon|trabzon
+          Tunceli|tunceli
+          Uşak|usak
+          Van|van
+          Yalova|yalova
+          Yozgat|yozgat
+          Zonguldak|zonguldak
+          PROVINCES
           printf '%s\n' 'province,slug,ea_http,ea_date,ea_count,ea_pharmacies,ea_first_row_date,ea_today,tp_http,tp_duty_date,tp_city_duty_date,tp_count,tp_pharmacies,tp_coordinate_rows,tp_cities_served,tp_cities_blocked,tp_last_updated,tp_today' > coverage.csv
           : > coverage.md
           ea_today_count=0
