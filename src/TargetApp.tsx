@@ -22,7 +22,7 @@ import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor, officialLinkFor } from './dutyLink';
 import { shouldShowEmpty } from './searchErrors';
 import { dutyViewState, formatDutySourceDate, shouldShowDutyCount } from './dutyView';
-import {placeCanUseCoordinates,turkpidyaSourceLinkForPlaces} from './placePresentation';
+import {placeCanUseCoordinates,placeDirectionsUrl,placeDistancePresentation,turkpidyaSourceLinkForPlaces} from './placePresentation';
 import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning, isPositionFresh, shouldRequestGpsOnEntry, homeEntryOutcome, canStartEntry, pharmacyResultsView } from './searchPlan';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
@@ -682,12 +682,12 @@ function LegacyPlaceCard({p}:{p:Place}){
  return <article className={'place nearby-place-card'+(p.isDuty?' duty-place':'')}>
    <div className="place-icon category-place-icon"><Icon/></div>
    <div className="place-body">
-     <div className="place-title-row"><h3>{p.name?.trim()||'İşletme adı bulunamadı'}</h3>{p.isDuty&&<span className="duty-badge">NÖBETÇİ</span>}</div>
+     <div className="place-title-row"><h3>{p.name?.trim()||'İşletme adı bulunamadı'}</h3>{showDutyBadge&&p.isDuty&&<span className="duty-badge">NÖBETÇİ</span>}</div>
      <p>{cleanCardAddress(p.address)}</p>
-     <small className="place-meta-line"><Navigation/> <b>{formatDistance(p.distance)}</b> · Kuş uçuşu · <ShieldCheck/> {p.source}</small>
+     <small className="place-meta-line">{distanceDisplay&&<><Navigation/> <b>{formatDistance(distanceDisplay.distance)}</b> · {distanceDisplay.label} · </>}<ShieldCheck/> {p.source}</small>
      {p.district&&<small className="place-district">İlçe: {p.district}</small>}{p.isDuty&&<small className="place-source-note">Veri: Eczane Adresi</small>}
 
-     {p.phone?<footer className="place-actions"><a href={'tel:'+p.phone}><Phone/>Ara</a><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>:<footer className="place-actions"><span className="no-phone">Telefon bilgisi yok</span><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>}
+     {p.phone?<footer className="place-actions"><a href={'tel:'+p.phone}><Phone/>Ara</a><a target="_blank" rel="noreferrer" href={directions}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>:<footer className="place-actions"><span className="no-phone">Telefon bilgisi yok</span><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>}
    </div>
  </article>
 }
