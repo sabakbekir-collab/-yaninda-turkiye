@@ -677,8 +677,10 @@ function Nearby(){
    </>
  </main>
 }
-function LegacyPlaceCard({p}:{p:Place}){
+function LegacyPlaceCard({p,showDutyBadge=false}:{p:Place;showDutyBadge?:boolean}){
  const Icon=categoryIcon(p.category);
+ const directions=placeDirectionsUrl(p);
+ const distanceDisplay=placeDistancePresentation(p);
  return <article className={'place nearby-place-card'+(p.isDuty?' duty-place':'')}>
    <div className="place-icon category-place-icon"><Icon/></div>
    <div className="place-body">
@@ -687,7 +689,7 @@ function LegacyPlaceCard({p}:{p:Place}){
      <small className="place-meta-line">{distanceDisplay&&<><Navigation/> <b>{formatDistance(distanceDisplay.distance)}</b> · {distanceDisplay.label} · </>}<ShieldCheck/> {p.source}</small>
      {p.district&&<small className="place-district">İlçe: {p.district}</small>}{p.isDuty&&<small className="place-source-note">Veri: Eczane Adresi</small>}
 
-     {p.phone?<footer className="place-actions"><a href={'tel:'+p.phone}><Phone/>Ara</a><a target="_blank" rel="noreferrer" href={directions}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>:<footer className="place-actions"><span className="no-phone">Telefon bilgisi yok</span><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>}
+     {p.phone?<footer className="place-actions"><a href={'tel:'+p.phone}><Phone/>Ara</a><a target="_blank" rel="noreferrer" href={directions}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>:<footer className="place-actions"><span className="no-phone">Telefon bilgisi yok</span><a target="_blank" rel="noreferrer" href={directions}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>}
    </div>
  </article>
 }
