@@ -5,7 +5,7 @@ import {resolveSearchAnchor,chooseSearchCenter,placesCacheKey} from '../lib/sear
 import {isCentralDistrict,trSlug,resolveName} from '../../src/text';
 import {districtMap,districtsFor} from '../../src/turkeyDistricts';
 import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery';
-import {activeDutyDates,dutyDateKey,dutyRowAllowed,isActiveDutyDate} from '../lib/dutyDates';
+import {activeDutyDates,dutyDateKey,dutyRowAllowed,isActiveDutyDate,isTodayDutyDate} from '../lib/dutyDates';
 import {classifyOverpassBody} from '../lib/overpassBody';
 import {cachePolicyFor} from '../lib/placesCachePolicy';
 import {haversineKm,countRecordsNearAnother} from '../lib/geoDistance';
@@ -439,7 +439,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   const cached=debug?null:await dbCacheGet(env,key);
   if(cached&&typeof cached==='object'&&!Array.isArray(cached)&&Array.isArray((cached as {places?:unknown}).places)){
     const snapshot=cached as {places:Place[];partial?:boolean};
-    const staleDutyCache=category==='pharmacy'&&!nonDutyPharmacy&&snapshot.places.length>0&&!snapshot.places.every(place=>dutyRowAllowed(place.verifiedAt,undefined));
+    const staleDutyCache=category==='pharmacy'&&!nonDutyPharmacy&&snapshot.places.length>0&&!snapshot.places.every(place=>isTodayDutyDate(place.verifiedAt));
     if(!staleDutyCache){
       const policy=cachePolicyFor({ok:true,resultCount:snapshot.places.length,partial:snapshot.partial});
       const cachedDates=snapshot.places.map(place=>dutyDateKey(place.verifiedAt));
@@ -451,7 +451,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   }
   if(Array.isArray(cached)){
     const cachedPlaces=cached as Place[];
-    const staleDutyCache=category==='pharmacy'&&!nonDutyPharmacy&&cachedPlaces.length>0&&!cachedPlaces.every(place=>dutyRowAllowed(place.verifiedAt,undefined));
+    const staleDutyCache=category==='pharmacy'&&!nonDutyPharmacy&&cachedPlaces.length>0&&!cachedPlaces.every(place=>isTodayDutyDate(place.verifiedAt));
     if(!staleDutyCache){
       const policy=cachePolicyFor({ok:true,resultCount:cachedPlaces.length});
       const cachedDates=cachedPlaces.map(place=>dutyDateKey(place.verifiedAt));
