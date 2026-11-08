@@ -216,6 +216,10 @@ jobs:
             if [ "$failed" -ne 0 ]; then echo; echo 'Bir veya daha fazla sağlayıcı çağrısı hata verdi; ayrıntılar job logunda ve coverage.csv içindedir.'; fi
           } >> "$GITHUB_STEP_SUMMARY"
           echo "CSV rows: $(($(wc -l < coverage.csv)-1))"
+          echo "===== GITHUB_STEP_SUMMARY (full markdown table and summary) ====="
+          cat "$GITHUB_STEP_SUMMARY"
+          echo "===== coverage.csv (complete) ====="
+          cat coverage.csv
           if [ "$failed" -ne 0 ]; then exit 1; fi
       - name: Upload coverage CSV
         if: always()
