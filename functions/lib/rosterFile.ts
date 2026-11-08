@@ -85,6 +85,7 @@ export function parseRosterFile(input: string, now: Date, ctx: RosterContext): R
   const maxDate = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, Number(today.slice(8, 10)) + 45)).toISOString().slice(0, 10);
   const rows: MonthlyRosterRow[] = [];
   const errors: number[] = [];
+  const unknownDistrictErrors: number[] = [];
   const seen = new Set<string>();
   const days = new Set<string>();
   let duplicates = 0;
@@ -107,7 +108,11 @@ export function parseRosterFile(input: string, now: Date, ctx: RosterContext): R
     const name = fields[2];
     const address = fields[3];
     const phone = fields[4];
-    if (!date || date < today || date > maxDate || (fields[1] && !district) || !name || name.length > 120 || !address || address.length > 240 || !phone || !validPhone(phone) || invalidControl(name) || invalidControl(address)) {
+    if (fields[1] && !district) {
+      unknownDistrictErrors.push(index + 2);
+      continue;
+    }
+    if (!date || date < today || date > maxDate || !name || name.length > 120 || !address || address.length > 240 || !phone || !validPhone(phone) || invalidControl(name) || invalidControl(address)) {
       errors.push(index + 2);
       continue;
     }
@@ -120,6 +125,7 @@ export function parseRosterFile(input: string, now: Date, ctx: RosterContext): R
     days.add(date);
     rows.push({ duty_date: date, district_slug: district ? ctx.slugify(district) : '', name, address, phone, roster_kind: 'monthly' });
   }
+  if (unknownDistrictErrors.length) return fail('unknown_district', unknownDistrictErrors);
   if (errors.length) return fail('invalid_rows', errors);
   if (!rows.length) return fail('empty_roster');
   if (days.size > 62) return fail('too_many_dates');

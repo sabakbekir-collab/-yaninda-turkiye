@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { parseRosterFile, planReminders, monthlyEntryNote, dailyEntryNote } from '../functions/lib/rosterFile.ts';
 
 const slugify = (value) => String(value ?? '').replace(/[ıİIğĞşŞçÇöÖüÜâÂîÎûÛ]/g, (char) => ({ 'ı': 'i', 'İ': 'i', 'I': 'i', 'ğ': 'g', 'Ğ': 'g', 'ş': 's', 'Ş': 's', 'ç': 'c', 'Ç': 'c', 'ö': 'o', 'Ö': 'o', 'ü': 'u', 'Ü': 'u', 'â': 'a', 'Â': 'a', 'î': 'i', 'Î': 'i', 'û': 'u', 'Û': 'u' })[char]).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-const ctx = { provinceSlugs: ['mus', 'ankara', 'van'], provinceNames: { mus: 'Muş', ankara: 'Ankara', van: 'Van' }, districtsByProvince: { mus: ['Bulanık', 'Malazgirt', 'Merkez', 'Varto', 'Hasköy', 'Korkut'] }, slugify };
+const ctx = { provinceSlugs: ['mus', 'ankara', 'van'], provinceNames: { mus: 'Muş', ankara: 'Ankara', van: 'Van' }, districtsByProvince: { mus: ['Bulanık', 'Malazgirt', 'Merkez', 'Varto', 'Hasköy', 'Korkut'], van: ['Merkez', 'Edremit', 'Erciş'] }, slugify };
 
 const now = new Date('2026-11-09T06:30:00Z');
 const sample = 'Muş\n01.12.2026;Merkez;Demir Eczanesi;Atatürk Bulvarı No:5;04362121212\n01.12.2026;Merkez;Işık Eczanesi;Kışla Cad. No:12;04362131313\n02.12.2026;Varto;Şehir Eczanesi;Cumhuriyet Cad. No:3;04362141414';
@@ -54,9 +54,24 @@ test('duplicate province, date, name and address is deduplicated', () => {
   assert.equal(result.ok && result.duplicate_count, 1);
 });
 
-test('another province in the header is rejected', () => {
+test('known other province is accepted and unknown province is rejected', () => {
   assert.equal(parseRosterFile('Van\n01.12.2026;Merkez;A;Adres A;04362121212', now, ctx).ok, true);
   assert.equal(parseRosterFile('Atlantis\n01.12.2026;Merkez;A;Adres A;04362121212', now, ctx).ok, false);
+});
+
+test('a filled district missing from the province context is rejected with its line number', () => {
+  const result = parseRosterFile('Muş\n01.12.2026;UnknownTown;A;Adres A;04362121212', now, ctx);
+  assert.equal(result.ok, false);
+  if (!result.ok) {
+    assert.equal(result.error, 'unknown_district');
+    assert.deepEqual(result.lineNumbers, [2]);
+  }
+});
+
+test('an empty district is accepted as a province-wide row', () => {
+  const result = parseRosterFile('Muş\n01.12.2026;;A;Adres A;04362121212', now, ctx);
+  assert.equal(result.ok, true);
+  if (result.ok) assert.equal(result.rows[0].district_slug, '');
 });
 
 test('monthly and daily notes are explicit', () => {
