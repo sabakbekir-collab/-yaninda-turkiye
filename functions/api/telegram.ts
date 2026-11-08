@@ -1,4 +1,4 @@
-import { decideTelegramAction, verifyWebhookSecret } from "../lib/telegramRoster";
+import { decideTelegramAction, verifyWebhookSecret } from "../lib/telegramRoster.ts";
 import type { Env } from "../lib/types";
 
 type TelegramEnv = Env & { TELEGRAM_WEBHOOK_SECRET?: string };
