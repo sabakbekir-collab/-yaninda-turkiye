@@ -22,6 +22,7 @@ import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor, officialLinkFor } from './dutyLink';
 import { shouldShowEmpty } from './searchErrors';
 import { dutyViewState, formatDutySourceDate, shouldShowDutyCount } from './dutyView';
+import {placeCanUseCoordinates,turkpidyaSourceLinkForPlaces} from './placePresentation';
 import { choosePlan, distanceBasisLabel, shouldRerunWithGps, resultsForCategory, needsGpsRequest, accuracyWarning, isPositionFresh, shouldRequestGpsOnEntry, homeEntryOutcome, canStartEntry, pharmacyResultsView } from './searchPlan';
 
 const marker=L.divIcon({className:'yt-marker',html:'<span></span>',iconSize:[30,38],iconAnchor:[15,38]});
@@ -576,6 +577,10 @@ function Nearby(){
  const officialLink=pharmacyMode?officialLinkFor(province):null;
  const officialDutyUrl=dutyLink?.url||officialLink;
  const dutySourceDate=dutyFeedDate?formatDutySourceDate(dutyFeedDate,'Europe/Istanbul'):'';
+ const turkpidyaSourceUrl=turkpidyaSourceLinkForPlaces(dutyItems);
+ const turkpidyaDateValue=dutyItems.find(p=>p.id.startsWith('turkpidya-duty-'))?.verifiedAt||dutyFeedDate;
+ const turkpidyaSourceDate=turkpidyaDateValue?formatDutySourceDate(turkpidyaDateValue,'Europe/Istanbul'):'';
+ const mapPlaces=displayPlaces.filter(placeCanUseCoordinates);
 
  return <main className="inner nearby-page">
    <div className="page-title nearby-title">
@@ -640,7 +645,7 @@ function Nearby(){
    </div>
 
    {!pharmacyMode&&err&&<div className="error nearby-error" role="alert">{err}</div>}
-   {pharmacyMode&&hasSearched&&!loading&&dutyView.kind==='list'&&<section className="duty-summary"><div className="result-head"><b>Bugün nöbetçi{shouldShowDutyCount(dutyItems.length)&&<span>{dutyItems.length}</span>}</b></div><div className="results">{dutyItems.map(p=><EnhancedPlaceCard key={p.id} p={{...p,isDuty:true}} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)}</div></section>}
+   {pharmacyMode&&hasSearched&&!loading&&dutyView.kind==='list'&&<section className="duty-summary"><div className="result-head"><b>Bugün nöbetçi{shouldShowDutyCount(dutyItems.length)&&<span>{dutyItems.length}</span>}</b></div>{turkpidyaSourceUrl&&<p className="duty-provider-source" style={{fontSize:'13px',margin:'8px 0'}}><a href={turkpidyaSourceUrl} target="_blank" rel="noopener noreferrer">Veri: Turkpidya</a>{turkpidyaSourceDate&&<> · Kaynak tarihi: {turkpidyaSourceDate}</>}</p>}<div className="results">{dutyItems.map(p=><EnhancedPlaceCard key={p.id} p={{...p,isDuty:true}} showDutyBadge={dutyView.kind==='list'} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)}</div></section>}
    {pharmacyMode&&hasSearched&&!loading&&dutyView.kind==='none'&&(dutyError?<p className="duty-calm-error">Nöbetçi eczane kaynağına ulaşılamadı. <button type="button" onClick={()=>void search(true)}>Tekrar dene</button></p>:<div className="duty-calm-note"><p>Bugün için doğrulanmış nöbetçi listesi yok{dutySourceDate?' (kaynak tarihi: '+dutySourceDate+')':''}. Eski liste gösterilmiyor.</p>{officialDutyUrl&&<a href={officialDutyUrl} target="_blank" rel="noopener noreferrer">{dutyLink?.button||'Resmî nöbetçi eczane sorgusunu aç'} <ExternalLink/></a>}</div>)}
 
    <>
@@ -652,7 +657,7 @@ function Nearby(){
     {pharmacyMode&&nearbyPharmacies.length>0&&<p className="pharmacy-results-note">Nöbet durumu doğrulanmadı; gitmeden telefonla teyit edin.</p>}
 
     {loading?<div className="results skeleton-results">{[1,2,3].map(i=><div className="nearby-skeleton" key={i}/>)}</div>:
-     view==='map'&&displayPlaces[0]?<div className="map"><MapContainer center={[displayPlaces[0].lat,displayPlaces[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{displayPlaces.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:
+     view==='map'&&mapPlaces[0]?<div className="map"><MapContainer center={[mapPlaces[0].lat,mapPlaces[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{mapPlaces.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:
       <div className="results">
         {displayPlaces.length > 0 ? (
           <>

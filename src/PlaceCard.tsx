@@ -4,13 +4,14 @@ import {Flag,Heart,Navigation,Phone,Share2,ShieldCheck} from 'lucide-react';
 import type {Place} from './types';
 import {categoryIcon,cleanCardAddress,formatDistance} from './placeUtils';
 import {useFavorites} from './favorites';
-import {mapsLink,shareText} from './share';
+import {shareText} from './share';
+import {placeDirectionsUrl,placeDistancePresentation,placeShareMapUrl} from './placePresentation';
 import {track} from './api';
 import {formatOpeningHours} from './openingHours';
 
 const reasons:[string,string][]=[['wrong_info','Bilgiler yanlış'],['wrong_phone','Telefon yanlış'],['wrong_address','Adres yanlış'],['closed','Kapalı / artık yok']];
 
-export default function PlaceCard({p,distanceLabel}:{p:Place;distanceLabel?:string}){
+export default function PlaceCard({p,distanceLabel,showDutyBadge=false}:{p:Place;distanceLabel?:string;showDutyBadge?:boolean}){
   const Icon=categoryIcon(p.category);
   const {has,toggle}=useFavorites();
   const [status,setStatus]=useState('');
@@ -20,12 +21,13 @@ export default function PlaceCard({p,distanceLabel}:{p:Place;distanceLabel?:stri
   const [busy,setBusy]=useState(false);
   const isFav=has(p.id);
   const openingHours=formatOpeningHours(p.openingHours,p.category);
-  const directions='https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon;
+  const directions=placeDirectionsUrl(p);
+  const distanceDisplay=placeDistancePresentation(p,distanceLabel);
   const onFav=()=>{if(!isFav)track('favorite_click',{category:p.category});toggle(p)};
   const onShare=async()=>{
     const lines=[p.name,cleanCardAddress(p.address)];
     if(p.phone)lines.push('Tel: '+p.phone);
-    const r=await shareText(p.name,lines.join('\n'),mapsLink(p.lat,p.lon));
+    const r=await shareText(p.name,lines.join('\n'),placeShareMapUrl(p));
     setStatus(r==='copied'?'Bilgiler panoya kopyalandı.':r==='failed'?'Paylaşılamadı.':'');
   };
   const onReport=async(e:FormEvent)=>{
@@ -40,9 +42,9 @@ export default function PlaceCard({p,distanceLabel}:{p:Place;distanceLabel?:stri
   return <article className={'place nearby-place-card'+(p.isDuty?' duty-place':'')}>
     <div className="place-icon category-place-icon"><Icon/></div>
     <div className="place-body">
-      <div className="place-title-row"><h3>{p.name?.trim()||'İşletme adı bulunamadı'}</h3>{p.isDuty&&<span className="duty-badge">NÖBETÇİ</span>}</div>
+      <div className="place-title-row"><h3>{p.name?.trim()||'İşletme adı bulunamadı'}</h3>{showDutyBadge&&p.isDuty&&<span className="duty-badge">NÖBETÇİ</span>}</div>
       <p>{cleanCardAddress(p.address)}</p>
-      <small className="place-meta-line">{typeof p.distance==='number'&&<><Navigation/> <b>{formatDistance(p.distance)}</b> · {distanceLabel||'Konumuna göre, kuş uçuşu'} · </>}<ShieldCheck/> {p.source.startsWith('OpenStreetMap')?'OpenStreetMap — eksik olabilir':p.source}</small>
+      <small className="place-meta-line">{distanceDisplay&&<><Navigation/> <b>{formatDistance(distanceDisplay.distance)}</b> · {distanceDisplay.label} · </>}<ShieldCheck/> {p.source.startsWith('OpenStreetMap')?'OpenStreetMap — eksik olabilir':p.source}</small>
       {p.district&&<small className="place-district">İlçe: {p.district}</small>}
       {p.isDuty&&<small className="place-source-note">Üçüncü taraf kaynağından alınmıştır; resmî kurum doğrulaması değildir. Gitmeden telefonla teyit et. {p.verifiedAt&&'Veri tarihi: '+p.verifiedAt} {p.officialUrl&&<a href={p.officialUrl} target="_blank" rel="noreferrer">Resmî e-Devlet sorgusu</a>}</small>}
       {openingHours&&<small className="place-opening-hours"><b>{openingHours.label}:</b> {openingHours.value}</small>}
