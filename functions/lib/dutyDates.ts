@@ -53,7 +53,7 @@ export function isTodayDutyDate(value: unknown, now: Date = new Date()): boolean
 }
 
 export function dutyRowAllowed(rowDate: unknown, feedDate: unknown, now: Date = new Date()): boolean {
-  const row = dutyDateKey(rowDate);
+  const row = dutyDateKey(rowDate ?? feedDate);
   const feed = dutyDateKey(feedDate);
   const active = activeDutyDates(now);
   return row !== null && feed !== null && active.includes(row) && active.includes(feed);
