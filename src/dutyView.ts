@@ -34,16 +34,20 @@ export function dutyViewState<T>(input: DutyViewInput<T>): DutyView<T> {
   if (!Number.isFinite(now.getTime())) return { kind: 'none', items: [] };
   let today: string;
   try { today = dateKey(now, input.tz) || ''; } catch { return { kind: 'none', items: [] }; }
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: input.tz, hour: '2-digit', hourCycle: 'h23' }).format(now));
+  const prevKey = dateKey(new Date(now.getTime() - 86400000), input.tz);
+  const active = hour >= 9 || !prevKey ? [today] : [today, prevKey];
   const feed = input.feedDate === null || input.feedDate === undefined || input.feedDate === '' ? null : dateKey(input.feedDate, input.tz);
   const datedItems = Array.isArray(input.items) ? input.items.filter(item => {
     if (!item || typeof item !== 'object') return false;
     const row = item as Record<string, unknown>;
     const rowDate = row.verifiedAt ?? row.dutyDate ?? row.duty_date ?? row.date;
-    return rowDate !== null && rowDate !== undefined && dateKey(rowDate as string | number | Date, input.tz) === today;
+    return rowDate !== null && rowDate !== undefined && active.includes(dateKey(rowDate as string | number | Date, input.tz) || '');
   }) : [];
-  if (feed === today && datedItems.length > 0) return { kind: 'list', items: datedItems };
-  return { kind: 'none', ...(feed && feed !== today ? { staleDate: feed } : {}), items: [] };
+  if (feed !== null && active.includes(feed) && datedItems.length > 0) return { kind: 'list', items: datedItems };
+  return { kind: 'none', ...(feed && !active.includes(feed) ? { staleDate: feed } : {}), items: [] };
 }
+
 export function shouldShowDutyCount(count: number): boolean {
   return Number.isFinite(count) && count > 0;
 }
