@@ -129,23 +129,23 @@ PROVINCES
             http=$(curl -sS --connect-timeout 10 --max-time 20 -G -o "$body" -w '%{http_code}' "$url" -H 'Accept: application/json' -H 'User-Agent: YanimdaTurkiye/1.0 (+https://yaninda-turkiye.sabakbekir.workers.dev)' "$@" 2>"${provider}-${slug}.stderr")
             curl_rc=$?
             if [ "$curl_rc" -ne 0 ]; then
-              if [ "$curl_rc" -eq 28 ]; then echo "hata: timeout"; else echo "hata: curl-$curl_rc"; fi
+              if [ "$curl_rc" -eq 28 ]; then FETCH_STATUS="hata: timeout"; else FETCH_STATUS="hata: curl-$curl_rc"; fi
               return 1
             fi
             if [ "$http" = "403" ] || [ "$http" = "429" ]; then
               stop_code="$http"
-              echo "hata: $http"
+              FETCH_STATUS="hata: $http"
               return 1
             fi
             if [ "$http" -lt 200 ] || [ "$http" -ge 300 ]; then
-              echo "hata: $http"
+              FETCH_STATUS="hata: $http"
               return 1
             fi
             if ! jq -e . "$body" >/dev/null 2>&1; then
-              echo "hata: json"
+              FETCH_STATUS="hata: json"
               return 1
             fi
-            echo "ok"
+            FETCH_STATUS="ok"
             return 0
           }
           while IFS='|' read -r province slug; do
@@ -155,7 +155,8 @@ PROVINCES
               ea_http="atlandı: $stop_code"; tp_http="atlandı: $stop_code"
             else
               echo "===== $province ($slug) / Eczane Adresi ====="
-              ea_status=$(fetch_one ea "$slug" 'https://eczaneadresi.com/api/public/v1/duty-pharmacies' --data-urlencode "city=$slug" --data-urlencode 'limit=200') || true
+              fetch_one ea "$slug" 'https://eczaneadresi.com/api/public/v1/duty-pharmacies' --data-urlencode "city=$slug" --data-urlencode 'limit=200' || true
+              ea_status="$FETCH_STATUS"
               ea_http="$ea_status"
               if [ "$ea_status" = "ok" ]; then
                 ea_date=$(jq -r '.date // ""' "ea-$slug.json")
@@ -169,7 +170,8 @@ PROVINCES
               sleep 1
               if [ -z "$stop_code" ]; then
                 echo "===== $province ($slug) / Turkpidya ====="
-                tp_status=$(fetch_one tp "$slug" 'https://turkpidya.com/wp-json/turkpidya-data/v1/pharmacies/on-duty' --data-urlencode "city=$slug") || true
+                fetch_one tp "$slug" 'https://turkpidya.com/wp-json/turkpidya-data/v1/pharmacies/on-duty' --data-urlencode "city=$slug" || true
+                tp_status="$FETCH_STATUS"
                 tp_http="$tp_status"
                 if [ "$tp_status" = "ok" ]; then
                   tp_date=$(jq -r '.duty_date // ""' "tp-$slug.json")
