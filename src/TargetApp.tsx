@@ -575,7 +575,6 @@ function Nearby(){
  const officialLink=pharmacyMode?officialLinkFor(province):null;
  const officialDutyUrl=dutyLink?.url||officialLink;
  const dutySourceDate=dutyFeedDate?formatDutySourceDate(dutyFeedDate,'Europe/Istanbul'):'';
- const pharmacyLiveWidget=false;
  const pharmacyView=pharmacyResultsView({dutyStatus:'stale',dutyCount:0,nearbyStatus,nearbyCount:nearbyPharmacies.length});
 
  return <main className="inner nearby-page">
