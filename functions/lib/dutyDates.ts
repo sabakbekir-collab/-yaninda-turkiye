@@ -14,15 +14,8 @@ function istanbulDay(date: Date): string | null {
   return `${p.year}-${p.month}-${p.day}`;
 }
 export function activeDutyDates(now: Date = new Date()): string[] {
-  const p = istanbulParts(now);
-  const year = Number(p.year), month = Number(p.month), day = Number(p.day);
-  const yesterday = new Date(Date.UTC(year, month - 1, day));
-  const dates = [formatDay(year, month, day)];
-  if (p.hour < 9) {
-    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    dates.push(yesterday.toISOString().slice(0, 10));
-  }
-  return dates;
+  const today = istanbulDay(now);
+  return today ? [today] : [];
 }
 export function dutyDateKey(value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
