@@ -14,8 +14,15 @@ function istanbulDay(date: Date): string | null {
   return `${p.year}-${p.month}-${p.day}`;
 }
 export function activeDutyDates(now: Date = new Date()): string[] {
-  const today = istanbulDay(now);
-  return today ? [today] : [];
+  const p = istanbulParts(now);
+  const year = Number(p.year), month = Number(p.month), day = Number(p.day);
+  const yesterday = new Date(Date.UTC(year, month - 1, day));
+  const dates = [formatDay(year, month, day)];
+  if (p.hour < 9) {
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    dates.push(yesterday.toISOString().slice(0, 10));
+  }
+  return dates;
 }
 export function dutyDateKey(value: unknown): string | null {
   if (value === null || value === undefined || value === "") return null;
@@ -53,8 +60,8 @@ export function isTodayDutyDate(value: unknown, now: Date = new Date()): boolean
 }
 
 export function dutyRowAllowed(rowDate: unknown, feedDate: unknown, now: Date = new Date()): boolean {
-  const today = istanbulDay(now);
+  const row = dutyDateKey(rowDate);
   const feed = dutyDateKey(feedDate);
-  const row = dutyDateKey(rowDate ?? feedDate);
-  return today !== null && feed === today && row === today;
+  const active = activeDutyDates(now);
+  return row !== null && feed !== null && active.includes(row) && active.includes(feed);
 }
