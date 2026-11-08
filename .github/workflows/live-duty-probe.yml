@@ -20,6 +20,7 @@ jobs:
           HOUR=$(TZ=Europe/Istanbul date +%H)
           echo "Istanbul date=$TODAY hour=$HOUR"
           cat > provinces.txt <<'PROVINCES'
+cat > provinces.txt <<'PROVINCES'
 Adana|adana
 Adıyaman|adiyaman
 Afyonkarahisar|afyonkarahisar
