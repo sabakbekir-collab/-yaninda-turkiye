@@ -27,20 +27,30 @@ function dateKey(value: string | number | Date, tz: string): string | null {
   }
   return iso[1] + '-' + iso[2] + '-' + iso[3];
 }
+function activeKeys(now: Date, tz: string): string[] {
+  const today = dateKey(now, tz) || '';
+  if (!today) return [];
+  const hour = Number(new Intl.DateTimeFormat('en-GB', { timeZone: tz, hour: '2-digit', hourCycle: 'h23' }).format(now));
+  if (hour >= 9) return [today];
+  const prev = dateKey(new Date(now.getTime() - 86400000), tz);
+  return prev ? [today, prev] : [today];
+}
 export function dutyViewState<T>(input: DutyViewInput<T>): DutyView<T> {
   const now = input.now instanceof Date ? input.now : new Date(input.now);
   if (!Number.isFinite(now.getTime())) return { kind: 'none', items: [] };
   let today: string;
   try { today = dateKey(now, input.tz) || ''; } catch { return { kind: 'none', items: [] }; }
+  const active = activeKeys(now, input.tz);
   const feed = input.feedDate === null || input.feedDate === undefined || input.feedDate === '' ? null : dateKey(input.feedDate, input.tz);
+  const feedActive = feed !== null && active.includes(feed);
   const datedItems = Array.isArray(input.items) ? input.items.filter(item => {
     if (!item || typeof item !== 'object') return false;
     const row = item as Record<string, unknown>;
-    const rowDate = row.verifiedAt ?? row.dutyDate ?? row.duty_date ?? row.date;
-    return rowDate !== null && rowDate !== undefined && dateKey(rowDate as string | number | Date, input.tz) === today;
+    const rowDate = row.verifiedAt ?? row.dutyDate ?? row.duty_date ?? row.date ?? input.feedDate;
+    return rowDate !== null && rowDate !== undefined && active.includes(dateKey(rowDate as string | number | Date, input.tz) || '');
   }) : [];
-  if (feed === today && datedItems.length > 0) return { kind: 'list', items: datedItems };
-  return { kind: 'none', ...(feed && feed !== today ? { staleDate: feed } : {}), items: [] };
+  if ((!feed || feedActive) && datedItems.length > 0) return { kind: 'list', items: datedItems };
+  return { kind: 'none', ...(feed && !feedActive ? { staleDate: feed } : {}), items: [] };
 }
 export function shouldShowDutyCount(count: number): boolean { return Number.isFinite(count) && count > 0; }
 export function formatDutySourceDate(value: string | number | Date, tz = 'Europe/Istanbul'): string {
