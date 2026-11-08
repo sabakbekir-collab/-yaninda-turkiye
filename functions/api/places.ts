@@ -162,7 +162,7 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
         source:'Veri: Turkpidya — il eczacı odaları ve belediyeler; tarihli kaynak listesi',
         distance:distance(lat,lon,la,lo),district:recordDistrict||undefined,isDuty:true,
         officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
-        verifiedAt:recordDate,dutyUpdatedAt:new Date().toISOString()});
+        verifiedAt:recordDate||undefined,dutyUpdatedAt:new Date().toISOString()});
     }
     out.sort((a,b)=>(a.distance??999)-(b.distance??999));
     const hasDatedRows=rows.some(value=>{
@@ -188,7 +188,7 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
 
 export async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,_radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string;reason?:string;providerStatus?:number}>{
   const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string,applyDistrictFilter:boolean)=>{
-    if(!Array.isArray(data.pharmacies))return [];
+    if(!dutyRowAllowed(undefined,data.date)||!Array.isArray(data.pharmacies))return [];
     const out:Place[]=[];
     for(const [i,x] of data.pharmacies.entries()){
       // Provider JSON is untrusted: malformed null/primitive rows must not crash the whole response.
