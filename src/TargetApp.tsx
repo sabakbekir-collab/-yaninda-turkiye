@@ -575,6 +575,8 @@ function Nearby(){
  const officialLink=pharmacyMode?officialLinkFor(province):null;
  const officialDutyUrl=dutyLink?.url||officialLink;
  const dutySourceDate=dutyFeedDate?formatDutySourceDate(dutyFeedDate,'Europe/Istanbul'):'';
+ const pharmacyLiveWidget=false;
+ const pharmacyView=pharmacyResultsView({dutyStatus:'stale',dutyCount:0,nearbyStatus,nearbyCount:nearbyPharmacies.length});
 
  return <main className="inner nearby-page">
    <div className="page-title nearby-title">
@@ -667,7 +669,7 @@ function Nearby(){
         {displayPlaces.length > 0 ? (
           <>
           {pharmacyMode&&<p className="pharmacy-results-note">Nöbet durumu doğrulanmadı; gitmeden telefonla teyit edin.</p>}
-          {displayPlaces.map(p => <EnhancedPlaceCard key={p.id} p={{...p,isDuty:visiblePlaces.length>0?p.isDuty:undefined}} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)}
+          {displayPlaces.map(p => <EnhancedPlaceCard key={p.id} p={pharmacyMode?{...p,isDuty:undefined}:p} distanceLabel={submitted?distanceBasisLabel(submitted.anchor,submitted.district?submitted.province+' / '+submitted.district:submitted.province):'Konumuna göre, kuş uçuşu'} />)}
           </>
         ) : pharmacyMode&&pharmacyView.message ? (
           pharmacyView.message==='loading' ? <div className="results skeleton-results" aria-label="Yakındaki eczaneler yükleniyor">{[1,2,3].map(i=><div className="nearby-skeleton" key={i}/>)}</div> :
@@ -683,7 +685,7 @@ function Nearby(){
 
           </div>
         ) : (
-          {!pharmacyMode&&err&&<div className="error nearby-error" role="alert">{err}</div>}
+          {!pharmacyMode&&err?<div className="error nearby-error" role="alert">{err}</div>:null}
         )}
       </div>
      }
