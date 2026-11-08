@@ -1,5 +1,4 @@
-import { districtMap } from '../../src/turkeyDistricts';
-import { trSlug } from '../../src/text';
+export type RosterContext = { provinceSlugs: readonly string[]; slugify: (value: string) => string; provinceNames?: Readonly<Record<string, string>>; districtsByProvince?: Readonly<Record<string, readonly string[]>> };
 
 export type MonthlyRosterRow = { duty_date: string; district_slug: string; name: string; address: string; phone: string; roster_kind: 'monthly' | 'daily' };
 export type RosterFileResult = { ok: true; province: string; province_slug: string; rows: MonthlyRosterRow[]; dates: string[]; missing_dates: string[]; duplicate_count: number; first_date: string; last_date: string } | { ok: false; error: string; lineNumbers?: number[] };
@@ -73,14 +72,15 @@ function fail(error: string, lineNumbers: number[] = []): RosterFileResult {
   return { ok: false, error, ...(lineNumbers.length ? { lineNumbers: lineNumbers.slice(0, 10) } : {}) };
 }
 
-export function parseRosterFile(input: string, now: Date = new Date()): RosterFileResult {
+export function parseRosterFile(input: string, now: Date, ctx: RosterContext): RosterFileResult {
   if (typeof input !== 'string') return fail('invalid_file');
   const text = input.charCodeAt(0) === 65279 ? input.slice(1) : input;
   if (new TextEncoder().encode(text).length > 200 * 1024) return fail('file_too_large');
   const lines = text.split(String.fromCharCode(10)).map(line => line.endsWith(String.fromCharCode(13)) ? line.slice(0, -1) : line);
   const provinceText = (lines.shift() || '').trim();
-  const province = Object.keys(districtMap).find(name => trSlug(name) === trSlug(provinceText));
-  if (!province) return fail('unknown_province', [1]);
+  const provinceSlug = ctx.provinceSlugs.find(slug => slug === ctx.slugify(provinceText));
+  if (!provinceSlug) return fail('unknown_province', [1]);
+  const province = ctx.provinceNames?.[provinceSlug] || provinceText;
   const today = dayKey(now);
   const maxDate = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1, Number(today.slice(8, 10)) + 45)).toISOString().slice(0, 10);
   const rows: MonthlyRosterRow[] = [];
@@ -96,14 +96,14 @@ export function parseRosterFile(input: string, now: Date = new Date()): RosterFi
       errors.push(index + 2);
       continue;
     }
-    if (index === 0 && trSlug(fields[0]) === 'tarih' && trSlug(fields[1] || '') === 'ilce') continue;
+    if (index === 0 && ctx.slugify(fields[0]) === 'tarih' && ctx.slugify(fields[1] || '') === 'ilce') continue;
     if (rows.length >= 600) return fail('too_many_rows', [index + 2]);
     if (fields.length !== 5) {
       errors.push(index + 2);
       continue;
     }
     const date = parseDate(fields[0]);
-    const district = fields[1] ? (districtMap[province] || []).find(name => trSlug(name) === trSlug(fields[1])) : '';
+    const district = fields[1] ? (ctx.districtsByProvince?.[provinceSlug] || []).find(name => ctx.slugify(name) === ctx.slugify(fields[1])) : '';
     const name = fields[2];
     const address = fields[3];
     const phone = fields[4];
@@ -111,14 +111,14 @@ export function parseRosterFile(input: string, now: Date = new Date()): RosterFi
       errors.push(index + 2);
       continue;
     }
-    const key = [date, trSlug(name), trSlug(address)].join('|');
+    const key = [date, ctx.slugify(name), ctx.slugify(address)].join('|');
     if (seen.has(key)) {
       duplicates += 1;
       continue;
     }
     seen.add(key);
     days.add(date);
-    rows.push({ duty_date: date, district_slug: district ? trSlug(district) : '', name, address, phone, roster_kind: 'monthly' });
+    rows.push({ duty_date: date, district_slug: district ? ctx.slugify(district) : '', name, address, phone, roster_kind: 'monthly' });
   }
   if (errors.length) return fail('invalid_rows', errors);
   if (!rows.length) return fail('empty_roster');
@@ -131,7 +131,7 @@ export function parseRosterFile(input: string, now: Date = new Date()): RosterFi
     const key = date.toISOString().slice(0, 10);
     if (!days.has(key)) missing.push(key);
   }
-  return { ok: true, province, province_slug: trSlug(province), rows, dates: sorted, missing_dates: missing, duplicate_count: duplicates, first_date: sorted[0], last_date: sorted[sorted.length - 1] };
+  return { ok: true, province, province_slug: provinceSlug, rows, dates: sorted, missing_dates: missing, duplicate_count: duplicates, first_date: sorted[0], last_date: sorted[sorted.length - 1] };
 }
 
 export function planReminders(now: Date, rows: Array<{ duty_date: string }>): ReminderPlan {

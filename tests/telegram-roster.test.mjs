@@ -2,11 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parseRosterMessage, verifyWebhookSecret, decideTelegramAction } from '../functions/lib/telegramRoster.ts';
 
+const slugify = (value) => String(value ?? '').replace(/[ıİIğĞşŞçÇöÖüÜâÂîÎûÛ]/g, (char) => ({ 'ı': 'i', 'İ': 'i', 'I': 'i', 'ğ': 'g', 'Ğ': 'g', 'ş': 's', 'Ş': 's', 'ç': 'c', 'Ç': 'c', 'ö': 'o', 'Ö': 'o', 'ü': 'u', 'Ü': 'u', 'â': 'a', 'Â': 'a', 'î': 'i', 'Î': 'i', 'û': 'u', 'Û': 'u' })[char]).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+const ctx = { provinceSlugs: ['mus', 'ankara', 'van'], provinceNames: { mus: 'Muş', ankara: 'Ankara', van: 'Van' }, districtsByProvince: { mus: ['Bulanık', 'Malazgirt', 'Merkez', 'Varto', 'Hasköy', 'Korkut'] }, slugify };
+
 const now = new Date('2026-11-09T06:30:00Z');
 const valid = 'Muş 09.11.2026\n[Merkez] Yeni Eczane | İstasyon Caddesi No 4 | +90 (436) 212-34-56\n[Varto] Varto Eczanesi | Cumhuriyet Mahallesi | 0436 711 22 33';
 
 test('valid roster resolves province, date and rows', () => {
-  const result = parseRosterMessage(valid, now);
+  const result = parseRosterMessage(valid, now, ctx);
   assert.equal(result.ok, true);
   if (!result.ok) return;
   assert.equal(result.province, 'Muş');
@@ -18,7 +21,7 @@ test('valid roster resolves province, date and rows', () => {
 });
 
 test('province-only rows have an empty district and phone format is accepted', () => {
-  const result = parseRosterMessage('Muş\nYeni Eczane | İstasyon Caddesi | +90 436 212 34 56', now);
+  const result = parseRosterMessage('Muş\nYeni Eczane | İstasyon Caddesi | +90 436 212 34 56', now, ctx);
   assert.equal(result.ok, true);
   if (result.ok) {
     assert.equal(result.rows[0].district_slug, '');
@@ -27,38 +30,38 @@ test('province-only rows have an empty district and phone format is accepted', (
 });
 
 test('missing date uses Istanbul today at 00:30 and 09:30', () => {
-  const early = parseRosterMessage('Muş\nEczane A | Adres A | 0436 111 22 33', new Date('2026-11-08T21:30:00Z'));
-  const late = parseRosterMessage('Muş\nEczane A | Adres A | 0436 111 22 33', new Date('2026-11-09T06:30:00Z'));
+  const early = parseRosterMessage('Muş\nEczane A | Adres A | 0436 111 22 33', new Date('2026-11-08T21:30:00Z'), ctx);
+  const late = parseRosterMessage('Muş\nEczane A | Adres A | 0436 111 22 33', new Date('2026-11-09T06:30:00Z'), ctx);
   assert.equal(early.ok && early.duty_date, '2026-11-09');
   assert.equal(late.ok && late.duty_date, '2026-11-09');
 });
 
 test('yesterday is rejected and tomorrow is accepted', () => {
-  assert.equal(parseRosterMessage('Muş 08.11.2026\nEczane A | Adres A | 0436 111 22 33', now).ok, false);
-  const tomorrow = parseRosterMessage('Muş 10.11.2026\nEczane A | Adres A | 0436 111 22 33', now);
+  assert.equal(parseRosterMessage('Muş 08.11.2026\nEczane A | Adres A | 0436 111 22 33', now, ctx).ok, false);
+  const tomorrow = parseRosterMessage('Muş 10.11.2026\nEczane A | Adres A | 0436 111 22 33', now, ctx);
   assert.equal(tomorrow.ok && tomorrow.duty_date, '2026-11-10');
 });
 
 test('an unsupported line rejects the whole message and reports its line number', () => {
-  const result = parseRosterMessage('Muş\nEczane A | Adres A | 0436 111 22 33\nBu satır anlaşılmaz', now);
+  const result = parseRosterMessage('Muş\nEczane A | Adres A | 0436 111 22 33\nBu satır anlaşılmaz', now, ctx);
   assert.equal(result.ok, false);
   if (!result.ok) assert.equal(result.lineNumber, 3);
 });
 
 test('61 rows are rejected', () => {
   const rows = Array.from({ length: 61 }, (_, i) => 'Eczane ' + i + ' | Adres ' + i + ' | 0436 111 22 33').join('\n');
-  assert.equal(parseRosterMessage('Muş\n' + rows, now).ok, false);
+  assert.equal(parseRosterMessage('Muş\n' + rows, now, ctx).ok, false);
 });
 
 test('unknown province is rejected', () => {
-  assert.equal(parseRosterMessage('Atlantis\nEczane A | Adres A | 0436 111 22 33', now).ok, false);
+  assert.equal(parseRosterMessage('Atlantis\nEczane A | Adres A | 0436 111 22 33', now, ctx).ok, false);
 });
 
 test('empty name, address or phone and invalid phone characters are rejected', () => {
-  assert.equal(parseRosterMessage('Muş\n | Adres A | 0436 111 22 33', now).ok, false);
-  assert.equal(parseRosterMessage('Muş\nEczane A |  | 0436 111 22 33', now).ok, false);
-  assert.equal(parseRosterMessage('Muş\nEczane A | Adres A | ', now).ok, false);
-  assert.equal(parseRosterMessage('Muş\nEczane A | Adres A | 0436ABC', now).ok, false);
+  assert.equal(parseRosterMessage('Muş\n | Adres A | 0436 111 22 33', now, ctx).ok, false);
+  assert.equal(parseRosterMessage('Muş\nEczane A |  | 0436 111 22 33', now, ctx).ok, false);
+  assert.equal(parseRosterMessage('Muş\nEczane A | Adres A | ', now, ctx).ok, false);
+  assert.equal(parseRosterMessage('Muş\nEczane A | Adres A | 0436ABC', now, ctx).ok, false);
 });
 
 test('webhook secret verifier rejects missing, wrong and different-length values', () => {

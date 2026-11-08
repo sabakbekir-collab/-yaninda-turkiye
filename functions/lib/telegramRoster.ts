@@ -1,5 +1,4 @@
-import { districtMap } from '../../src/turkeyDistricts';
-import { trSlug } from '../../src/text';
+export type RosterContext = { provinceSlugs: readonly string[]; slugify: (value: string) => string; provinceNames?: Readonly<Record<string, string>>; districtsByProvince?: Readonly<Record<string, readonly string[]>> };
 
 export type RosterRow = { district_slug: string; name: string; address: string; phone: string };
 export type RosterParseResult = { ok: true; province: string; province_slug: string; duty_date: string; rows: RosterRow[] } | { ok: false; error: string; lineNumber?: number };
@@ -37,7 +36,7 @@ function fail(error: string, lineNumber?: number): RosterParseResult {
   return { ok: false, error, ...(lineNumber === undefined ? {} : { lineNumber }) };
 }
 
-export function parseRosterMessage(text: string, now: Date = new Date()): RosterParseResult {
+export function parseRosterMessage(text: string, now: Date, ctx: RosterContext): RosterParseResult {
   if (typeof text !== 'string' || text.length > 8000) return fail('message_too_long');
   const lines = text.split(String.fromCharCode(10));
   const header = (lines.shift() || '').trim();
@@ -45,8 +44,9 @@ export function parseRosterMessage(text: string, now: Date = new Date()): Roster
   const firstSpace = header.indexOf(' ');
   const provinceText = firstSpace < 0 ? header : header.slice(0, firstSpace).trim();
   const dateText = firstSpace < 0 ? '' : header.slice(firstSpace + 1).trim();
-  const province = Object.keys(districtMap).find(name => trSlug(name) === trSlug(provinceText));
-  if (!province) return fail('unknown_province', 1);
+  const provinceSlug = ctx.provinceSlugs.find(slug => slug === ctx.slugify(provinceText));
+  if (!provinceSlug) return fail('unknown_province', 1);
+  const province = ctx.provinceNames?.[provinceSlug] || provinceText;
   const today = istanbulDay(now);
   const dutyDate = dateText ? parseDate(dateText) : today;
   if (!dutyDate) return fail('invalid_date', 1);
@@ -63,9 +63,9 @@ export function parseRosterMessage(text: string, now: Date = new Date()): Roster
       const close = raw.indexOf(']');
       if (close < 2 || raw.slice(close + 1, close + 2) !== ' ') return fail('invalid_row', index + 2);
       const districtText = raw.slice(1, close).trim();
-      const knownDistrict = districtsForProvince(province, districtText);
+      const knownDistrict = districtsForProvince(provinceSlug, districtText, ctx);
       if (!knownDistrict) return fail('unknown_district', index + 2);
-      district = trSlug(knownDistrict);
+      district = ctx.slugify(knownDistrict);
       rowText = raw.slice(close + 2).trim();
     }
     const columns = rowText.split('|').map(value => value.trim());
@@ -73,12 +73,12 @@ export function parseRosterMessage(text: string, now: Date = new Date()): Roster
     rows.push({ district_slug: district, name: columns[0].slice(0, 160), address: columns[1].slice(0, 400), phone: columns[2].slice(0, 40) });
   }
   if (!rows.length) return fail('empty_roster');
-  return { ok: true, province, province_slug: trSlug(province), duty_date: dutyDate, rows };
+  return { ok: true, province, province_slug: provinceSlug, duty_date: dutyDate, rows };
 }
 
-function districtsForProvince(province: string, input: string): string | null {
-  const districts = districtMap[province] || [];
-  return districts.find(name => trSlug(name) === trSlug(input)) || null;
+function districtsForProvince(provinceSlug: string, input: string, ctx: RosterContext): string | null {
+  const districts = ctx.districtsByProvince?.[provinceSlug] || [];
+  return districts.find(name => ctx.slugify(name) === ctx.slugify(input)) || null;
 }
 
 export function verifyWebhookSecret(expected: string | null | undefined, actual: string | null | undefined): boolean {
