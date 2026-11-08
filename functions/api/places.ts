@@ -165,7 +165,6 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
         verifiedAt:recordDate,dutyUpdatedAt:new Date().toISOString()});
     }
     out.sort((a,b)=>(a.distance??999)-(b.distance??999));
-    const sourceDate=dutyDateKey(rootDate)||undefined;
     const hasDatedRows=rows.some(value=>{
       if(!value||typeof value!=='object'||Array.isArray(value))return false;
       const x=value as Record<string,unknown>;
@@ -174,7 +173,7 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
     const hasActiveDatedRows=rows.some(value=>{
       if(!value||typeof value!=='object'||Array.isArray(value))return false;
       const x=value as Record<string,unknown>;
-      return isActiveDutyDate(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih??rootDate);
+      return isTodayDutyDate(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih??rootDate);
     });
     const stale=!out.length&&Boolean(
       (sourceDate&&!activeDutyDates().includes(sourceDate))||
@@ -247,9 +246,8 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
       const reason=st===429?'provider_rate_limited':st===403||st===401?'provider_forbidden':st===404?'provider_not_found':st&&st>=500?'provider_server_error':'provider_error';
       return {places:[],ok:false,reason,providerStatus:st};
     }
-    // A feed dated neither today nor (before 09:00 TR) yesterday is stale: never show it as "nöbetçi".
+    // Only a feed dated today in Europe/Istanbul can be shown as "nöbetçi".
     const anyActive=isTodayDutyDate(data.date)&&Array.isArray(data.pharmacies)&&data.pharmacies.some(x=>x&&typeof x==='object'&&isTodayDutyDate((x as Record<string,unknown>).date??(x as Record<string,unknown>).duty_date??(x as Record<string,unknown>).dutyDate??(x as Record<string,unknown>).nobet_tarihi??data.date));
-    const feedDate=dutyDateKey(data.date);
     // An old feed date is stale even when the provider returns an empty array.
     // Previously an empty October feed was incorrectly reported as a healthy
     // "no records today" response for a November lookup.
