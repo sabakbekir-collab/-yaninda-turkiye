@@ -3,7 +3,7 @@
  * İlçe adları, 81 il / 973 ilçe yapısını temsil eden açık veri listesinden alınmıştır.
  * Uygulama bunları tamamen offline kullanır; ilçe seçimi için API çağrısı gerekmez.
  */
-import { trSlug } from './text';
+import { trSlug } from './text.ts';
 
 export const districtMap: Record<string, string[]> = {
 Adana:['Seyhan','Ceyhan','Feke','Karaisalı','Karataş','Kozan','Pozantı','Saimbeyli','Tufanbeyli','Yumurtalık','Yüreğir','Aladağ','İmamoğlu','Sarıçam','Çukurova'],
