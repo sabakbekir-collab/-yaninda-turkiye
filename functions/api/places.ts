@@ -6,6 +6,7 @@ import {isCentralDistrict,trSlug,resolveName} from '../../src/text';
 import {districtMap,districtsFor} from '../../src/turkeyDistricts';
 import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery';
 import {activeDutyDates,dutyDateKey,dutyRowAllowed,isActiveDutyDate} from '../lib/dutyDates';
+import {parseTurkpidya} from '../lib/turkpidyaParse';
 import {classifyOverpassBody} from '../lib/overpassBody';
 import {cachePolicyFor} from '../lib/placesCachePolicy';
 import {haversineKm,countRecordsNearAnother} from '../lib/geoDistance';
@@ -126,8 +127,7 @@ export async function onRequestAreaGet({request}:{request:Request}){
 
 /**
  * Independent secondary roster. Turkpidya documents provincial pharmacists'
- * chambers and municipality lists as its source. Coverage is partial; accept
- * only dated records with coordinates, and never infer a duty date.
+ * chambers and municipality lists as its source. Coverage is partial.
  */
 async function turkpidyaDutyFallback(province:string,district:string,lat:number,lon:number):Promise<{places:Place[];ok:boolean;date?:string;reason?:string}>{
   try{
@@ -136,50 +136,26 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
     const r=await fetch(u,{headers:{Accept:'application/json','User-Agent':OSM_UA},signal:AbortSignal.timeout(9000)});
     if(!r.ok)return {places:[],ok:false,reason:'secondary_http_'+r.status};
     const body=await r.json() as unknown;
-    const root=body&&typeof body==='object'&&!Array.isArray(body)?body as Record<string,unknown>:{};
-    const nested=root.data&&typeof root.data==='object'&&!Array.isArray(root.data)?root.data as Record<string,unknown>:{};
-    const rows=Array.isArray(body)?body:Array.isArray(root.pharmacies)?root.pharmacies:Array.isArray(root.data)?root.data:Array.isArray(nested.pharmacies)?nested.pharmacies:Array.isArray(nested.items)?nested.items:Array.isArray(root.results)?root.results:[];
-    const rootDate=root.rosterDate??root.roster_date??root.sourceDate??root.source_date??root.date??root.tarih??nested.rosterDate??nested.roster_date??nested.date??nested.tarih;
-    const sourceDate=dutyDateKey(rootDate)||undefined;
-    if(!isActiveDutyDate(rootDate))return {places:[],ok:false,date:sourceDate,reason:'stale_duty_list'};
-    const out:Place[]=[];
-    for(const [i,value] of rows.entries()){
-      if(!value||typeof value!=='object'||Array.isArray(value))continue;
-      const x=value as Record<string,unknown>;
-      const recordDate=dutyDateKey(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih??rootDate);
-      if(!dutyRowAllowed(recordDate,rootDate))continue;
-      const recordCity=clean(x.city??x.province??x.il);
-      if(recordCity&&slug(recordCity)!==slug(province))continue;
-      const recordDistrict=clean(x.district??x.ilce??x.county);
-      if(district&&(!recordDistrict||slug(recordDistrict)!==slug(district)))continue;
-      const location=x.location&&typeof x.location==='object'?x.location as Record<string,unknown>:{};
-      const la=Number(x.lat??x.latitude??location.lat),lo=Number(x.lng??x.lon??x.longitude??location.lng??location.lon);
-      const name=clean(x.name??x.pharmacyName??x.pharmacy_name??x.title??x.ad);
-      if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < 35||la > 43||lo < 25||lo > 46)continue;
-      out.push({id:'turkpidya-duty-'+String(x.id??x.pharmacyId??x.pharmacy_id??i),name,category:'pharmacy',lat:la,lon:lo,
-        address:clean(x.address??x.adres),phone:clean(x.phone??x.telephone??x.telefon,60),
-        openingHours:clean(x.hours??x.dutyHours??x.duty_hours,180),
-        source:'Veri: Turkpidya — il eczacı odaları ve belediyeler; tarihli kaynak listesi',
-        distance:distance(lat,lon,la,lo),district:recordDistrict||undefined,isDuty:true,
-        officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
-        verifiedAt:recordDate||undefined,dutyUpdatedAt:new Date().toISOString()});
-    }
-    out.sort((a,b)=>(a.distance??999)-(b.distance??999));
-    const hasDatedRows=rows.some(value=>{
-      if(!value||typeof value!=='object'||Array.isArray(value))return false;
-      const x=value as Record<string,unknown>;
-      return Boolean(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih??rootDate);
+    const now=new Date();
+    const parsed=parseTurkpidya(body,slug(province),slug(district),now,slug,activeDutyDates(now),dutyDateKey);
+    if(!parsed.rows.length)return {places:[],ok:parsed.reason!=='stale_duty_list',date:parsed.date,reason:parsed.reason==='stale_duty_list'?'stale_duty_list':undefined};
+    const updatedAt=now.toISOString();
+    const out:Place[]=parsed.rows.map(row=>({
+      id:'turkpidya-duty-'+row.id,name:row.name,category:'pharmacy',
+      lat:row.hasCoords?row.lat!:lat,lon:row.hasCoords?row.lon!:lon,
+      address:row.address,phone:row.phone,
+      source:'Veri: Turkpidya — il eczacı odaları ve belediyeler; tarihli kaynak listesi',
+      ...(row.hasCoords?{distance:distance(lat,lon,row.lat!,row.lon!)}:{coordsUnknown:true}),
+      district:row.district,isDuty:true,
+      officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
+      verifiedAt:row.dutyDate,dutyUpdatedAt:updatedAt
+    }));
+    out.sort((a,b)=>{
+      if(Boolean(a.coordsUnknown)!==Boolean(b.coordsUnknown))return a.coordsUnknown?1:-1;
+      if(!a.coordsUnknown&&!b.coordsUnknown)return (a.distance??999)-(b.distance??999);
+      return a.name.localeCompare(b.name,'tr');
     });
-    const hasActiveDatedRows=rows.some(value=>{
-      if(!value||typeof value!=='object'||Array.isArray(value))return false;
-      const x=value as Record<string,unknown>;
-      return dutyRowAllowed(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih,rootDate);
-    });
-    const stale=!out.length&&Boolean(
-      (rootDate&&!isActiveDutyDate(rootDate))||
-      (hasDatedRows&&!hasActiveDatedRows)
-    );
-    return {places:out.slice(0,25),ok:!stale,date:sourceDate,reason:stale?'stale_duty_list':undefined};
+    return {places:out.slice(0,25),ok:true,date:parsed.date};
   }catch(e){
     const timeout=e instanceof Error&&(e.name==='TimeoutError'||e.name==='AbortError');
     return {places:[],ok:false,reason:timeout?'secondary_timeout':'secondary_error'};
