@@ -33,7 +33,13 @@ export function dutyViewState<T>(input: DutyViewInput<T>): DutyView<T> {
   let today: string;
   try { today = dateKey(now, input.tz) || ''; } catch { return { kind: 'none', items: [] }; }
   const feed = input.feedDate === null || input.feedDate === undefined || input.feedDate === '' ? null : dateKey(input.feedDate, input.tz);
-  if (feed === today && Array.isArray(input.items) && input.items.length > 0) return { kind: 'list', items: input.items };
+  const datedItems = Array.isArray(input.items) ? input.items.filter(item => {
+    if (!item || typeof item !== 'object') return false;
+    const row = item as Record<string, unknown>;
+    const rowDate = row.verifiedAt ?? row.dutyDate ?? row.duty_date ?? row.date;
+    return rowDate !== null && rowDate !== undefined && dateKey(rowDate as string | number | Date, input.tz) === today;
+  }) : [];
+  if (feed === today && datedItems.length > 0) return { kind: 'list', items: datedItems };
   return { kind: 'none', ...(feed && feed !== today ? { staleDate: feed } : {}), items: [] };
 }
 export function shouldShowDutyCount(count: number): boolean { return Number.isFinite(count) && count > 0; }
