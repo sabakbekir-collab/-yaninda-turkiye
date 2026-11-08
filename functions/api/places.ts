@@ -440,11 +440,20 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   if(cached&&typeof cached==='object'&&!Array.isArray(cached)&&Array.isArray((cached as {places?:unknown}).places)){
     const snapshot=cached as {places:Place[];partial?:boolean};
     const policy=cachePolicyFor({ok:true,resultCount:snapshot.places.length,partial:snapshot.partial});
-    return jsonResponse(snapshot.places,{headers:{'Cache-Control':policy.cacheControl,'X-Data-Source':'cache'}});
+    const cachedDates=snapshot.places.map(place=>dutyDateKey(place.verifiedAt));
+    const cachedDutyDate=category==='pharmacy'&&!nonDutyPharmacy&&cachedDates.length>0&&cachedDates[0]!==null&&cachedDates.every(date=>date===cachedDates[0])?cachedDates[0]:null;
+    const headers:Record<string,string>={'Cache-Control':policy.cacheControl,'X-Data-Source':'cache'};
+    if(cachedDutyDate)headers['X-Duty-Date']=cachedDutyDate;
+    return jsonResponse(snapshot.places,{headers});
   }
   if(Array.isArray(cached)){
-    const policy=cachePolicyFor({ok:true,resultCount:cached.length});
-    return jsonResponse(cached,{headers:{'Cache-Control':policy.cacheControl,'X-Data-Source':'cache'}});
+    const cachedPlaces=cached as Place[];
+    const policy=cachePolicyFor({ok:true,resultCount:cachedPlaces.length});
+    const cachedDates=cachedPlaces.map(place=>dutyDateKey(place.verifiedAt));
+    const cachedDutyDate=category==='pharmacy'&&!nonDutyPharmacy&&cachedDates.length>0&&cachedDates[0]!==null&&cachedDates.every(date=>date===cachedDates[0])?cachedDates[0]:null;
+    const headers:Record<string,string>={'Cache-Control':policy.cacheControl,'X-Data-Source':'cache'};
+    if(cachedDutyDate)headers['X-Duty-Date']=cachedDutyDate;
+    return jsonResponse(cachedPlaces,{headers});
   }
 
   // General OSM pharmacies are a separate, explicitly non-duty dataset.
