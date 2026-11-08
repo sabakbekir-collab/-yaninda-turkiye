@@ -459,3 +459,11 @@ html[data-theme="dark"]{color-scheme:light;filter:none;background:#fff7fb}
 .place-opening-hours{display:flex;align-items:center;gap:4px;flex-wrap:wrap;margin-top:5px;color:#596773;font-size:10px;line-height:1.4}
 .place-opening-hours b{font-weight:800;color:#344451}
 @media(max-width:760px){.nearby-place-card .place-body{padding-right:64px}}
+
+.duty-calm-note,.duty-calm-error{margin:10px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--ink);font-size:12px;line-height:1.5;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.duty-calm-note p,.duty-calm-error p{margin:0}
+.duty-calm-note a,.duty-calm-error button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:0 13px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--blue);font-size:12px;font-weight:800}
+.duty-calm-note svg{width:14px}
+.place-actions{display:flex;flex-wrap:wrap;gap:6px;overflow:visible;min-width:0}
+.place-actions>a,.place-actions>button,.place-actions>.no-phone{flex:1 1 28%;min-width:0;max-width:100%;white-space:normal;overflow-wrap:anywhere;padding:0 7px;text-align:center}
+@media(max-width:390px){.place-actions>a,.place-actions>button,.place-actions>.no-phone{font-size:10px;padding:0 5px;gap:4px}}

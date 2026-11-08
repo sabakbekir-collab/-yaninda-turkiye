@@ -140,12 +140,14 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
     const nested=root.data&&typeof root.data==='object'&&!Array.isArray(root.data)?root.data as Record<string,unknown>:{};
     const rows=Array.isArray(body)?body:Array.isArray(root.pharmacies)?root.pharmacies:Array.isArray(root.data)?root.data:Array.isArray(nested.pharmacies)?nested.pharmacies:Array.isArray(nested.items)?nested.items:Array.isArray(root.results)?root.results:[];
     const rootDate=root.rosterDate??root.roster_date??root.sourceDate??root.source_date??root.date??root.tarih??nested.rosterDate??nested.roster_date??nested.date??nested.tarih;
+    const sourceDate=dutyDateKey(rootDate)||undefined;
+    if(!isTodayDutyDate(rootDate))return {places:[],ok:false,date:sourceDate,reason:'stale_duty_list'};
     const out:Place[]=[];
     for(const [i,value] of rows.entries()){
       if(!value||typeof value!=='object'||Array.isArray(value))continue;
       const x=value as Record<string,unknown>;
       const recordDate=dutyDateKey(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih??rootDate);
-      if(!recordDate||!activeDutyDates().includes(recordDate))continue;
+      if(!recordDate||!isTodayDutyDate(recordDate))continue;
       const recordCity=clean(x.city??x.province??x.il);
       if(recordCity&&slug(recordCity)!==slug(province))continue;
       const recordDistrict=clean(x.district??x.ilce??x.county);
@@ -187,7 +189,7 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
 
 export async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,_radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string;reason?:string;providerStatus?:number}>{
   const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string,applyDistrictFilter:boolean)=>{
-    if(!Array.isArray(data.pharmacies))return [];
+    if(!isTodayDutyDate(data.date)||!Array.isArray(data.pharmacies))return [];
     const out:Place[]=[];
     for(const [i,x] of data.pharmacies.entries()){
       // Provider JSON is untrusted: malformed null/primitive rows must not crash the whole response.
@@ -201,7 +203,7 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
       if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < 35||la > 43||lo < 25||lo > 46)continue;
       // Each record may carry its own duty date; otherwise the feed date applies. Unknown or stale dates are never shown as "nöbetçi".
       const recordDate=x.date??x.duty_date??x.dutyDate??x.nobet_tarihi;
-      if(!isActiveDutyDate(recordDate??data.date))continue;
+      if(!isTodayDutyDate(recordDate??data.date))continue;
       const recordDistrict=clean(x.district);
       if(district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
       if(!applyDistrictFilter&&district&&!recordDistrict)continue;
@@ -246,13 +248,13 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
       return {places:[],ok:false,reason,providerStatus:st};
     }
     // A feed dated neither today nor (before 09:00 TR) yesterday is stale: never show it as "nöbetçi".
-    const anyActive=Array.isArray(data.pharmacies)&&data.pharmacies.some(x=>x&&typeof x==='object'&&isActiveDutyDate((x as Record<string,unknown>).date??(x as Record<string,unknown>).duty_date??(x as Record<string,unknown>).dutyDate??(x as Record<string,unknown>).nobet_tarihi??data.date));
+    const anyActive=isTodayDutyDate(data.date)&&Array.isArray(data.pharmacies)&&data.pharmacies.some(x=>x&&typeof x==='object'&&isTodayDutyDate((x as Record<string,unknown>).date??(x as Record<string,unknown>).duty_date??(x as Record<string,unknown>).dutyDate??(x as Record<string,unknown>).nobet_tarihi??data.date));
     const feedDate=dutyDateKey(data.date);
     // An old feed date is stale even when the provider returns an empty array.
     // Previously an empty October feed was incorrectly reported as a healthy
     // "no records today" response for a November lookup.
     if(!all.length&&!anyActive&&(
-      (feedDate!==null&&!activeDutyDates().includes(feedDate))||
+      !isTodayDutyDate(data.date)||
       (Array.isArray(data.pharmacies)&&data.pharmacies.length>0)
     ))return {places:[],ok:false,date:String(data.date??''),reason:'stale_duty_list'};
     return {places:all.slice(0,25),ok:true,date:data.date};
