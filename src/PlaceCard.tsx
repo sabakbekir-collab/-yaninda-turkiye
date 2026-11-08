@@ -46,7 +46,7 @@ export default function PlaceCard({p,distanceLabel}:{p:Place;distanceLabel?:stri
       {p.district&&<small className="place-district">İlçe: {p.district}</small>}
       {p.isDuty&&<small className="place-source-note">Üçüncü taraf kaynağından alınmıştır; resmî kurum doğrulaması değildir. Gitmeden telefonla teyit et. {p.verifiedAt&&'Veri tarihi: '+p.verifiedAt} {p.officialUrl&&<a href={p.officialUrl} target="_blank" rel="noreferrer">Resmî e-Devlet sorgusu</a>}</small>}
       {openingHours&&<small className="place-opening-hours"><b>{openingHours.label}:</b> {openingHours.value}</small>}
-      <footer>
+      <footer className="place-actions">
         {p.phone?<a href={'tel:'+p.phone} onClick={()=>track('phone_click',{category:p.category})}><Phone/>Ara</a>:<span className="no-phone">Telefon bilgisi yok</span>}
         <a target="_blank" rel="noreferrer" href={directions} onClick={()=>track('directions_click',{category:p.category})}><Navigation/>Yol Tarifi</a>
         <button type="button" className={isFav?'fav-on':''} aria-pressed={isFav} onClick={onFav}><Heart/>{isFav?'Favoride':'Favori'}</button>

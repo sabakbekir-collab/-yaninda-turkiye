@@ -5,7 +5,7 @@ import {resolveSearchAnchor,chooseSearchCenter,placesCacheKey} from '../lib/sear
 import {isCentralDistrict,trSlug,resolveName} from '../../src/text';
 import {districtMap,districtsFor} from '../../src/turkeyDistricts';
 import {OSM_FILTERS,UNNAMED_LABELS,buildOverpassQuery} from '../../src/osmQuery';
-import {activeDutyDates,dutyDateKey,isActiveDutyDate} from '../lib/dutyDates';
+import {activeDutyDates,dutyDateKey,dutyRowAllowed,isActiveDutyDate} from '../lib/dutyDates';
 import {classifyOverpassBody} from '../lib/overpassBody';
 import {cachePolicyFor} from '../lib/placesCachePolicy';
 import {haversineKm,countRecordsNearAnother} from '../lib/geoDistance';
@@ -140,12 +140,14 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
     const nested=root.data&&typeof root.data==='object'&&!Array.isArray(root.data)?root.data as Record<string,unknown>:{};
     const rows=Array.isArray(body)?body:Array.isArray(root.pharmacies)?root.pharmacies:Array.isArray(root.data)?root.data:Array.isArray(nested.pharmacies)?nested.pharmacies:Array.isArray(nested.items)?nested.items:Array.isArray(root.results)?root.results:[];
     const rootDate=root.rosterDate??root.roster_date??root.sourceDate??root.source_date??root.date??root.tarih??nested.rosterDate??nested.roster_date??nested.date??nested.tarih;
+    const sourceDate=dutyDateKey(rootDate)||undefined;
+    if(!isActiveDutyDate(rootDate))return {places:[],ok:false,date:sourceDate,reason:'stale_duty_list'};
     const out:Place[]=[];
     for(const [i,value] of rows.entries()){
       if(!value||typeof value!=='object'||Array.isArray(value))continue;
       const x=value as Record<string,unknown>;
       const recordDate=dutyDateKey(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih??rootDate);
-      if(!recordDate||!activeDutyDates().includes(recordDate))continue;
+      if(!dutyRowAllowed(recordDate,rootDate))continue;
       const recordCity=clean(x.city??x.province??x.il);
       if(recordCity&&slug(recordCity)!==slug(province))continue;
       const recordDistrict=clean(x.district??x.ilce??x.county);
@@ -160,10 +162,9 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
         source:'Veri: Turkpidya — il eczacı odaları ve belediyeler; tarihli kaynak listesi',
         distance:distance(lat,lon,la,lo),district:recordDistrict||undefined,isDuty:true,
         officialUrl:'https://www.turkiye.gov.tr/saglik-titck-nobetci-eczane-sorgulama',
-        verifiedAt:recordDate,dutyUpdatedAt:new Date().toISOString()});
+        verifiedAt:recordDate||undefined,dutyUpdatedAt:new Date().toISOString()});
     }
     out.sort((a,b)=>(a.distance??999)-(b.distance??999));
-    const sourceDate=dutyDateKey(rootDate)||undefined;
     const hasDatedRows=rows.some(value=>{
       if(!value||typeof value!=='object'||Array.isArray(value))return false;
       const x=value as Record<string,unknown>;
@@ -172,10 +173,10 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
     const hasActiveDatedRows=rows.some(value=>{
       if(!value||typeof value!=='object'||Array.isArray(value))return false;
       const x=value as Record<string,unknown>;
-      return isActiveDutyDate(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih??rootDate);
+      return dutyRowAllowed(x.rosterDate??x.roster_date??x.sourceDate??x.source_date??x.dutyDate??x.duty_date??x.date??x.tarih,rootDate);
     });
     const stale=!out.length&&Boolean(
-      (sourceDate&&!activeDutyDates().includes(sourceDate))||
+      (rootDate&&!isActiveDutyDate(rootDate))||
       (hasDatedRows&&!hasActiveDatedRows)
     );
     return {places:out.slice(0,25),ok:!stale,date:sourceDate,reason:stale?'stale_duty_list':undefined};
@@ -187,7 +188,7 @@ async function turkpidyaDutyFallback(province:string,district:string,lat:number,
 
 export async function dutyPharmacies(env:Env,province:string,district:string,lat:number,lon:number,_radiusKm:number):Promise<{places:Place[];ok:boolean;date?:string;reason?:string;providerStatus?:number}>{
   const buildPlaces=(data:{date?:string;pharmacies?:Array<Record<string,unknown>>},idPrefix:string,applyDistrictFilter:boolean)=>{
-    if(!Array.isArray(data.pharmacies))return [];
+    if(!isActiveDutyDate(data.date)||!Array.isArray(data.pharmacies))return [];
     const out:Place[]=[];
     for(const [i,x] of data.pharmacies.entries()){
       // Provider JSON is untrusted: malformed null/primitive rows must not crash the whole response.
@@ -201,7 +202,7 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
       if(!name||!Number.isFinite(la)||!Number.isFinite(lo)||la < 35||la > 43||lo < 25||lo > 46)continue;
       // Each record may carry its own duty date; otherwise the feed date applies. Unknown or stale dates are never shown as "nöbetçi".
       const recordDate=x.date??x.duty_date??x.dutyDate??x.nobet_tarihi;
-      if(!isActiveDutyDate(recordDate??data.date))continue;
+      if(!dutyRowAllowed(recordDate,data.date))continue;
       const recordDistrict=clean(x.district);
       if(district&&recordDistrict&&slug(recordDistrict)!==slug(district))continue;
       if(!applyDistrictFilter&&district&&!recordDistrict)continue;
@@ -245,14 +246,13 @@ export async function dutyPharmacies(env:Env,province:string,district:string,lat
       const reason=st===429?'provider_rate_limited':st===403||st===401?'provider_forbidden':st===404?'provider_not_found':st&&st>=500?'provider_server_error':'provider_error';
       return {places:[],ok:false,reason,providerStatus:st};
     }
-    // A feed dated neither today nor (before 09:00 TR) yesterday is stale: never show it as "nöbetçi".
-    const anyActive=Array.isArray(data.pharmacies)&&data.pharmacies.some(x=>x&&typeof x==='object'&&isActiveDutyDate((x as Record<string,unknown>).date??(x as Record<string,unknown>).duty_date??(x as Record<string,unknown>).dutyDate??(x as Record<string,unknown>).nobet_tarihi??data.date));
-    const feedDate=dutyDateKey(data.date);
+    // Only a feed dated today in Europe/Istanbul can be shown as "nöbetçi".
+    const anyActive=Array.isArray(data.pharmacies)&&data.pharmacies.some(x=>x&&typeof x==='object'&&dutyRowAllowed((x as Record<string,unknown>).date??(x as Record<string,unknown>).duty_date??(x as Record<string,unknown>).dutyDate??(x as Record<string,unknown>).nobet_tarihi,data.date));
     // An old feed date is stale even when the provider returns an empty array.
     // Previously an empty October feed was incorrectly reported as a healthy
     // "no records today" response for a November lookup.
     if(!all.length&&!anyActive&&(
-      (feedDate!==null&&!activeDutyDates().includes(feedDate))||
+      !isActiveDutyDate(data.date)||
       (Array.isArray(data.pharmacies)&&data.pharmacies.length>0)
     ))return {places:[],ok:false,date:String(data.date??''),reason:'stale_duty_list'};
     return {places:all.slice(0,25),ok:true,date:data.date};
@@ -439,12 +439,27 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   const cached=debug?null:await dbCacheGet(env,key);
   if(cached&&typeof cached==='object'&&!Array.isArray(cached)&&Array.isArray((cached as {places?:unknown}).places)){
     const snapshot=cached as {places:Place[];partial?:boolean};
-    const policy=cachePolicyFor({ok:true,resultCount:snapshot.places.length,partial:snapshot.partial});
-    return jsonResponse(snapshot.places,{headers:{'Cache-Control':policy.cacheControl,'X-Data-Source':'cache'}});
+    const staleDutyCache=category==='pharmacy'&&!nonDutyPharmacy&&snapshot.places.length>0&&!snapshot.places.every(place=>dutyRowAllowed(place.verifiedAt,undefined));
+    if(!staleDutyCache){
+      const policy=cachePolicyFor({ok:true,resultCount:snapshot.places.length,partial:snapshot.partial});
+      const cachedDates=snapshot.places.map(place=>dutyDateKey(place.verifiedAt));
+      const cachedDutyDate=category==='pharmacy'&&!nonDutyPharmacy&&cachedDates.length>0&&cachedDates[0]!==null&&cachedDates.every(date=>date===cachedDates[0])?cachedDates[0]:null;
+      const headers:Record<string,string>={'Cache-Control':policy.cacheControl,'X-Data-Source':'cache'};
+      if(cachedDutyDate)headers['X-Duty-Date']=cachedDutyDate;
+      return jsonResponse(snapshot.places,{headers});
+    }
   }
   if(Array.isArray(cached)){
-    const policy=cachePolicyFor({ok:true,resultCount:cached.length});
-    return jsonResponse(cached,{headers:{'Cache-Control':policy.cacheControl,'X-Data-Source':'cache'}});
+    const cachedPlaces=cached as Place[];
+    const staleDutyCache=category==='pharmacy'&&!nonDutyPharmacy&&cachedPlaces.length>0&&!cachedPlaces.every(place=>dutyRowAllowed(place.verifiedAt,undefined));
+    if(!staleDutyCache){
+      const policy=cachePolicyFor({ok:true,resultCount:cachedPlaces.length});
+      const cachedDates=cachedPlaces.map(place=>dutyDateKey(place.verifiedAt));
+      const cachedDutyDate=category==='pharmacy'&&!nonDutyPharmacy&&cachedDates.length>0&&cachedDates[0]!==null&&cachedDates.every(date=>date===cachedDates[0])?cachedDates[0]:null;
+      const headers:Record<string,string>={'Cache-Control':policy.cacheControl,'X-Data-Source':'cache'};
+      if(cachedDutyDate)headers['X-Duty-Date']=cachedDutyDate;
+      return jsonResponse(cachedPlaces,{headers});
+    }
   }
 
   // General OSM pharmacies are a separate, explicitly non-duty dataset.
