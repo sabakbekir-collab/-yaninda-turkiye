@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dutyViewState, shouldShowDutyCount } from '../src/dutyView.ts';
 
 const today = '2026-11-08';
-const items = [{ name: 'Eczane A' }, { name: 'Eczane B' }];
+const items = [{ name: 'Eczane A', verifiedAt: today }, { name: 'Eczane B', verifiedAt: today }];
 
 test('today dated feed with two pharmacies returns list', () => {
   assert.deepEqual(dutyViewState({ feedDate: today, items, now: '2026-11-08T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'list', items });
@@ -42,4 +42,12 @@ test('pharmacy error and stale roster messages never render role alert', () => {
 test('zero duty items do not show a numeric badge', () => {
   assert.equal(shouldShowDutyCount(0), false);
   assert.equal(shouldShowDutyCount(2), true);
+});
+
+test('today feed cannot promote an undated pharmacy row to duty', () => {
+  assert.deepEqual(dutyViewState({ feedDate: today, items: [{ name: 'Tarihsiz eczane' }], now: '2026-11-08T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'none', items: [] });
+});
+
+test('today feed filters out rows whose own date is stale', () => {
+  assert.deepEqual(dutyViewState({ feedDate: today, items: [{ name: 'Eski eczane', verifiedAt: '2026-10-11' }], now: '2026-11-08T12:00:00+03:00', tz: 'Europe/Istanbul' }), { kind: 'none', items: [] });
 });
