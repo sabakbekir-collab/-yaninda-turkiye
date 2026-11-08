@@ -36,7 +36,8 @@ test('none state cannot produce a duty label', () => {
 test('pharmacy error and stale roster messages never render role alert', () => {
   const source = readFileSync(new URL('../src/TargetApp.tsx', import.meta.url), 'utf8');
   assert.match(source, /!pharmacyMode&&err&&<div className="error nearby-error" role="alert">/);
-  assert.doesNotMatch(source, /(?<!!)pharmacyMode&&[^\n]*role="alert"/);
+  const BAD_ALERT = source.split(String.fromCharCode(10)).filter(line => line.includes('role="alert"') && line.includes('pharmacyMode&&') && !line.includes('!pharmacyMode&&'));
+  assert.deepEqual(BAD_ALERT, []);
 });
 
 test('zero duty items do not show a numeric badge', () => {
