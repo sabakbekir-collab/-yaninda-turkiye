@@ -6,21 +6,17 @@ import { trSlug } from '../src/text.ts';
 
 const slugify = trSlug;
 const now = new Date('2026-11-08T12:00:00+03:00');
-const rows = Array.from({ length: 9 }, (_, i) => ({
-  city: 'ankara',
-  district: 'Cankaya',
-  subDistrict: 'Çankaya',
-  name: i === 0 ? 'Ege Sena Eczanesi' : 'Ankara Fixture Eczanesi ' + (i + 1),
-  address: 'Çankaya, Ankara ' + (i + 1),
-  phone: null,
-  duty_date: '2026-11-08',
-  duty_start: null,
-  duty_end: null,
-  open_now: null,
-  source_state: 'current',
-  lat: null,
-  lng: null
-}));
+const rows = [
+  { city: 'ankara', district: 'Cankaya', subDistrict: 'Çankaya', name: 'Ege Sena Eczanesi', address: 'Ümit Mah.meksika Cad.no:39/A Ümitköy, Çankaya', phone: '+903122359811', duty_date: '2026-11-08', duty_start: null, duty_end: null, open_now: null, source_state: 'current', lat: null, lng: null },
+  { city: 'ankara', district: 'Cankaya', subDistrict: 'Çankaya', name: 'Feride Eczanesi', address: '100. Yıl Mah. Nenehatun Cad. No:63/A, Çankaya', phone: '+903124361855', duty_date: '2026-11-08', duty_start: null, duty_end: null, open_now: null, source_state: 'current', lat: null, lng: null },
+  { city: 'ankara', district: 'Cankaya', subDistrict: 'Çankaya', name: 'Gökbala Eczanesi', address: 'Ehlibeyt Mah. Ceyhun Atuf Kansu Cad. No:91/E, Çankaya', phone: '+903129115546', duty_date: '2026-11-08', duty_start: null, duty_end: null, open_now: null, source_state: 'current', lat: null, lng: null },
+  { city: 'ankara', district: 'Cankaya', subDistrict: 'Çankaya', name: 'Leman Eczanesi', address: 'Emek Mah. Kazakistan Cad. No: 138/A, Çankaya', phone: '+903122129796', duty_date: '2026-11-08', duty_start: null, duty_end: null, open_now: null, source_state: 'current', lat: null, lng: null },
+  { city: 'ankara', district: 'Cankaya', subDistrict: 'Çankaya', name: 'Pırıl Eczanesi', address: 'Zülfü Tigrel Akın-1 Blok No:9/A, Çankaya', phone: '+903124902196', duty_date: '2026-11-08', duty_start: null, duty_end: null, open_now: null, source_state: 'current', lat: null, lng: null },
+  { city: 'ankara', district: 'Cankaya', subDistrict: 'Çankaya', name: 'Yaşamkent Mine Eczanesi', address: 'Alacaatlı Mah. Mehmet Rifat Börekçi Cad. No:35/B-e, Çankaya', phone: '+905052584300', duty_date: '2026-11-08', duty_start: null, duty_end: null, open_now: null, source_state: 'current', lat: null, lng: null },
+  { city: 'ankara', district: 'Cankaya', subDistrict: 'Çankaya', name: 'Özlemin Eczanesi', address: 'Birlik Mah. Şehit Kurbani Akboğa Sok. No:35/8, Çankaya', phone: '+903124965364', duty_date: '2026-11-08', duty_start: null, duty_end: null, open_now: null, source_state: 'current', lat: null, lng: null },
+  { city: 'ankara', district: 'Cankaya', subDistrict: 'Çankaya', name: 'Ülkü Eczanesi', address: 'Kocatepe Mah.meşrutiyet Cad. No: 23/B-23C, Çankaya', phone: '+903124188929', duty_date: '2026-11-08', duty_start: null, duty_end: null, open_now: null, source_state: 'current', lat: null, lng: null },
+  { city: 'ankara', district: 'Cankaya', subDistrict: 'Çankaya', name: 'İrem Eczanesi', address: 'Topraklık Mah. Kıbrıs Cad. No:64/A, Çankaya', phone: '+903124341061', duty_date: '2026-11-08', duty_start: null, duty_end: null, open_now: null, source_state: 'current', lat: null, lng: null }
+];
 const ankaraFixture = {
   source: 'Provincial pharmacist chambers (eczacı odası), with municipal fallbacks, via the Turkpidya tools platform',
   duty_date: '2026-11-08',
