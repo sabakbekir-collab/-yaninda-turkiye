@@ -1,9 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { activeDutyDates, dutyDateKey, isActiveDutyDate } from "../functions/lib/dutyDates.ts";
-test("night duty keeps yesterday active until 09:00 Istanbul time", () => {
-  assert.deepEqual(activeDutyDates(new Date("2026-11-04T05:59:00Z")), ["2026-11-04", "2026-11-03"]);
+import { activeDutyDates, dutyDateKey, isActiveDutyDate, dutyRowAllowed } from "../functions/lib/dutyDates.ts";
+test("only the current Istanbul calendar date is active even before 09:00", () => {
+  assert.deepEqual(activeDutyDates(new Date("2026-11-04T05:59:00Z")), ["2026-11-04"]);
   assert.deepEqual(activeDutyDates(new Date("2026-11-04T06:00:00Z")), ["2026-11-04"]);
+  assert.equal(isActiveDutyDate("2026-11-03", new Date("2026-11-04T05:59:00Z")), false);
 });
 test("date-only and Turkish day-month-year formats are normalised", () => {
   assert.equal(dutyDateKey("2026-11-05"), "2026-11-05");
@@ -30,4 +31,12 @@ test("active duty checks use supplied clock deterministically", () => {
   const now = new Date("2026-11-04T05:00:00Z");
   assert.equal(isActiveDutyDate("2026-11-03", now), true);
   assert.equal(isActiveDutyDate("2026-11-02", now), false);
+});
+
+test("duty row requires a today feed date and a today row date", () => {
+  const now = new Date("2026-11-08T21:30:00Z");
+  assert.equal(dutyRowAllowed("2026-11-09", "2026-11-09", now), true);
+  assert.equal(dutyRowAllowed("2026-11-08", "2026-11-08", now), false);
+  assert.equal(dutyRowAllowed("2026-11-09", null, now), false);
+  assert.equal(dutyRowAllowed(null, "2026-11-09", now), true);
 });
