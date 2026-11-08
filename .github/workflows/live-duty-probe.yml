@@ -104,6 +104,7 @@ jobs:
           PROVINCES
           printf '%s\n' 'province,slug,ea_http,ea_date,ea_count,ea_pharmacies,ea_first_row_date,ea_today,tp_http,tp_duty_date,tp_city_duty_date,tp_count,tp_pharmacies,tp_coordinate_rows,tp_cities_served,tp_cities_blocked,tp_last_updated,tp_today' > coverage.csv
           : > coverage.md
+          : > neither.txt
           ea_today_count=0
           tp_today_count=0
           either_today_count=0
@@ -194,7 +195,7 @@ jobs:
             fi
             if [ "$ea_today" = "evet" ]; then ea_today_count=$((ea_today_count+1)); fi
             if [ "$tp_today" = "evet" ]; then tp_today_count=$((tp_today_count+1)); fi
-            if [ "$ea_today" = "evet" ] || [ "$tp_today" = "evet" ]; then either_today_count=$((either_today_count+1)); else neither_count=$((neither_count+1)); fi
+            if [ "$ea_today" = "evet" ] || [ "$tp_today" = "evet" ]; then either_today_count=$((either_today_count+1)); else neither_count=$((neither_count+1)); echo "$province" >> neither.txt; fi
             csv_row "$province" "$slug" "$ea_http" "$ea_date" "$ea_count" "$ea_pharmacies" "$ea_first" "$ea_today" "$tp_http" "$tp_date" "$tp_city_date" "$tp_count" "$tp_pharmacies" "$tp_coords" "$tp_served" "$tp_blocked" "$tp_updated" "$tp_today" >> coverage.csv
             printf '| %s | %s | %s | %s | %s | %s | %s/%s |\n' "$province" "${ea_date:-$ea_http}" "${ea_count:-—}" "${tp_date:-$tp_http}" "${tp_count:-—}" "${tp_coords:-—}" "$ea_today" "$tp_today" >> coverage.md
           done < provinces.txt
@@ -210,7 +211,7 @@ jobs:
             echo "Bugün tarihli liste veren il sayısı: EA=$ea_today_count, TP=$tp_today_count, ikisinden biri=$either_today_count, hiçbiri=$neither_count"
             echo
             echo 'Hiçbiri olmayan iller:'
-            awk -F, 'NR>1 && $8!="evet" && $18!="evet" {print "- " $1}' coverage.csv
+            sed 's/^/- /' neither.txt
             if [ -n "$stop_code" ]; then echo; echo "DURDURULDU: sağlayıcı HTTP $stop_code verdi; kalan iller sorgulanmadı."; fi
             if [ "$failed" -ne 0 ]; then echo; echo 'Bir veya daha fazla sağlayıcı çağrısı hata verdi; ayrıntılar job logunda ve coverage.csv içindedir.'; fi
           } >> "$GITHUB_STEP_SUMMARY"
