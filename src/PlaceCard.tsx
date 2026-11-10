@@ -2,9 +2,9 @@ import {useState} from 'react';
 import type {FormEvent} from 'react';
 import {Flag,Heart,Navigation,Phone,Share2,ShieldCheck} from 'lucide-react';
 import type {Place} from './types';
-import {categoryIcon,cleanCardAddress,formatDistance} from './placeUtils';
+import {categoryIcon,cleanCardAddress,dutySourceNote,formatDistance} from './placeUtils';
 import {useFavorites} from './favorites';
-import {mapsLink,shareText} from './share';
+import {directionsLinkForPlace,mapsLinkForPlace,shareText} from './share';
 import {track} from './api';
 import {formatOpeningHours} from './openingHours';
 
@@ -20,12 +20,13 @@ export default function PlaceCard({p,distanceLabel}:{p:Place;distanceLabel?:stri
   const [busy,setBusy]=useState(false);
   const isFav=has(p.id);
   const openingHours=formatOpeningHours(p.openingHours,p.category);
-  const directions='https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon;
+  const dutyNote=dutySourceNote(p);
+  const directions=directionsLinkForPlace(p);
   const onFav=()=>{if(!isFav)track('favorite_click',{category:p.category});toggle(p)};
   const onShare=async()=>{
     const lines=[p.name,cleanCardAddress(p.address)];
     if(p.phone)lines.push('Tel: '+p.phone);
-    const r=await shareText(p.name,lines.join('\n'),mapsLink(p.lat,p.lon));
+    const r=await shareText(p.name,lines.join('\n'),mapsLinkForPlace(p));
     setStatus(r==='copied'?'Bilgiler panoya kopyalandı.':r==='failed'?'Paylaşılamadı.':'');
   };
   const onReport=async(e:FormEvent)=>{
@@ -44,7 +45,8 @@ export default function PlaceCard({p,distanceLabel}:{p:Place;distanceLabel?:stri
       <p>{cleanCardAddress(p.address)}</p>
       <small className="place-meta-line">{typeof p.distance==='number'&&<><Navigation/> <b>{formatDistance(p.distance)}</b> · {distanceLabel||'Konumuna göre, kuş uçuşu'} · </>}<ShieldCheck/> {p.source.startsWith('OpenStreetMap')?'OpenStreetMap — eksik olabilir':p.source}</small>
       {p.district&&<small className="place-district">İlçe: {p.district}</small>}
-      {p.isDuty&&<small className="place-source-note">Üçüncü taraf kaynağından alınmıştır; resmî kurum doğrulaması değildir. Gitmeden telefonla teyit et. {p.verifiedAt&&'Veri tarihi: '+p.verifiedAt} {p.officialUrl&&<a href={p.officialUrl} target="_blank" rel="noreferrer">Resmî e-Devlet sorgusu</a>}</small>}
+      {p.isDuty&&dutyNote==='third_party'&&<small className="place-source-note">Üçüncü taraf kaynağından alınmıştır; resmî kurum doğrulaması değildir. Gitmeden telefonla teyit et. {p.verifiedAt&&'Veri tarihi: '+p.verifiedAt} {p.officialUrl&&<a href={p.officialUrl} target="_blank" rel="noreferrer">Resmî e-Devlet sorgusu</a>}</small>}
+      {p.isDuty&&dutyNote&&dutyNote!=='third_party'&&<small className="place-source-note">{dutyNote}</small>}
       {openingHours&&<small className="place-opening-hours"><b>{openingHours.label}:</b> {openingHours.value}</small>}
       <footer className="place-actions">
         {p.phone?<a href={'tel:'+p.phone} onClick={()=>track('phone_click',{category:p.category})}><Phone/>Ara</a>:<span className="no-phone">Telefon bilgisi yok</span>}

@@ -4,6 +4,9 @@
   "main": "./worker/index.ts",
   "workers_dev": true,
   "compatibility_date": "2026-10-01",
+  "triggers": {
+    "crons": ["0 5 * * *"]
+  },
   "observability": {
     "enabled": true
   },

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { onRequest } from "../functions/api/telegram.ts";
+import { isTelegramWebhookPath, onRequest } from "../functions/api/telegram.ts";
 import { buildRosterContext } from "../functions/api/rosterContext.ts";
 
 const secret = "test-webhook-secret";
@@ -26,9 +26,16 @@ test("Telegram webhook rejects an incorrect secret without reading the body", as
       return null;
     },
   };
+
   const response = await onRequest({ request, env: { TELEGRAM_WEBHOOK_SECRET: secret } });
   assert.equal(response.status, 401);
   assert.equal(bodyRead, false);
+});
+
+test("Telegram webhook path matcher includes the documented setup URL", () => {
+  assert.equal(isTelegramWebhookPath("/api/telegram"), true);
+  assert.equal(isTelegramWebhookPath("/api/telegram/webhook"), true);
+  assert.equal(isTelegramWebhookPath("/api/telegram/other"), false);
 });
 
 test("Telegram webhook rejects methods other than POST", async () => {

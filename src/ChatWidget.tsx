@@ -1,10 +1,11 @@
 import {useEffect,useRef,useState} from "react";
 import {MessageCircle,Send,X,LocateFixed,Navigation} from "lucide-react";
 import {getCurrentLocation,getLocationPermissionState,LocationError} from "./location";
+import {directionsLinkForPlace} from "./share";
 import "./chat.css";
 
 type Msg={role:"user"|"assistant";content:string};
-type Place={name:string;address?:string;phone?:string;lat?:number;lon?:number;distance?:number;isDuty?:boolean};
+type Place={name:string;address?:string;phone?:string;lat?:number;lon?:number;coordsUnknown?:boolean;distance?:number;isDuty?:boolean};
 type Reply={reply?:string;places?:Place[];route?:{url:string;label:string}};
 type SelectedArea={province?:string;district?:string};
 function readSelectedArea():SelectedArea{try{const value=JSON.parse(localStorage.getItem("yt-nearby-selection-v5")||"{}") as SelectedArea;return {province:typeof value.province==="string"?value.province:"",district:typeof value.district==="string"?value.district:""};}catch{return {};}}
@@ -77,7 +78,7 @@ export default function ChatWidget(){
     <header><div><b>Yanımda AI</b><small>Konum, hizmet ve yol tarifi yardımcın</small></div><button onClick={()=>setOpen(false)} aria-label="Kapat"><X/></button></header>
     <div className="yai-messages">
      {messages.map((m,i)=><div key={i} className={"yai-msg "+m.role}><div>{m.content}</div></div>)}
-     {results.length>0&&<div className="yai-results">{results.map((p,i)=><div className="yai-place" key={p.name+"-"+i}><b>{p.name}</b>{p.isDuty&&<em>NÖBETÇİ</em>}<small>{p.address||"Adres bilgisi yok"} {distanceText(p.distance)&&"• "+distanceText(p.distance)}</small><div>{p.phone&&<a href={"tel:"+p.phone}>Ara</a>} {p.lat&&p.lon&&<a target="_blank" rel="noreferrer" href={"https://www.google.com/maps/dir/?api=1&destination="+p.lat+","+p.lon}>Yol Tarifi</a>}</div></div>)}</div>}
+    {results.length>0&&<div className="yai-results">{results.map((p,i)=><div className="yai-place" key={p.name+"-"+i}><b>{p.name}</b>{p.isDuty&&<em>NÖBETÇİ</em>}<small>{p.address||"Adres bilgisi yok"} {distanceText(p.distance)&&"• "+distanceText(p.distance)}</small><div>{p.phone&&<a href={"tel:"+p.phone}>Ara</a>}<a target="_blank" rel="noreferrer" href={directionsLinkForPlace(p)}>Yol Tarifi</a></div></div>)}</div>}
      {route&&<a className="yai-route" target="_blank" rel="noreferrer" href={route.url}>🧭 {route.label}</a>}
      {loading&&<div className="yai-msg assistant"><div className="yai-typing">Yanıt hazırlıyor…</div></div>}
      <div ref={end}/>

@@ -9,6 +9,7 @@ import {activeDutyDates,dutyDateKey,dutyRowAllowed,isActiveDutyDate} from '../li
 import {classifyOverpassBody} from '../lib/overpassBody';
 import {cachePolicyFor} from '../lib/placesCachePolicy';
 import {haversineKm,countRecordsNearAnother} from '../lib/geoDistance';
+import {currentManualDutyPlaces} from '../lib/manualDutyPlaces';
 
 type OsmEl={type:string;id:number;lat?:number;lon?:number;center?:{lat:number;lon:number};tags?:Record<string,string>};
 
@@ -432,9 +433,31 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   // Kullanıcının seçtiği yarıçap her aramada korunur. Yakın ilçeler açılırsa yalnızca kontrollü şekilde genişletilir.
   const effectiveRadius=nearbyDistricts?Math.min(30,radiusKm*1.5):radiusKm;
 
+  const nonDutyPharmacy=category==='pharmacy'&&u.searchParams.get('nonDuty')==='1';
+  let resolvedDutyArea:{province:string;district:string}|null=null;
+  if(category==='pharmacy'&&!nonDutyPharmacy){
+    resolvedDutyArea=province?{province,district}:await reverseArea(lat,lon);
+    if(resolvedDutyArea?.province&&env.DB){
+      const dutyDate=dutyDateKey(new Date().toISOString());
+      if(!dutyDate)return jsonResponse({error:'duty_date_unavailable'},{status:503,headers:{'Cache-Control':'no-store'}});
+      let manualResult;
+      try{
+        manualResult=await currentManualDutyPlaces(env,slug(resolvedDutyArea.province),resolvedDutyArea.district,dutyDate);
+      }catch{
+        return jsonResponse({error:'manual_duty_unavailable'},{status:503,headers:{'Cache-Control':'no-store'}});
+      }
+      if(manualResult){
+        return jsonResponse(manualResult.places,{headers:{
+          'Cache-Control':'no-store',
+          'X-Data-Source':'Elle girildi',
+          'X-Duty-Date':dutyDate
+        }});
+      }
+    }
+  }
+
   // Never label an OSM pharmacy as "nöbetçi". Official duty integration is deliberately
   // disabled until a structured, current official feed is available.
-  const nonDutyPharmacy=category==='pharmacy'&&u.searchParams.get('nonDuty')==='1';
   const key=placesCacheKey(category+(nonDutyPharmacy?'-non-duty':''),anchor,lat.toFixed(4),lon.toFixed(4),province,district,String(effectiveRadius),nearbyDistricts?'1':'0',u.searchParams.get('refresh')||'');
   const cached=debug?null:await dbCacheGet(env,key);
   if(cached&&typeof cached==='object'&&!Array.isArray(cached)&&Array.isArray((cached as {places?:unknown}).places)){
@@ -474,13 +497,8 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   // Eczane kategorisi yalnızca güncel nöbet verisini kullanır.
   // OSM'deki genel eczaneler nöbetçi gibi gösterilmez.
   if(category==='pharmacy'){
-    let dutyProvince=province;
-    let dutyDistrict=district;
-    if(!dutyProvince){
-      const area=await reverseArea(lat,lon);
-      dutyProvince=area?.province||'';
-      dutyDistrict=area?.district||'';
-    }
+    const dutyProvince=resolvedDutyArea?.province||province;
+    const dutyDistrict=resolvedDutyArea?.district||district;
     if(!dutyProvince)return jsonResponse(debug?{ok:false,error:'duty_pharmacy_location_unknown',input:{province,district},coordinates:{lat,lon},geocodedArea:null,activeDutyDates:activeDutyDates()}:{error:'duty_pharmacy_location_unknown'},{status:400,headers:{'Cache-Control':'no-store'}});
     const primaryDuty=await dutyPharmacies(env,dutyProvince,dutyDistrict,lat,lon,effectiveRadius);
     // Fall back to a separate chamber/municipality-backed roster only if the
@@ -563,7 +581,10 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     .slice(0,40);
 
   if(debug){
-    const proximity25m=countRecordsNearAnother(result.map(place=>({lat:place.lat,lon:place.lon})),25);
+    const proximityCoordinates=result
+      .filter((place):place is Place&{lat:number;lon:number}=>typeof place.lat==='number'&&Number.isFinite(place.lat)&&typeof place.lon==='number'&&Number.isFinite(place.lon))
+      .map(place=>({lat:place.lat,lon:place.lon}));
+    const proximity25m=countRecordsNearAnother(proximityCoordinates,25);
     return jsonResponse({ok:upstreamOk,category,province,district,anchor,center:{lat,lon},radiusKm:effectiveRadius,resultCount:result.length,proximity25m,records:result},{headers:{'Cache-Control':'no-store'}});
   }
   if(!result.length&&!upstreamOk)return jsonResponse({error:'upstream_unavailable',attempts,center:{lat,lon}},{status:503,headers:{'Cache-Control':'no-store'}});

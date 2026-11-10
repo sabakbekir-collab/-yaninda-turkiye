@@ -1,4 +1,6 @@
-import { decideTelegramAction, verifyWebhookSecret } from "../lib/telegramRoster.ts";
+import { verifyWebhookSecret } from "../lib/telegramRoster.ts";
+import { processTelegramMessage } from "../lib/telegramFlow.ts";
+import { ensureSchema } from "../lib/schema.ts";
 import type { Env } from "../lib/types";
 
 type TelegramEnv = Env & { TELEGRAM_WEBHOOK_SECRET?: string };
@@ -14,6 +16,7 @@ type TelegramUpdate = {
 const MAX_BODY_BYTES = 100 * 1024;
 const ok = () => new Response("OK", { status: 200 });
 const errorResponse = (status: number, error: string) => Response.json({ error }, { status });
+export const isTelegramWebhookPath = (path: string) => path === "/api/telegram" || path === "/api/telegram/webhook";
 
 async function readBoundedBody(request: Request): Promise<string | null> {
   if (!request.body) return "";
@@ -61,7 +64,8 @@ export async function onRequest({ request, env }: TelegramRequestContext): Promi
     const chatId = update.message.chat?.id;
     const messageText = update.message.text;
     if (chatId === undefined || typeof messageText !== "string") return ok();
-    decideTelegramAction({ linkedChatId: null, incomingChatId: String(chatId), text: messageText });
+    await ensureSchema(env);
+    await processTelegramMessage(env, { chatId: String(chatId), text: messageText });
     return ok();
   } catch {
     console.error("telegram_webhook_error");
