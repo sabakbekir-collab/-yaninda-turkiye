@@ -1,6 +1,6 @@
 import type {Env} from '../lib/types';
-import {sameOrigin} from '../lib/auth';
-import {rateLimited,clientIp} from '../lib/ratelimit';
+import {sameOrigin} from '../lib/auth.ts';
+import {rateLimited,clientIp} from '../lib/ratelimit.ts';
 
 const clean=(v:unknown)=>typeof v==='string'?v.trim().slice(0,100):'';
 async function hashIp(ip:string,salt:string){
