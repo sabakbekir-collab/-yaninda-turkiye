@@ -14,7 +14,12 @@ function safeUrl(v:string):string{
   try{const u=new URL(v);return u.protocol==='https:'||u.protocol==='http:'?u.toString():'__invalid__'}catch{return '__invalid__'}
 }
 async function audit(env:Env,request:Request,action:string,targetId:number|null,detail?:string){
-  try{await env.DB?.prepare('INSERT INTO admin_logs(action,target_id,detail,ip) VALUES(?,?,?,?)').bind(action,targetId,detail?detail.slice(0,300):null,clientIp(request)).run();}catch{/* audit must not break the action */}
+  try{
+    const ip=clientIp(request);
+    const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode((env.ADMIN_SESSION_SECRET||'audit-salt')+':'+ip));
+    const ipHash=[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,'0')).join('');
+    await env.DB?.prepare('INSERT INTO admin_logs(action,target_id,detail,ip) VALUES(?,?,?,?)').bind(action,targetId,detail?detail.slice(0,300):null,ipHash).run();
+  }catch{/* audit must not break the action */}
 }
 /** Real id only: Number(null) === 0 and Number(undefined) === NaN must not count as an id. */
 const parseId=(v:unknown):number|null=>typeof v==='number'&&Number.isInteger(v)&&v>0?v:null;
@@ -49,11 +54,13 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
       const targetUrl=safeUrl(clean(body.target_url,1000));
       if(imageUrl==='__invalid__'||targetUrl==='__invalid__')return Response.json({error:'invalid_url'},{status:400});
       const placement=clean(body.placement,30)||'home_top';
+      const startsAt=clean(body.starts_at,10)||null,endsAt=clean(body.ends_at,10)||null;
+      if((startsAt&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(startsAt))||(endsAt&&!/^\\d{4}-\\d{2}-\\d{2}$/.test(endsAt))||(startsAt&&endsAt&&startsAt>endsAt))return Response.json({error:'invalid_ad_dates'},{status:400});
       if(!title)return Response.json({error:'title_required'},{status:400});
       if(id!==null){
-        await env.DB.prepare('UPDATE ads SET title=?,text=?,image_url=?,target_url=?,placement=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(title,text,imageUrl,targetUrl,placement,id).run();
+        await env.DB.prepare('UPDATE ads SET title=?,text=?,image_url=?,target_url=?,placement=?,starts_at=?,ends_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(title,text,imageUrl,targetUrl,placement,startsAt,endsAt,id).run();
       }else{
-        await env.DB.prepare('INSERT INTO ads(title,text,image_url,target_url,placement,status) VALUES(?,?,?,?,?,\'active\')').bind(title,text,imageUrl,targetUrl,placement).run();
+        await env.DB.prepare('INSERT INTO ads(title,text,image_url,target_url,placement,status,starts_at,ends_at) VALUES(?,?,?,?,?,\'active\',?,?)').bind(title,text,imageUrl,targetUrl,placement,startsAt,endsAt).run();
       }
     }else if(action==='toggle_ad'){
       if(id===null)return Response.json({error:'invalid_id'},{status:400});
@@ -103,6 +110,9 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
         longitude=coordinates.longitude;
       }
       await env.DB.prepare("UPDATE submissions SET status='approved',latitude=?,longitude=? WHERE id=?").bind(latitude,longitude,id).run();
+    }else if(action==='update_submission_note'){
+      if(id===null)return Response.json({error:'invalid_id'},{status:400});
+      await env.DB.prepare('UPDATE submissions SET admin_note=?,updated_at=CURRENT_TIMESTAMP WHERE id=?').bind(clean(body.note,1000),id).run();
     }else if(action==='reject_submission'){
       if(id===null)return Response.json({error:'invalid_id'},{status:400});
       await env.DB.prepare('UPDATE submissions SET status=\'rejected\' WHERE id=?').bind(id).run();
