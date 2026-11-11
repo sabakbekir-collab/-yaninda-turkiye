@@ -778,21 +778,23 @@ function Admin(){
  const[submissionFilter,setSubmissionFilter]=useState('all');
  const[reportFilter,setReportFilter]=useState('open');
  const[analytics,setAnalytics]=useState<Record<string,unknown>|null>(null);
- const[analyticsRange,setAnalyticsRange]=useState<'today'|'7'|'30'>('7');
+ const[analyticsRange,setAnalyticsRange]=useState<'today'|'7'|'30'|'custom'>('7');
+ const[analyticsFrom,setAnalyticsFrom]=useState(new Date(Date.now()-6*86400000).toISOString().slice(0,10));
+ const[analyticsTo,setAnalyticsTo]=useState(new Date().toISOString().slice(0,10));
  const[analyticsLoading,setAnalyticsLoading]=useState(false);
  const[heatmapPath,setHeatmapPath]=useState('/');
  useEffect(()=>{
   if(!ok)return;
   let active=true;setAnalyticsLoading(true);
   const end=new Date();const start=new Date(end);
-  if(analyticsRange==='today')start.setHours(0,0,0,0);else start.setDate(start.getDate()-(Number(analyticsRange)-1));
-  const from=start.toISOString().slice(0,10),to=end.toISOString().slice(0,10);
+  if(analyticsRange==='today')start.setHours(0,0,0,0);else if(analyticsRange!=='custom')start.setDate(start.getDate()-(Number(analyticsRange)-1));
+  const from=analyticsRange==='custom'?analyticsFrom:start.toISOString().slice(0,10),to=analyticsRange==='custom'?analyticsTo:end.toISOString().slice(0,10);
   fetch('/api/admin/analytics?from='+from+'&to='+to,{cache:'no-store'}).then(async response=>{
    if(!response.ok)throw new Error('Analitik verileri alınamadı.');
    return await response.json() as Record<string,unknown>;
   }).then(value=>{if(active)setAnalytics(value);}).catch(()=>{if(active)setAnalytics(null);}).finally(()=>{if(active)setAnalyticsLoading(false);});
   return()=>{active=false;};
- },[ok,analyticsRange]);
+ },[ok,analyticsRange,analyticsFrom,analyticsTo]);
  const analyticsRows=(key:string):Record<string,unknown>[]=>Array.isArray(analytics?.[key])?analytics[key] as Record<string,unknown>[]:[];
  const exportAnalytics=()=>{
   if(!analytics)return;
@@ -843,7 +845,7 @@ function Admin(){
    </div>
    {!stats&&<p className="admin-data-note">İstatistikler henüz alınamadı; tahmini rakam gösterilmiyor.</p>}
    <section className="panel admin-analytics">
-    <div className="analytics-head"><div><h2>Analitik ve Ziyaretçi Davranışı</h2><p>Gerçek kullanıcı olayları üzerinden site performansını inceleyin.</p></div><div className="analytics-controls"><select aria-label="Analitik tarih aralığı" value={analyticsRange} onChange={e=>setAnalyticsRange(e.target.value as 'today'|'7'|'30')}><option value="today">Bugün</option><option value="7">Son 7 gün</option><option value="30">Son 30 gün</option></select><button type="button" onClick={exportAnalytics}>CSV indir</button></div></div>
+    <div className="analytics-head"><div><h2>Analitik ve Ziyaretçi Davranışı</h2><p>Gerçek kullanıcı olayları üzerinden site performansını inceleyin.</p></div><div className="analytics-controls"><select aria-label="Analitik tarih aralığı" value={analyticsRange} onChange={e=>setAnalyticsRange(e.target.value as 'today'|'7'|'30')}><option value="today">Bugün</option><option value="7">Son 7 gün</option><option value="30">Son 30 gün</option><option value="custom">Özel tarih</option></select>{analyticsRange==='custom'&&<><input type="date" aria-label="Başlangıç tarihi" value={analyticsFrom} onChange={e=>setAnalyticsFrom(e.target.value)}/><input type="date" aria-label="Bitiş tarihi" value={analyticsTo} onChange={e=>setAnalyticsTo(e.target.value)}/></>}<button type="button" onClick={exportAnalytics}>CSV indir</button></div></div>
     {analyticsLoading?<p role="status">Analitik verileri yükleniyor…</p>:!analytics?<p>Analitik verisi alınamadı veya henüz kayıt yok.</p>:<>
      <div className="analytics-kpis">{(['page_views','sessions','visitors','searches','zero_searches','avg_seconds','bounce_rate'] as const).map(key=><article key={key}><small title={key==='visitors'?'IP hash ile ölçülen izinli tekil tarayıcılar':key==='sessions'?'İzin verilmiş anonim oturumlar':key==='page_views'?'Kaydedilen sayfa görüntülemeleri':key==='searches'?'Arama olaylarının sayısı':'Sonuçsuz arama sayısı'}>{({page_views:'Sayfa görüntüleme',sessions:'Oturum',visitors:'Tekil ziyaretçi',searches:'Arama',zero_searches:'0 sonuçlu arama',avg_seconds:'Ort. süre (sn)',bounce_rate:'Hemen çıkma (%)'})[key]}</small><strong>{String((analytics.summary as Record<string,unknown>|undefined)?.[key]??'0')}</strong></article>)}</div>
      <div className="analytics-grid">
