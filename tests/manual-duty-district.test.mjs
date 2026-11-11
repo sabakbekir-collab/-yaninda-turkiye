@@ -15,11 +15,11 @@ test('Varto shows its district records and province-wide records', () => {
   assert.equal(manualDutyDistrictNote(result.districtFallback), null);
 });
 
-test('Bulanık shows province-wide records but excludes records from other districts', () => {
+test('Bulanık shows all province records with an explicit fallback note', () => {
   const result = selectManualDutyRows(rows, 'bulanik');
-  assert.deepEqual(result.rows.map(row => row.id), ['province']);
+  assert.deepEqual(result.rows.map(row => row.id), ['province', 'varto', 'merkez']);
   assert.equal(result.districtFallback, true);
-  assert.equal(manualDutyDistrictNote(result.districtFallback), 'Seçili ilçe için kayıt yok; diğer ilçelerin kayıtları gösterilmiyor.');
+  assert.equal(manualDutyDistrictNote(result.districtFallback), 'Bu ilçe için ayrı kayıt yok; ilin diğer ilçelerindeki nöbetçi eczaneler gösteriliyor.');
 });
 
 test('no selected district shows all rows without a fallback note', () => {

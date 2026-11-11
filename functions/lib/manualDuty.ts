@@ -13,11 +13,13 @@ export function selectManualDutyRows<T extends { district_slug: string }>(rows: 
   const district = trSlug(selectedDistrict);
   const districtRows = rows.filter(row => row.district_slug && trSlug(row.district_slug) === district);
   const provinceRows = rows.filter(row => !row.district_slug);
-  return { rows: [...provinceRows, ...districtRows], districtFallback: districtRows.length === 0 };
+  return districtRows.length
+    ? { rows: [...provinceRows, ...districtRows], districtFallback: false }
+    : { rows: rows.slice(), districtFallback: true };
 }
 
 export function manualDutyDistrictNote(districtFallback: boolean): string | null {
-  return districtFallback ? 'Seçili ilçe için kayıt yok; diğer ilçelerin kayıtları gösterilmiyor.' : null;
+  return districtFallback ? 'Bu ilçe için ayrı kayıt yok; ilin diğer ilçelerindeki nöbetçi eczaneler gösteriliyor.' : null;
 }
 
 export function manualDutyPlaceFor(row: { id: string | number; province_slug: string; district_slug: string; name: string; address: string; phone: string; duty_note?: string | null }) {

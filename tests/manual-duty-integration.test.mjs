@@ -39,9 +39,9 @@ test('places API returns only the current manual roster and selected district ro
   assert.match(api, /currentManualDutyPlaces/);
 });
 
-test('places API excludes records from other districts when the selected district has no entry', async () => {
+test('places API shows province records with a note when the selected district has no entry', async () => {
   const result = await currentManualDutyPlaces(envWithRoster(), 'mus', 'Bulanık', '2026-11-10');
   const places = result.places;
-  assert.deepEqual(places.map(place => place.name), ['İl Geneli Eczanesi']);
-  assert.match(places[0].dutyNote, /diğer ilçelerin kayıtları gösterilmiyor/);
+  assert.deepEqual(places.map(place => place.name), ['İl Geneli Eczanesi', 'Varto Eczanesi', 'Merkez Eczanesi']);
+  assert.ok(places.every(place => /diğer ilçelerindeki nöbetçi eczaneler gösteriliyor/.test(place.dutyNote)));
 });
