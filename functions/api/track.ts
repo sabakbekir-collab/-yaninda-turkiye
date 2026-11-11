@@ -1,7 +1,7 @@
 import type {Env} from '../lib/types';
-import {ANALYTICS_EVENTS} from '../../shared/analyticsEvents';
-import {sameOrigin} from '../lib/auth';
-import {rateLimited} from '../lib/ratelimit';
+import {ANALYTICS_EVENTS} from '../../shared/analyticsEvents.ts';
+import {sameOrigin} from '../lib/auth.ts';
+import {rateLimited} from '../lib/ratelimit.ts';
 
 const MAX_BYTES=4096;
 const allowed=new Set<string>(ANALYTICS_EVENTS);
