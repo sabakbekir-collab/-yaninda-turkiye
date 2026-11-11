@@ -82,7 +82,7 @@ function MobileNav(){
  return <nav className="mobile-nav"><NavLink to="/"><Activity/><small>Ana Sayfa</small></NavLink><NavLink className={nearbyActive||mapActive?'active':''} to="/nearby"><Compass/><small>Keşfet</small></NavLink><NavLink to="/favorites"><Heart/><small>Favoriler</small></NavLink><NavLink to="/calendar"><CalendarDays/><small>Takvim</small></NavLink><NavLink to="/menu"><UserCircle/><small>Hesabım</small></NavLink></nav>
 }
 
-type AdRow={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null};
+type AdRow={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null;placement?:string|null};
 const adPlacement={top:'home_top',mid:'home_mid',bottom:'home_bottom'} as const;
 const httpUrl=(v?:string|null)=>{try{const u=new URL(v||'');return u.protocol==='https:'||u.protocol==='http:'?u.toString():''}catch{return ''}};
 // Only real, admin-approved ads from /api/ads are shown. No placeholder brands: nothing renders when there is no ad.
