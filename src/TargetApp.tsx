@@ -943,11 +943,15 @@ export default function TargetApp(){
    track('heatmap_click',{target_id:key,target_label:label,x,y});
   };
   const onExit=()=>{if(exited)return;exited=true;track('time_on_page',{duration_seconds:Math.max(0,Math.round((Date.now()-started)/1000))});};
+  const onError=()=>track('error',{source:'window'});
+  const onUnhandled=()=>track('error',{source:'promise'});
   window.addEventListener('scroll',onScroll,{passive:true});
   document.addEventListener('click',onClick,true);
   window.addEventListener('pagehide',onExit,{once:true});
+  window.addEventListener('error',onError);
+  window.addEventListener('unhandledrejection',onUnhandled);
   onScroll();
-  return()=>{onExit();window.removeEventListener('scroll',onScroll);document.removeEventListener('click',onClick,true);window.removeEventListener('pagehide',onExit);};
+  return()=>{onExit();window.removeEventListener('scroll',onScroll);document.removeEventListener('click',onClick,true);window.removeEventListener('pagehide',onExit);window.removeEventListener('error',onError);window.removeEventListener('unhandledrejection',onUnhandled);};
  },[location.pathname]);
  return <div><Header/><Routes><Route path="/" element={<Home/>}/><Route path="/nearby" element={<Nearby/>}/><Route path="/services" element={<Services/>}/><Route path="/ads" element={<AdCampaigns/>}/><Route path="/emergency" element={<Emergency/>}/><Route path="/add-business" element={<AddBusiness/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/admin" element={<Admin/>}/><Route path="/favorites" element={<FavoritesPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/news" element={<Simple title="Haberler"/>}/><Route path="/contact" element={<Simple title="İletişim"/>}/><Route path="/kvkk" element={<Legal type="kvkk"/>}/><Route path="/gizlilik" element={<Legal type="privacy"/>}/><Route path="*" element={<Home/>}/></Routes><MobileNav/><ChatWidget/><AnalyticsConsentBanner/></div>
 }
