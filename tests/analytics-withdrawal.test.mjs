@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {setAnalyticsConsent,track,isAnalyticsTrackingEnabled} from '../src/api.ts';
+import {setAnalyticsConsent,track,isAnalyticsTrackingEnabled} from '../src/analyticsConsent.ts';
 
 class MemoryStorage{
  values=new Map();
