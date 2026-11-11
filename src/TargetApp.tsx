@@ -768,14 +768,16 @@ function AddBusiness(){
 function MenuPage(){return <main className="menu-page"><h1>Menü</h1>{[['/calendar','Takvim & Önemli Günler',CalendarDays],['/nearby','Yakınımdaki hizmetler',Compass],['/services','Çözüm Merkezi',Wrench],['/emergency','Acil Durum',Siren],['/add-business','İşletmeni Ekle',Building2],['/admin','Admin Girişi',LockKeyhole]].map(([to,t,I])=><NavLink key={String(to)} to={String(to)}><I/><b>{String(t)}</b><ChevronRight/></NavLink>)}</main>}
 
 type AdminStats={visitorsTotal:number;visitorsToday:number;searchesTotal:number;searchesToday:number;phoneClicks:number;directionsClicks:number;emergencyClicks:number;favoriteClicks:number};
-type AdminAd={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null;placement:string;status:string};
-type AdminSubmission={id:number;name:string;category:string;phone:string;address:string;province:string;district:string;status:string};
+type AdminAd={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null;placement:string;status:string;starts_at?:string|null;ends_at?:string|null};
+type AdminSubmission={id:number;name:string;category:string;phone:string;address:string;province:string;district:string;status:string;admin_note?:string|null};
 type AdminReport={id:number;place_name:string;reason:string;details?:string;created_at:string};
 type AdminData={stats?:AdminStats;ads?:AdminAd[];submissions?:AdminSubmission[];reports?:AdminReport[]};
 function Admin(){
  const[email,setEmail]=useState(''),[password,setPassword]=useState(''),[ok,setOk]=useState(false),[data,setData]=useState<AdminData>(),[error,setError]=useState(''),[notice,setNotice]=useState(''),[loading,setLoading]=useState(false);
  const[editingId,setEditingId]=useState<number|null>(null);
- const[adForm,setAdForm]=useState({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});
+ const[adForm,setAdForm]=useState({title:'',text:'',image_url:'',target_url:'',placement:'home_top',starts_at:'',ends_at:''});
+ const[submissionFilter,setSubmissionFilter]=useState('all');
+ const[reportFilter,setReportFilter]=useState('open');
  const[analytics,setAnalytics]=useState<Record<string,unknown>|null>(null);
  const[analyticsRange,setAnalyticsRange]=useState<'today'|'7'|'30'>('7');
  const[analyticsLoading,setAnalyticsLoading]=useState(false);
@@ -825,7 +827,7 @@ function Admin(){
    e.preventDefault();
    const saved=await action({action:'save_ad',...(editingId?{id:editingId}:{}),...adForm});
    if(!saved)return;
-   setEditingId(null);setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});
+   setEditingId(null);setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top',starts_at:'',ends_at:''});
  };
  const logout=async()=>{
    try{await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'logout'})})}catch{}
@@ -872,11 +874,13 @@ function Admin(){
      <label>Açıklama<textarea maxLength={300} rows={3} placeholder="Kampanyayı kısaca açıklayın." value={adForm.text} onChange={e=>setAdForm(v=>({...v,text:e.target.value}))}/><small>En fazla 300 karakter.</small></label>
      <label>Görsel URL<input type="url" placeholder="https://ornek.com/reklam.jpg" value={adForm.image_url} onChange={e=>setAdForm(v=>({...v,image_url:e.target.value}))}/><small>https ile başlayan herkese açık görsel adresi.</small></label>
      <label>Hedef URL<input type="url" placeholder="https://ornek.com/kampanya" value={adForm.target_url} onChange={e=>setAdForm(v=>({...v,target_url:e.target.value}))}/><small>Kullanıcı reklama dokunduğunda açılacak sayfa.</small></label>
+     <label>Başlangıç tarihi<input type="date" value={adForm.starts_at} onChange={e=>setAdForm(v=>({...v,starts_at:e.target.value}))}/><small>Boş bırakılırsa hemen geçerli olur.</small></label>
+     <label>Bitiş tarihi<input type="date" value={adForm.ends_at} onChange={e=>setAdForm(v=>({...v,ends_at:e.target.value}))}/><small>Boş bırakılırsa bitiş tarihi uygulanmaz.</small></label>
      <label>Alan<select value={adForm.placement} onChange={e=>setAdForm(v=>({...v,placement:e.target.value}))}><option value="home_top">Ana sayfa üst – ilk içerik alanı</option><option value="home_mid">Ana sayfa orta – içerik akışı</option><option value="home_bottom">Ana sayfa alt – sayfa sonu</option></select><small>Reklamın ana sayfada gösterileceği konum.</small></label>
      <div className="admin-ad-preview"><b>Önizleme</b><span>{adForm.placement==='home_top'?'Ana sayfa üst alanı':adForm.placement==='home_mid'?'Ana sayfa orta alanı':'Ana sayfa alt alanı'}</span>{adForm.image_url&&<img src={adForm.image_url} alt="Reklam görseli önizlemesi" onError={e=>{e.currentTarget.style.display='none'}}/>}<strong>{adForm.title||'Reklam başlığı'}</strong><p>{adForm.text||'Reklam açıklaması burada görünecek.'}</p></div>
      <div className="admin-ad-actions"><button disabled={loading}>{loading?'Kaydediliyor…':editingId?'Reklamı Güncelle':'Reklam Ekle'}</button>{editingId&&<button type="button" onClick={()=>{setEditingId(null);setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top'})}}>Vazgeç</button>}</div>
     </form>
-    {ads.length?ads.map(ad=><div className="ad-row" key={ad.id}>{ad.image_url&&<img src={ad.image_url} alt=""/>}<div><b>{ad.title}</b><small>{ad.placement} · {ad.status==='active'?'Yayında':'Duraklatıldı'}</small></div><button type="button" onClick={()=>{setEditingId(ad.id);setAdForm({title:ad.title,text:ad.text||'',image_url:ad.image_url||'',target_url:ad.target_url||'',placement:ad.placement||'home_top'})}}>Düzenle</button><button type="button" disabled={loading} onClick={()=>void action({action:'toggle_ad',id:ad.id})}>{ad.status==='active'?'Duraklat':'Yayınla'}</button><button type="button" disabled={loading} onClick={()=>{if(window.confirm('Bu reklam silinsin mi?'))void action({action:'delete_ad',id:ad.id})}}>Sil</button></div>):<p>Henüz kayıtlı reklam yok.</p>}
+    {ads.length?ads.map(ad=><div className="ad-row" key={ad.id}>{ad.image_url&&<img src={ad.image_url} alt=""/>}<div><b>{ad.title}</b><small>{ad.placement} · {ad.status==='active'?'Yayında':'Duraklatıldı'}</small></div><button type="button" onClick={()=>{setEditingId(ad.id);setAdForm({title:ad.title,text:ad.text||'',image_url:ad.image_url||'',target_url:ad.target_url||'',placement:ad.placement||'home_top',starts_at:ad.starts_at||'',ends_at:ad.ends_at||''})}}>Düzenle</button><button type="button" disabled={loading} onClick={()=>void action({action:'toggle_ad',id:ad.id})}>{ad.status==='active'?'Duraklat':'Yayınla'}</button><button type="button" disabled={loading} onClick={()=>{if(window.confirm('Bu reklam silinsin mi?'))void action({action:'delete_ad',id:ad.id})}}>Sil</button></div>):<p>Henüz kayıtlı reklam yok.</p>}
    </div>
    <div className="panel"><h2>İşletme Başvuruları</h2><p className="admin-section-help">İşletme kayıt taleplerini inceleyip yayın onayı verin veya reddedin.</p>{(data?.submissions||[]).length?(data?.submissions||[]).map(item=><div className="ad-row" key={item.id}><div><b>{item.name}</b><small>{item.category} · {item.province}/{item.district} · {item.phone}</small><small>{item.address} · {item.status}</small></div>{item.status==='pending'&&<><button disabled={loading} onClick={()=>void action({action:'approve_submission',id:item.id})}>Onayla</button><button disabled={loading} onClick={()=>void action({action:'reject_submission',id:item.id})}>Reddet</button></>}</div>):<p>Bekleyen veya kayıtlı başvuru yok.</p>}</div>
    <div className="panel"><h2>Hatalı Bilgi Bildirimleri</h2><p className="admin-section-help">Kullanıcıların bildirdiği yanlış veya güncel olmayan bilgileri takip edin.</p>{(data?.reports||[]).length?(data?.reports||[]).map(item=><div className="ad-row" key={item.id}><div><b>{item.place_name}</b><small>{item.reason} · {item.details||'Açıklama yok'}</small></div><button disabled={loading} onClick={()=>void action({action:'resolve_report',id:item.id})}>Çözüldü</button></div>):<p>Açık bildirim yok.</p>}</div>
