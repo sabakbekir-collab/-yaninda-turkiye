@@ -112,11 +112,19 @@ export async function findPlaces(
   return cleaned;
 }
 
-export function track(type:string,metadata:Record<string,string|number|boolean>={}){
-  fetch('/api/events',{
-    method:'POST',
-    headers:{'content-type':'application/json'},
-    body:JSON.stringify({type,metadata}),
-    keepalive:true
-  }).catch(()=>undefined);
+function analyticsSessionId(){
+  try{
+    const key='yt_analytics_session';
+    let id=localStorage.getItem(key);
+    if(!id){id=typeof crypto.randomUUID==='function'?crypto.randomUUID():`s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;localStorage.setItem(key,id);}
+    return id;
+  }catch{return '';}
+}
+export function track(event:string,props:Record<string,string|number|boolean>={}){
+  const payload=JSON.stringify({event,props,path:typeof location!=='undefined'?location.pathname:'/',referrer:typeof document!=='undefined'?document.referrer:'',session_id:analyticsSessionId()});
+  try{
+    const blob=new Blob([payload],{type:'application/json'});
+    if(typeof navigator!=='undefined'&&typeof navigator.sendBeacon==='function'&&navigator.sendBeacon('/api/track',blob))return;
+  }catch{/* Beacon unavailable; use keepalive fetch below. */}
+  fetch('/api/track',{method:'POST',headers:{'content-type':'application/json'},body:payload,keepalive:true}).catch(()=>undefined);
 }
