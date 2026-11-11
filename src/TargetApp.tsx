@@ -867,7 +867,7 @@ function Admin(){
       <article><h3>Reklam performansı</h3>{analyticsRows('ads').length?analyticsRows('ads').map((row,i)=>{const impressions=Number(row.impressions)||0,clicks=Number(row.clicks)||0;return <p key={i}>{String(row.placement||'Alan yok')} · {impressions} gösterim · {clicks} tıklama · CTR {impressions?((clicks/impressions)*100).toFixed(1):'0'}%</p>}):<p>Reklam gösterimi kaydı yok.</p>}</article>
       <article><h3>Yanımda AI</h3>{analyticsRows('ai').length?analyticsRows('ai').map((row,i)=><p key={i}>{String(row.topic||row.event)} <b>{String(row.count)}</b></p>):<p>AI sohbet olayı yok.</p>}</article>
      </div>
-     <article><h3>Canlı olay akışı</h3><span className="analytics-live">Son 50 kayıt</span>{analyticsRows('live').length?analyticsRows('live').map((row,i)=><p key={i}>{String(row.ts||'')} · {String(row.event||'')} · {String(row.path||'')} · {String(row.city||'Konum yok')} · {String(row.device||'Cihaz yok')}</p>):<p>Henüz olay kaydı yok.</p>}</article>
+     <article><h3>Canlı olay akışı</h3><span className="analytics-live">Gerçek zamanlı · 30 saniyede yenilenir · Son 50 olay</span>{analyticsRows('live').length?analyticsRows('live').map((row,i)=><p key={i}>{String(row.ts||'')} · {String(row.event||'')} · {String(row.path||'')} · {String(row.city||'Konum yok')} · {String(row.device||'Cihaz yok')}</p>):<p>Henüz olay kaydı yok.</p>}</article>
     </>}
    </section>
    <div className="panel ads">
