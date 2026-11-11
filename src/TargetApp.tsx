@@ -875,7 +875,7 @@ export default function TargetApp(){
    if(href.startsWith('tel:'))eventName='phone_click';
    else if(/wa\\.me|whatsapp/i.test(href))eventName='whatsapp_click';
    else if(/maps|directions/i.test(href))eventName='directions_click';
-   else if(href&&new URL(href,location.origin).origin!==location.origin)eventName='website_click';
+   else if(href&&new URL(href,window.location.origin).origin!==window.location.origin)eventName='website_click';
    else if(el.closest('.place'))eventName='place_click';
    else if(/favori|kalp/i.test(label))eventName='favorite_click';
    else if(/paylaş/i.test(label))eventName='share_click';
