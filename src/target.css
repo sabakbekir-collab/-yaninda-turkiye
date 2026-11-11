@@ -506,3 +506,4 @@ html[data-theme="dark"]{color-scheme:light;filter:none;background:#fff7fb}
 
 .admin-header-label{font-size:12px;font-weight:800;color:#17232d;padding:8px 10px;border-radius:8px;background:#f1f5f9}
 .admin-filter{display:flex;align-items:center;gap:10px;margin:8px 0 12px;font-size:12px;font-weight:700;color:#334155}.admin-filter select{min-height:44px;max-width:220px;border:1px solid #cbd5e1;border-radius:8px;padding:8px;background:#fff}
+.analytics-kpis em{display:block;margin-top:4px;color:#64748b;font-size:10px;font-style:normal;line-height:1.3}
