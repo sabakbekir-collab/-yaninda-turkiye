@@ -46,7 +46,8 @@ export default function ChatWidget(){
 
  async function send(){
   const text=input.trim();if(!text||loading)return;
-  track("ai_message",{message_count:messages.filter(m=>m.role==="user").length+1,topic:text.slice(0,60)});
+  const topic=/eczane/i.test(text)?"eczane":/yol|rota|nasıl gider/i.test(text)?"yol tarifi":/market|mağaza|alışveriş/i.test(text)?"alışveriş":/konum|yakınım/i.test(text)?"konum":/hava/i.test(text)?"hava durumu":"diğer";
+  track("ai_message",{message_count:messages.filter(m=>m.role==="user").length+1,topic});
   setInput("");setResults([]);setRoute(undefined);setLocationError("");
   const next=[...messages,{role:"user" as const,content:text}].slice(-12);
   setMessages(m=>[...m,{role:"user",content:text}]);setLoading(true);
