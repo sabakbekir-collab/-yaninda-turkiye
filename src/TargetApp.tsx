@@ -88,11 +88,11 @@ const httpUrl=(v?:string|null)=>{try{const u=new URL(v||'');return u.protocol===
 // Only real, admin-approved ads from /api/ads are shown. No placeholder brands: nothing renders when there is no ad.
 function Ad({kind}:{kind:'top'|'mid'|'bottom'}){
  const[ad,setAd]=useState<AdRow|null>(null);
- useEffect(()=>{let live=true;fetch('/api/ads?placement='+adPlacement[kind]).then(r=>r.ok?r.json():null).then((d:{ads?:AdRow[]}|null)=>{if(live&&d&&Array.isArray(d.ads)&&d.ads[0]&&typeof d.ads[0].title==='string')setAd(d.ads[0])}).catch(()=>undefined);return()=>{live=false}},[kind]);
+ useEffect(()=>{let live=true;fetch('/api/ads?placement='+adPlacement[kind]).then(r=>r.ok?r.json():null).then((d:{ads?:AdRow[]}|null)=>{if(live&&d&&Array.isArray(d.ads)&&d.ads[0]&&typeof d.ads[0].title==='string'){setAd(d.ads[0]);track('ad_impression',{target_id:String(d.ads[0].id),target_label:d.ads[0].title,placement:adPlacement[kind]})}}).catch(()=>undefined);return()=>{live=false}},[kind]);
  if(!ad)return null;
  const href=httpUrl(ad.target_url),img=httpUrl(ad.image_url);
  const body=<>{img&&<img src={img} alt="" loading="lazy"/>}<div><small>REKLAM</small><strong>{ad.title}</strong>{ad.text&&<b>{ad.text}</b>}</div></>;
- return href?<a href={href} target="_blank" rel="sponsored noopener noreferrer" className="yt-ad red">{body}</a>:<div className="yt-ad red">{body}</div>
+ return href?<a href={href} target="_blank" rel="sponsored noopener noreferrer" className="yt-ad red" data-track-id={"ad:"+ad.id} onClick={()=>track("ad_click",{target_id:String(ad.id),target_label:ad.title,placement:adPlacement[kind]})}>{body}</a>:<div className="yt-ad red">{body}</div>
 }
 
 const quick:[string,string,LucideIcon,string][]=[
