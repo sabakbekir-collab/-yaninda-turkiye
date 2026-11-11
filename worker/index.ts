@@ -1,6 +1,7 @@
 import { onRequestGet as getPlaces, onRequestAreaGet as getLocationArea } from "../functions/api/places";
 import { onRequestGet as getAds } from "../functions/api/ads";
 import { onRequestPost as postEvents } from "../functions/api/events";
+import { onRequestPost as postTrack } from "../functions/api/track";
 import { onRequestGet as getAdmin, onRequestPost as postAdmin } from "../functions/api/admin";
 import { onRequestPost as postSubmissions } from "../functions/api/submissions";
 import { onRequestPost as postReports } from "../functions/api/reports";
@@ -115,6 +116,10 @@ export default {
             { status: 503, headers: { "Cache-Control": "no-store" } },
           );
         }
+      }
+
+      if (path === "/api/track" && request.method === "POST") {
+        return await postTrack({ request, env });
       }
 
       if (path === "/api/admin/ai" && request.method === "POST") {
