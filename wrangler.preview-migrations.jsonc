@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "d1_databases": [
+    {
+      "binding": "PREVIEW_DB",
+      "database_name": "yaninda-turkiye-preview-db",
+      "database_id": "a974803a-d0da-4baf-acef-f46cf3588623",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
