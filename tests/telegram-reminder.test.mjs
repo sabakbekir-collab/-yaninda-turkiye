@@ -70,5 +70,5 @@ test('Worker schedule and Wrangler cron both wire the reminder without running i
   const worker = readFileSync(new URL('../worker/index.ts', import.meta.url), 'utf8');
   const config = JSON.parse(readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8'));
   assert.match(worker, /scheduled\([^]*sendMissingRosterReminder/);
-  assert.deepEqual(config.triggers.crons, ['0 5 * * *']);
+  assert.deepEqual(config.triggers.crons, ['0 5 * * *', '30 13 * * *']);
 });
