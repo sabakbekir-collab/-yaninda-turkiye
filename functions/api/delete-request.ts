@@ -16,6 +16,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
  const sessionId=clean(body.session_id);
  if(!/^[a-zA-Z0-9_-]{12,100}$/.test(sessionId))return Response.json({error:'valid_session_required'},{status:400});
  try{
+  await env.DB.prepare('INSERT OR IGNORE INTO analytics_session_revocations(session_id,revoked_at) VALUES(?,?)').bind(sessionId,new Date().toISOString()).run();
   const result=await env.DB.prepare('DELETE FROM events WHERE session_id=?').bind(sessionId).run() as {meta?:{changes?:number}};
   const ipHash=await hashIp(clientIp(request),env.ADMIN_SESSION_SECRET||'delete-request-audit');
   await env.DB.prepare('INSERT INTO admin_logs(action,target_id,detail,ip) VALUES(?,?,?,?)')

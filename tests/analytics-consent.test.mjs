@@ -4,7 +4,7 @@ import {onRequestPost} from '../functions/api/track.ts';
 
 function makeEnv(){
  const calls=[];
- const env={ADMIN_SESSION_SECRET:'test-secret',DB:{prepare(sql){return {bind(...values){return {async run(){calls.push({sql,values});return {meta:{changes:1}};},async first(){return {payload:'1'};},async all(){return {results:[]};}};}};}}};
+ const env={ADMIN_SESSION_SECRET:'test-secret',DB:{prepare(sql){return {bind(...values){return {async run(){calls.push({sql,values});return {meta:{changes:1}};},async first(){return sql.includes('analytics_session_revocations')?null:{payload:'1'};},async all(){return {results:[]};}};}};}}};
  return {env,calls};
 }
 function request(body){

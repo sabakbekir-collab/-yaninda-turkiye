@@ -9,6 +9,11 @@ const clean=(v:unknown,max=180)=>typeof v==='string'?[...v].filter(ch=>{const co
 const uaClass=(ua:string)=>/android|iphone|ipad|mobile/i.test(ua)?'mobil':'masaüstü';
 const browserClass=(ua:string)=>/edg\//i.test(ua)?'Edge':/firefox\//i.test(ua)?'Firefox':/chrome\//i.test(ua)?'Chrome':/safari\//i.test(ua)?'Safari':'Diğer';
 async function hashIp(ip:string,salt:string){const data=new TextEncoder().encode(salt+':'+ip);const digest=await crypto.subtle.digest('SHA-256',data);return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');}
+async function isRevokedSession(env:Env,sessionId:string){
+ if(!sessionId||!env.DB)return false;
+ const row=await env.DB.prepare('SELECT 1 FROM analytics_session_revocations WHERE session_id=? LIMIT 1').bind(sessionId).first<Record<string,unknown>>();
+ return Boolean(row);
+}
 export async function onRequestPost({request,env}:{request:Request;env:Env}){
  if(!sameOrigin(request))return new Response(null,{status:403});
  const ua=request.headers.get('User-Agent')||'';
@@ -28,6 +33,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
   const ipHash=consent&&env.ADMIN_SESSION_SECRET?await hashIp(ip,env.ADMIN_SESSION_SECRET):null;
   const path=clean(body.path,240)||new URL(request.url).pathname;
   const session=consent?clean(body.session_id,80):'';
+  if(consent&&session&&await isRevokedSession(env,session))return new Response(null,{status:204});
   const targetType=consent?clean(body.target_type??safeProps.target_type,40)||null:null,targetId=consent?clean(body.target_id??safeProps.target_id,100)||null:null,targetLabel=consent?clean(body.target_label??safeProps.target_label,160)||null:null;
   const cf=(request as Request & {cf?:{city?:string;region?:string}}).cf;
   const city=consent?clean(cf?.city||cf?.region||'',80)||null:null,referrer=consent?clean(body.referrer,300)||null:null;
