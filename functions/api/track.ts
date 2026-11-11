@@ -26,7 +26,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
   const ipHash=consent&&env.ADMIN_SESSION_SECRET?await hashIp(ip,env.ADMIN_SESSION_SECRET):null;
   const path=clean(body.path,240)||new URL(request.url).pathname;
   const session=consent?clean(body.session_id,80):'';
-  const targetType=consent?clean(body.target_type,40)||null:null,targetId=consent?clean(body.target_id,100)||null:null,targetLabel=consent?clean(body.target_label,160)||null:null;
+  const targetType=consent?clean(body.target_type??safeProps.target_type,40)||null:null,targetId=consent?clean(body.target_id??safeProps.target_id,100)||null:null,targetLabel=consent?clean(body.target_label??safeProps.target_label,160)||null:null;
   const cf=(request as Request & {cf?:{city?:string;region?:string}}).cf;
   const city=consent?clean(cf?.city||cf?.region||'',80)||null:null,referrer=consent?clean(body.referrer,300)||null:null;
   const device=consent?uaClass(ua):null,browser=consent?browserClass(ua):null,ts=new Date().toISOString(),propsJson=consent?JSON.stringify(safeProps):'{}';
