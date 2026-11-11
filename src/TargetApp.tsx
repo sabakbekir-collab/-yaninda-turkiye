@@ -853,6 +853,45 @@ function Simple({title}:{title:string}){return <main className="simple"><h1>{tit
 
 export default function TargetApp(){
  const location=useLocation();
- useEffect(()=>{track('page_view',{path:location.pathname});},[location.pathname]);
+ useEffect(()=>{
+  track('page_view',{path:location.pathname});
+  const started=Date.now(),sent=new Set<number>();
+  const thresholds=[25,50,75,100];
+  const onScroll=()=>{
+   const root=document.documentElement;
+   const max=Math.max(1,root.scrollHeight-window.innerHeight);
+   const depth=Math.min(100,Math.round(window.scrollY/max*100));
+   for(const mark of thresholds){if(depth>=mark&&!sent.has(mark)){sent.add(mark);track('scroll_depth',{depth:mark});}}
+  };
+  const onClick=(event:MouseEvent)=>{
+   const node=event.target instanceof Element?event.target.closest('a,button,[role="button"],[data-track-id]'):null;
+   if(!node)return;
+   const el=node as HTMLElement;
+   const label=(el.getAttribute('aria-label')||el.textContent||el.getAttribute('title')||'').trim().replace(/\\s+/g,' ').slice(0,100);
+   const href=el instanceof HTMLAnchorElement?el.href:'';
+   const key=el.dataset.trackId||[location.pathname,el.tagName,label.toLocaleLowerCase('tr-TR')].join(':').slice(0,140);
+   el.dataset.trackId=key;
+   let eventName:'phone_click'|'whatsapp_click'|'directions_click'|'website_click'|'category_click'|'place_click'|'favorite_click'|'share_click'='place_click';
+   if(href.startsWith('tel:'))eventName='phone_click';
+   else if(/wa\\.me|whatsapp/i.test(href))eventName='whatsapp_click';
+   else if(/maps|directions/i.test(href))eventName='directions_click';
+   else if(href&&new URL(href,location.origin).origin!==location.origin)eventName='website_click';
+   else if(el.closest('.place'))eventName='place_click';
+   else if(/favori|kalp/i.test(label))eventName='favorite_click';
+   else if(/paylaş/i.test(label))eventName='share_click';
+   else if(el.closest('.quick-grid,.popular-grid,.category-grid'))eventName='category_click';
+   const rect=el.getBoundingClientRect();
+   const x=Math.max(0,Math.min(100,Math.round((event.clientX/Math.max(1,window.innerWidth))*100)));
+   const y=Math.max(0,Math.min(100,Math.round(((event.clientY+window.scrollY)/Math.max(1,document.documentElement.scrollHeight))*100)));
+   track(eventName,{target_id:key,target_label:label,target_type:el.tagName.toLowerCase(),x,y});
+   track('heatmap_click',{target_id:key,target_label:label,x,y});
+  };
+  const onExit=()=>track('time_on_page',{duration_seconds:Math.max(0,Math.round((Date.now()-started)/1000))});
+  window.addEventListener('scroll',onScroll,{passive:true});
+  document.addEventListener('click',onClick,true);
+  window.addEventListener('pagehide',onExit,{once:true});
+  onScroll();
+  return()=>{window.removeEventListener('scroll',onScroll);document.removeEventListener('click',onClick,true);window.removeEventListener('pagehide',onExit);};
+ },[location.pathname]);
  return <div><Header/><Routes><Route path="/" element={<Home/>}/><Route path="/nearby" element={<Nearby/>}/><Route path="/services" element={<Services/>}/><Route path="/ads" element={<AdCampaigns/>}/><Route path="/emergency" element={<Emergency/>}/><Route path="/add-business" element={<AddBusiness/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/admin" element={<Admin/>}/><Route path="/favorites" element={<FavoritesPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/news" element={<Simple title="Haberler"/>}/><Route path="/contact" element={<Simple title="İletişim"/>}/><Route path="/kvkk" element={<Legal type="kvkk"/>}/><Route path="/gizlilik" element={<Legal type="privacy"/>}/><Route path="*" element={<Home/>}/></Routes><MobileNav/><ChatWidget/><AnalyticsConsentBanner/></div>
 }
