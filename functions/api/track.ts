@@ -17,7 +17,9 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
  if(await rateLimited(env,request,'track',90,60))return new Response(null,{status:429,headers:{'Retry-After':'60'}});
  if(!env.DB)return new Response(null,{status:202});
  try{
-  const body=await request.json() as Record<string,unknown>;
+  const raw=await request.text();
+  if(new TextEncoder().encode(raw).byteLength>MAX_BYTES)return Response.json({error:'payload_too_large'},{status:413});
+  const body=JSON.parse(raw) as Record<string,unknown>;
   const event=clean(body.event,48);if(!allowed.has(event))return new Response(null,{status:400});
   const consent=body.consent===true;
   const props=consent&&body.props&&typeof body.props==='object'&&!Array.isArray(body.props)?body.props as Record<string,unknown>:{};
