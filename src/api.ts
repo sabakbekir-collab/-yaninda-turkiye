@@ -118,7 +118,25 @@ export function getAnalyticsConsent():AnalyticsConsent{
   try{const v=localStorage.getItem('yt_analytics_consent');return v==='accepted'||v==='essential'?v:null;}catch{return null;}
 }
 export function setAnalyticsConsent(value:Exclude<AnalyticsConsent,null>){
-  try{localStorage.setItem('yt_analytics_consent',value);if(value==='essential')localStorage.removeItem('yt_analytics_session');}catch{/* Preference storage may be unavailable. */}
+  try{
+    localStorage.setItem('yt_analytics_consent',value);
+    if(value==='essential'){
+      localStorage.removeItem('yt_analytics_session');
+      localStorage.removeItem('yt_analytics_session_created');
+    }
+  }catch{/* Preference storage may be unavailable. */}
+}
+export async function requestAnalyticsDeletion():Promise<boolean>{
+  try{
+    const sessionId=localStorage.getItem('yt_analytics_session')||'';
+    if(!sessionId)return false;
+    const response=await fetch('/api/delete-request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({session_id:sessionId})});
+    if(!response.ok)return false;
+    localStorage.removeItem('yt_analytics_session');
+    localStorage.removeItem('yt_analytics_session_created');
+    setAnalyticsConsent('essential');
+    return true;
+  }catch{return false;}
 }
 function analyticsSessionId(consent:boolean){
   if(!consent)return '';
@@ -130,6 +148,7 @@ function analyticsSessionId(consent:boolean){
   }catch{return '';}
 }
 export function track(event:AnalyticsEvent,props:Record<string,string|number|boolean>={}){
+  if(getAnalyticsConsent()==='essential')return;
   const consent=getAnalyticsConsent()==='accepted';
   const safeProps=consent?props:{};
   const payload=JSON.stringify({event,props:safeProps,consent,path:typeof location!=='undefined'?location.pathname:'/',referrer:consent&&typeof document!=='undefined'?document.referrer:'',session_id:analyticsSessionId(consent)});
