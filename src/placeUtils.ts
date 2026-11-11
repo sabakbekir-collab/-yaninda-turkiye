@@ -10,6 +10,13 @@ export function cleanCardAddress(address?:string){
   if(!address)return 'Adres bilgisi bulunmuyor';
   return address.split(',').map(x=>x.trim()).filter(Boolean).filter(x=>!/^(marmara bölgesi|türkiye)$/i.test(x)).slice(0,4).join(', ');
 }
+export function dutySourceNote(place:{source?:string;coordsUnknown?:boolean;dutyNote?:string}){
+  if(place.coordsUnknown||place.source?.startsWith('Elle girildi:'))return place.dutyNote?.trim()||null;
+  return 'third_party';
+}
+export function isPlaceMappable<T extends {lat?:number;lon?:number;coordsUnknown?:boolean}>(place:T):place is T&{lat:number;lon:number}{
+  return !place.coordsUnknown&&typeof place.lat==='number'&&Number.isFinite(place.lat)&&typeof place.lon==='number'&&Number.isFinite(place.lon);
+}
 export function categoryIcon(id:string):LucideIcon{
   const map:Record<string,LucideIcon>={
     pharmacy:Pill,hospital:Hospital,atm:Banknote,fuel:Fuel,market:ShoppingBasket,bakery:ShoppingBasket,restaurant:Utensils,taxi:Bus,transport:Bus,

@@ -2,6 +2,8 @@ import type {Env} from '../lib/types';
 import {cookieHeader,clearCookie,makeSession,strictSameOrigin,validSession,secureCompare} from '../lib/auth';
 import {rateLimited,clientIp} from '../lib/ratelimit';
 import {parseTurkeyCoordinates} from '../lib/locationValidation';
+import {recentRosterEvents} from '../lib/telegramD1Store';
+import {createAdminTelegramLink} from '../lib/adminRoster';
 
 const json=async(r:Request)=>await r.json() as Record<string,unknown>;
 const clean=(v:unknown,n=300)=>typeof v==='string'?v.trim().replace(/[<>]/g,'').slice(0,n):'';
@@ -41,6 +43,11 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
     if(!(await isAdmin(request,env)))return new Response('Unauthorized',{status:401});
     if(!env.DB)return Response.json({error:'database_unavailable'},{status:503});
     await env.DB.prepare("CREATE TABLE IF NOT EXISTS ads (id INTEGER PRIMARY KEY AUTOINCREMENT,title TEXT NOT NULL,text TEXT,image_url TEXT,target_url TEXT,placement TEXT NOT NULL DEFAULT 'home_top',status TEXT NOT NULL DEFAULT 'active',created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)").run();
+    if(action==='create_telegram_link'){
+      const {code,expiresAt}=await createAdminTelegramLink(env);
+      await audit(env,request,action,null);
+      return Response.json({ok:true,code,expiresAt},{headers:{'Cache-Control':'no-store'}});
+    }
     const id=parseId(body.id);
     if(action==='save_ad'){
       const title=clean(body.title,120);
@@ -127,11 +134,12 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
     const row=await env.DB!.prepare(q).bind(...(since?[type,since]:[type])).first<{value:number}>();
     return Number(row?.value||0);
   };
-  const [visitorsToday,visitorsTotal,searchesToday,searchesTotal,phoneClicks,directionsClicks,emergencyClicks,favoriteClicks,submissions,reports,ads]=await Promise.all([
+  const [visitorsToday,visitorsTotal,searchesToday,searchesTotal,phoneClicks,directionsClicks,emergencyClicks,favoriteClicks,submissions,reports,ads,rosterEvents]=await Promise.all([
     count('page_view',today),count('page_view'),count('search',today),count('search'),count('phone_click'),count('directions_click'),count('emergency_click'),count('favorite_click'),
     env.DB.prepare('SELECT * FROM submissions ORDER BY created_at DESC LIMIT 50').all(),
     env.DB.prepare("SELECT * FROM reports WHERE status='open' ORDER BY created_at DESC LIMIT 50").all(),
-    env.DB.prepare('SELECT * FROM ads ORDER BY updated_at DESC LIMIT 50').all()
+    env.DB.prepare('SELECT * FROM ads ORDER BY updated_at DESC LIMIT 50').all(),
+    recentRosterEvents(env)
   ]);
-  return Response.json({stats:{visitorsToday,visitorsTotal,searchesToday,searchesTotal,phoneClicks,directionsClicks,emergencyClicks,favoriteClicks},submissions:submissions.results,reports:reports.results,ads:ads.results});
+  return Response.json({stats:{visitorsToday,visitorsTotal,searchesToday,searchesTotal,phoneClicks,directionsClicks,emergencyClicks,favoriteClicks},submissions:submissions.results,reports:reports.results,ads:ads.results,rosterEvents});
 }

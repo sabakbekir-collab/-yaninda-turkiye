@@ -13,11 +13,13 @@ import {getCurrentLocation,getLocationPermissionState,LocationError} from './loc
 import type {Place,Position} from './types';
 import ChatWidget from './ChatWidget';
 import AdminAI from './AdminAI';
+import AdminRoster,{type AdminRosterEvent} from './AdminRoster';
 import FavoritesPage from './FavoritesPage';
 import CalendarPage from './CalendarPage';
 import EnhancedPlaceCard from './PlaceCard';
 import {getTheme,applyTheme,saveTheme} from './theme';
-import {shareText,mapsLink} from './share';
+import {directionsLinkForPlace,shareText,mapsLink} from './share';
+import {isPlaceMappable} from './placeUtils';
 import {provinceCenter} from '../functions/lib/provinceCenters';
 import { dutyLinkFor, officialLinkFor } from './dutyLink';
 import { shouldShowEmpty } from './searchErrors';
@@ -310,7 +312,7 @@ function Nearby(){
  const location=useLocation();
  const nav=useNavigate();
  const[params,setParams]=useSearchParams();
- const memory=readNearbyMemory();
+ const memory=useMemo(()=>readNearbyMemory(),[]);
  const state=location.state as NearbyNavigationState|null;
 
  const initialProvince=params.get('province')||state?.province||memory.province||'';
@@ -371,13 +373,13 @@ function Nearby(){
      next.set('view',view);
      return next;
    },{replace:true});
- },[cat,province,district,radius,nearbyDistricts,view,setParams]);
+ },[cat,province,district,radius,nearbyDistricts,view,setParams,pos,memory.position,memory.positionSavedAt]);
 
  // Restore the saved area without marking it as a fresh manual change.
  useEffect(()=>{
    if(!province&&memory.province)setProvince(memory.province);
    if(!district&&memory.district)setDistrict(memory.district);
- },[]);
+ },[province,district,memory.province,memory.district]);
  // Never open the iOS permission prompt on entry. Read GPS only when permission
  // is already granted; failures silently preserve the selected-area fallback.
  useEffect(()=>{
@@ -572,6 +574,7 @@ function Nearby(){
  const dutyView=pharmacyMode?dutyViewState({feedDate:dutyFeedDate,items:visiblePlaces,now:new Date(),tz:'Europe/Istanbul'}):{kind:'none' as const,items:[] as Place[]};
  const dutyItems=dutyView.kind==='list'?dutyView.items:[];
  const displayPlaces=pharmacyMode?nearbyPharmacies:visiblePlaces;
+ const mappedPlaces=displayPlaces.filter(isPlaceMappable);
  const dutyLink=pharmacyMode?dutyLinkFor(province,false):null;
  const officialLink=pharmacyMode?officialLinkFor(province):null;
  const officialDutyUrl=dutyLink?.url||officialLink;
@@ -651,8 +654,9 @@ function Nearby(){
     </div>
     {pharmacyMode&&nearbyPharmacies.length>0&&<p className="pharmacy-results-note">Nöbet durumu doğrulanmadı; gitmeden telefonla teyit edin.</p>}
 
+    {view==='map'&&displayPlaces.some(p=>!isPlaceMappable(p))&&<div className="location-fallback-note" role="status">Konumu bilinmeyen eczaneler haritada gösterilemiyor; yol tarifi için eczane adı ve adresi kullanılır.</div>}
     {loading?<div className="results skeleton-results">{[1,2,3].map(i=><div className="nearby-skeleton" key={i}/>)}</div>:
-     view==='map'&&displayPlaces[0]?<div className="map"><MapContainer center={[displayPlaces[0].lat,displayPlaces[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{displayPlaces.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:
+     view==='map'?mappedPlaces.length?<div className="map"><MapContainer center={[mappedPlaces[0].lat,mappedPlaces[0].lon]} zoom={13}><TileLayer attribution="&copy; OpenStreetMap contributors" url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"/>{mappedPlaces.map(p=><Marker key={p.id} position={[p.lat,p.lon]} icon={marker}><Popup><b>{p.name}</b><br/>{cleanCardAddress(p.address)}</Popup></Marker>)}</MapContainer></div>:<div className="empty nearby-empty"><MapPin/><p>Haritada gösterilebilecek konumu bilinen eczane kaydı yok.</p></div>:
       <div className="results">
         {displayPlaces.length > 0 ? (
           <>
@@ -682,7 +686,7 @@ function LegacyPlaceCard({p}:{p:Place}){
      <small className="place-meta-line"><Navigation/> <b>{formatDistance(p.distance)}</b> · Kuş uçuşu · <ShieldCheck/> {p.source}</small>
      {p.district&&<small className="place-district">İlçe: {p.district}</small>}{p.isDuty&&<small className="place-source-note">Veri: Eczane Adresi</small>}
 
-     {p.phone?<footer className="place-actions"><a href={'tel:'+p.phone}><Phone/>Ara</a><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>:<footer className="place-actions"><span className="no-phone">Telefon bilgisi yok</span><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>}
+    {p.phone?<footer className="place-actions"><a href={'tel:'+p.phone}><Phone/>Ara</a><a target="_blank" rel="noreferrer" href={directionsLinkForPlace(p)}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>:<footer className="place-actions"><span className="no-phone">Telefon bilgisi yok</span><a target="_blank" rel="noreferrer" href={directionsLinkForPlace(p)}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>}
    </div>
  </article>
 }
@@ -768,9 +772,10 @@ type AdminStats={visitorsTotal:number;visitorsToday:number;searchesTotal:number;
 type AdminAd={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null;placement:string;status:string};
 type AdminSubmission={id:number;name:string;category:string;phone:string;address:string;province:string;district:string;status:string};
 type AdminReport={id:number;place_name:string;reason:string;details?:string;created_at:string};
-type AdminData={stats?:AdminStats;ads?:AdminAd[];submissions?:AdminSubmission[];reports?:AdminReport[]};
+type AdminData={stats?:AdminStats;ads?:AdminAd[];submissions?:AdminSubmission[];reports?:AdminReport[];rosterEvents?:AdminRosterEvent[]};
 function Admin(){
  const[email,setEmail]=useState(''),[password,setPassword]=useState(''),[ok,setOk]=useState(false),[data,setData]=useState<AdminData>(),[error,setError]=useState(''),[notice,setNotice]=useState(''),[loading,setLoading]=useState(false);
+ const[telegramLinkCode,setTelegramLinkCode]=useState('');
  const[editingId,setEditingId]=useState<number|null>(null);
  const[adForm,setAdForm]=useState({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});
  const refresh=async()=>{
@@ -792,6 +797,17 @@ function Admin(){
      if(!r.ok){const d=await r.json().catch(()=>({})) as {error?:string};throw new Error(d.error||'İşlem tamamlanamadı.');}
      await refresh();setNotice('İşlem başarıyla tamamlandı.');return true;
    }catch(e){setError(e instanceof Error?e.message:'Bağlantı kurulamadı.');return false}finally{setLoading(false)}
+ };
+ const createTelegramLink=async()=>{
+   setError('');setNotice('');setTelegramLinkCode('');setLoading(true);
+   try{
+     const r=await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'create_telegram_link'})});
+     const result=await r.json().catch(()=>({})) as {error?:string;code?:string};
+     if(!r.ok)throw new Error(result.error||'Telegram bağlantı kodu oluşturulamadı.');
+     if(typeof result.code!=='string')throw new Error('Telegram bağlantı kodu yanıtı geçersiz.');
+     setTelegramLinkCode(result.code);
+     setNotice('Kodu 10 dakika içinde bot sohbetine /baglan komutuyla gönderin.');
+   }catch(e){setError(e instanceof Error?e.message:'Bağlantı kurulamadı.')}finally{setLoading(false)}
  };
  const saveAd=async(e:FormEvent)=>{
    e.preventDefault();
@@ -827,6 +843,8 @@ function Admin(){
    </div>
    <div className="panel"><h2>İşletme Başvuruları</h2>{(data?.submissions||[]).length?(data?.submissions||[]).map(item=><div className="ad-row" key={item.id}><div><b>{item.name}</b><small>{item.category} · {item.province}/{item.district} · {item.phone}</small><small>{item.address} · {item.status}</small></div>{item.status==='pending'&&<><button disabled={loading} onClick={()=>void action({action:'approve_submission',id:item.id})}>Onayla</button><button disabled={loading} onClick={()=>void action({action:'reject_submission',id:item.id})}>Reddet</button></>}</div>):<p>Bekleyen veya kayıtlı başvuru yok.</p>}</div>
    <div className="panel"><h2>Hatalı Bilgi Bildirimleri</h2>{(data?.reports||[]).length?(data?.reports||[]).map(item=><div className="ad-row" key={item.id}><div><b>{item.place_name}</b><small>{item.reason} · {item.details||'Açıklama yok'}</small></div><button disabled={loading} onClick={()=>void action({action:'resolve_report',id:item.id})}>Çözüldü</button></div>):<p>Açık bildirim yok.</p>}</div>
+   <div className="panel"><h2>Telegram Bağlantısı</h2><p>Yeni bir 6 haneli kod oluşturup bot sohbetinde <code>/baglan KOD</code> biçiminde gönderin.</p><button type="button" disabled={loading} onClick={()=>void createTelegramLink()}>{loading?'Oluşturuluyor…':'Telegram Bağlama Kodu Oluştur'}</button>{telegramLinkCode&&<p role="status"><b>{telegramLinkCode}</b> · 10 dakika geçerli</p>}</div>
+  <AdminRoster events={data?.rosterEvents||[]}/>
   </section></main>;
 }
 function Legal({type}:{type:'kvkk'|'privacy'}){

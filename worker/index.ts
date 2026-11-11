@@ -6,10 +6,12 @@ import { onRequestPost as postSubmissions } from "../functions/api/submissions";
 import { onRequestPost as postReports } from "../functions/api/reports";
 import { onRequestPost as postAiChat } from "../functions/api/ai";
 import { onRequestPost as postAdminAi } from "../functions/api/admin-ai";
+import { isTelegramWebhookPath, onRequest as postTelegram } from "../functions/api/telegram";
 import type { Env } from "../functions/lib/types";
 import { ensureSchema } from "../functions/lib/schema";
 import { validSession } from "../functions/lib/auth";
 import { healthResponse } from "../functions/lib/health";
+import { sendMissingRosterReminder } from "../functions/lib/telegramFlow";
 
 type RuntimeEnv = Env & {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -104,6 +106,8 @@ export default {
         }
       }
 
+      if (isTelegramWebhookPath(path)) return await postTelegram({ request, env });
+
       // Schema first so rate limiting (api_cache) also works on the very first AI/admin call.
       if (path.startsWith("/api/") && env.DB) {
         try {
@@ -179,5 +183,8 @@ export default {
       });
       return Response.json({ error: "server_error" }, { status: 500 });
     }
+  },
+  scheduled(_controller: ScheduledController, env: RuntimeEnv, context: ExecutionContext) {
+    context.waitUntil(sendMissingRosterReminder(env));
   },
 };
