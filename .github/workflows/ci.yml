@@ -22,6 +22,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Apply D1 migrations to local test database
+        run: npx --yes wrangler@4 d1 migrations apply DB --local --config ./wrangler.jsonc
       - run: npm test
       - run: npx tsc -b
       - run: npm run lint
