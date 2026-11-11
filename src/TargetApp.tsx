@@ -800,9 +800,10 @@ function Admin(){
  const analyticsRows=(key:string):Record<string,unknown>[]=>Array.isArray(analytics?.[key])?analytics[key] as Record<string,unknown>[]:[];
  const exportAnalytics=()=>{
   if(!analytics)return;
-  const rows=analyticsRows('live');if(!rows.length){setNotice('Dışa aktarılacak olay bulunamadı.');return;}
-  const cols=['ts','event','path','target_label','city','device'];
-  const csv=[cols.join(','),...rows.map(row=>cols.map(col=>JSON.stringify(row[col]??'')).join(','))].join('\\n');
+  const groups=['summary','previousSummary','topTargets','searches','zeroSearches','categories','locations','actions','pages','heatmap','ads','ai','traffic','devices','browsers','sources','live'];
+  const rows=groups.flatMap(section=>{const value=analytics[section];if(Array.isArray(value))return value.map(row=>({section,data:JSON.stringify(row)}));return value&&typeof value==='object'?[{section,data:JSON.stringify(value)}]:[];});
+  if(!rows.length){setNotice('Dışa aktarılacak analitik verisi yok.');return;}
+  const csv=['bolum,veri',...rows.map(row=>[JSON.stringify(row.section),JSON.stringify(row.data)].join(','))].join('\\n');
   const blob=new Blob(['\\ufeff'+csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');
   link.href=url;link.download='yaninda-turkiye-analitik.csv';link.click();URL.revokeObjectURL(url);
  };
@@ -860,7 +861,7 @@ function Admin(){
      </div>
      <article className="analytics-heatmap"><h3>Tıklama ısı haritası</h3><select value={heatmapPath} onChange={e=>setHeatmapPath(e.target.value)} aria-label="Isı haritası sayfası"><option value="/">Ana sayfa</option>{analyticsRows('heatmap').map(row=>String(row.path)).filter((v,i,a)=>a.indexOf(v)===i&&v!=='/').map(path=><option key={path} value={path}>{path}</option>)}</select><svg viewBox="0 0 100 100" role="img" aria-label="Sayfa üzerindeki tıklama yoğunluğu">{analyticsRows('heatmap').filter(row=>row.path===heatmapPath).map((row,i)=><circle key={i} cx={Number(row.x)||0} cy={Number(row.y)||0} r={Math.min(8,2+Number(row.weight||1))} fill="#e11d48" fillOpacity=".45"/>)}</svg>{!analyticsRows('heatmap').some(row=>row.path===heatmapPath)&&<p>Bu sayfa için ısı haritası verisi yok.</p>}</article>
      <div className="analytics-grid">
-      <article><h3>Saatlik trafik</h3>{analyticsRows('traffic').length?analyticsRows('traffic').map((row,i)=><p key={i}>{String(row.hour)} <b>{String(row.count)}</b></p>):<p>Trafik kaydı yok.</p>}</article>
+      <article><h3>Saatlik trafik</h3>{analyticsRows('traffic').length?<svg viewBox="0 0 600 150" role="img" aria-label="Saatlik trafik çubuk grafiği">{analyticsRows('traffic').map((row,i)=>{const max=Math.max(1,...analyticsRows('traffic').map(v=>Number(v.count)||0));const value=Number(row.count)||0;const height=Math.max(2,value/max*112);return <g key={i}><rect x={i* Math.max(8,580/analyticsRows('traffic').length)+8} y={130-height} width={Math.max(4,Math.min(22,560/analyticsRows('traffic').length-3))} height={height} rx="3" fill="#2878c8"/><title>{String(row.hour)} · {value} olay</title></g>})}</svg>:<p>Trafik kaydı yok.</p>}</article>
       <article><h3>Cihaz dağılımı</h3>{analyticsRows('devices').length?analyticsRows('devices').map((row,i)=><p key={i}>{String(row.device||'Belirtilmedi')} <b>{String(row.count)}</b></p>):<p>Cihaz verisi yok.</p>}</article>
       <article><h3>Tarayıcı dağılımı</h3>{analyticsRows('browsers').length?analyticsRows('browsers').map((row,i)=><p key={i}>{String(row.browser||'Belirtilmedi')} <b>{String(row.count)}</b></p>):<p>Tarayıcı verisi yok.</p>}</article>
       <article><h3>Trafik kaynakları</h3>{analyticsRows('sources').length?analyticsRows('sources').map((row,i)=><p key={i}>{String(row.referrer)} <b>{String(row.count)}</b></p>):<p>Yönlendiren kaynak kaydı yok.</p>}</article>
