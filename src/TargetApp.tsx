@@ -925,7 +925,7 @@ export default function TargetApp(){
    const href=el instanceof HTMLAnchorElement?el.href:'';
    const key=el.dataset.trackId||[location.pathname,el.tagName,label.toLocaleLowerCase('tr-TR')].join(':').slice(0,140);
    el.dataset.trackId=key;
-   let eventName:'phone_click'|'whatsapp_click'|'directions_click'|'website_click'|'category_click'|'place_click'|'favorite_click'|'share_click'='place_click';
+   let eventName:'phone_click'|'whatsapp_click'|'directions_click'|'website_click'|'category_click'|'place_click'|'favorite_click'|'share_click'|'button_click'='button_click';
    if(href.startsWith('tel:'))eventName='phone_click';
    else if(/wa\\.me|whatsapp/i.test(href))eventName='whatsapp_click';
    else if(/maps|directions/i.test(href))eventName='directions_click';
