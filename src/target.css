@@ -474,3 +474,21 @@ html[data-theme="dark"]{color-scheme:light;filter:none;background:#fff7fb}
 
 .nearby-place-card footer.place-actions{flex-wrap:wrap;overflow:visible}
 .nearby-place-card footer.place-actions>a{min-width:0}
+
+
+/* Admin form: readable, stacked fields on every viewport. */
+.admin-ad-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:16px 0}
+.admin-ad-form>label{display:grid;grid-template-columns:minmax(0,1fr);gap:7px;min-width:0;font-size:13px;font-weight:700;color:#253449}
+.admin-ad-form input,.admin-ad-form textarea,.admin-ad-form select{display:block;width:100%;min-width:0;min-height:44px;border:1px solid #d7dee7;border-radius:10px;background:#fff;padding:11px 12px;color:#17232d;font:inherit;font-size:14px}
+.admin-ad-form textarea{resize:vertical}
+.admin-ad-form label small{font-size:11px;line-height:1.45;font-weight:400;color:#64748b}
+.admin-ad-preview{grid-column:1/-1;display:grid;gap:7px;border:1px dashed #cbd5e1;border-radius:12px;background:#f8fafc;padding:12px}
+.admin-ad-preview span{font-size:12px;color:#64748b}
+.admin-ad-preview img{max-width:100%;max-height:150px;object-fit:contain;object-position:left;border-radius:8px}
+.admin-ad-preview p{margin:0;font-size:13px;color:#64748b}
+.admin-ad-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.admin-ad-actions button{min-height:44px;border:0;border-radius:9px;background:var(--r);color:#fff;padding:10px 16px;font-weight:800}
+.admin-ad-actions button+button{background:#e8edf2;color:#253449}
+.admin-section-help{margin:-5px 0 12px;color:#64748b;font-size:12px;line-height:1.5}
+.admin>section{padding-bottom:calc(100px + env(safe-area-inset-bottom))}
+@media(max-width:760px){.admin-ad-form{grid-template-columns:1fr;gap:12px}.admin-ad-preview{grid-column:1}.admin>section{padding-bottom:calc(120px + env(safe-area-inset-bottom))}.admin-ad-actions{display:grid;grid-template-columns:1fr}.admin-ad-actions button{width:100%;min-height:46px}.admin .panel{overflow:hidden}.admin .ad-row{grid-template-columns:1fr;gap:8px}.admin .ad-row img{width:100%;height:auto;max-height:150px}.admin .ad-row button{grid-column:auto;min-height:44px}}
