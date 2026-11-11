@@ -2,6 +2,7 @@ import type {Place,Position} from './types';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName} from './text';
 import { mapPlacesError } from './searchErrors';
+import type {AnalyticsEvent} from '../shared/analyticsEvents';
 
 export type PlaceSearchOptions={
   radiusKm?:number;
@@ -128,7 +129,7 @@ function analyticsSessionId(consent:boolean){
     return id;
   }catch{return '';}
 }
-export function track(event:string,props:Record<string,string|number|boolean>={}){
+export function track(event:AnalyticsEvent,props:Record<string,string|number|boolean>={}){
   const consent=getAnalyticsConsent()==='accepted';
   const safeProps=consent?props:{};
   const payload=JSON.stringify({event,props:safeProps,consent,path:typeof location!=='undefined'?location.pathname:'/',referrer:consent&&typeof document!=='undefined'?document.referrer:'',session_id:analyticsSessionId(consent)});
