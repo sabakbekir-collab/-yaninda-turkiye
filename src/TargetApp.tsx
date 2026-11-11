@@ -464,7 +464,7 @@ function Nearby(){
    setLoading(true);setErr('');
    if(submitted.category==='pharmacy'){setDutyFeedDate(null);setDutyError(false);}
    findPlaces(submitted.category,submitted.pos,submitted.province,submitted.district,{radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts,anchor:submitted.anchor,forceRefresh:submitted.forceRefresh,onFeedDate:submitted.category==='pharmacy'?(date)=>{if(!cancelled)setDutyFeedDate(date)}:undefined})
-     .then(r=>{if(!cancelled){setPlaces(r);if(submitted.category==='pharmacy')setDutyError(false)}})
+     .then(r=>{if(!cancelled){setPlaces(r);track(r.length?'search':'search_zero_results',{category:submitted.category,province:submitted.province,district:submitted.district,result_count:r.length});if(submitted.category==='pharmacy')setDutyError(false)}})
      .catch((error:unknown)=>{if(!cancelled){const message=error instanceof Error&&error.message.trim()?error.message:'Nöbetçi eczane kaynağına ulaşılamadı.';setPlaces([]);setErr(message);if(submitted.category==='pharmacy')setDutyError(true)}})
      .finally(()=>{if(!cancelled)setLoading(false)});
    return()=>{cancelled=true};
@@ -500,6 +500,7 @@ function Nearby(){
        searchPosition=fresh;
        setPos(fresh);
        setLocationState('granted');
+       track('location_permission',{result:'granted'});
        manualAreaChosenRef.current=false;
        try{
          const area=await resolveLocationArea(fresh);
@@ -509,7 +510,7 @@ function Nearby(){
      }catch(error){
        const denied=error instanceof LocationError&&error.code==='permission_denied';
        const unsupported=error instanceof LocationError&&error.code==='unsupported';
-       if(denied)setLocationState('denied');
+       if(denied){setLocationState('denied');track('location_permission',{result:'denied'});}
        else if(unsupported)setLocationState('unsupported');
        else setLocationState('prompt');
        const fallbackArea=searchDistrict||searchProvince||'seçili bölge';
@@ -536,6 +537,7 @@ function Nearby(){
      // The button must always request a fresh device position. Never reuse
      // an old cached coordinate when the user explicitly taps "Konumumu Kullan".
      const current=await getCurrentLocation({forceFresh:true});
+     track('location_permission',{result:'granted'});
      // Resolve GPS coordinates to the same province/district fields used by
      // manual selection, so the same live duty-pharmacy widget is selected.
      const area=await resolveLocationArea(current);
