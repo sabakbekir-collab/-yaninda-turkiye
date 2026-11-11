@@ -8,7 +8,7 @@ import L from 'leaflet';
 import {categories,keywordMap,provinces,services} from './data';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName,trSlug} from './text';
-import {findPlaces,resolveLocationArea,track} from './api';
+import {findPlaces,resolveLocationArea,track,setAnalyticsConsent,requestAnalyticsDeletion} from './api';
 import {getCurrentLocation,getLocationPermissionState,LocationError} from './location';
 import type {Place,Position} from './types';
 import ChatWidget from './ChatWidget';
@@ -892,6 +892,8 @@ function Admin(){
 }
 function Legal({type}:{type:'kvkk'|'privacy'}){
  const privacy=type==='privacy';
+ const [deleteStatus,setDeleteStatus]=useState('');
+ const deleteMyAnalytics=async()=>{setDeleteStatus('Talep gönderiliyor…');const ok=await requestAnalyticsDeletion();setDeleteStatus(ok?'Analitik oturum verileriniz silindi.':'Silme talebi gönderilemedi. Bu cihazda analitik oturumu bulunmayabilir.');};
  return <main className="inner legal nearby-page">
    <div className="page-title"><button className="back-btn" onClick={()=>history.back()} aria-label="Geri">‹</button><div><small>YANINDA TÜRKİYE</small><h1>{privacy?'Gizlilik':'KVKK'}</h1></div></div>
    <section><h2>{privacy?'Gizlilik ve Konum Verisi':'Kişisel Verilerin Korunması'}</h2>
@@ -900,9 +902,9 @@ function Legal({type}:{type:'kvkk'|'privacy'}){
    <p>Harita ve açık veri sonuçlarında OpenStreetMap kaynakları kullanılabilir. Sonuçların kaynağı kart üzerinde gösterilir; işletme bilgilerinin güncelliği veri sağlayıcısına bağlıdır.</p>
    <p>İletişim veya işletme başvurusu sırasında gönderilen bilgiler yalnızca başvurunun değerlendirilmesi ve hizmetin yürütülmesi amacıyla işlenir.</p>
    <p><b>Analitik verileri:</b> Kabul tercihiyle sayfa görüntüleme, arama terimi, tıklanan öğe, cihaz/tarayıcı türü ve oturum süresi ölçülebilir. Sadece zorunlu tercihinde oturum kimliği, kullanıcı kimliği, IP özeti, yönlendiren adres ve ısı haritası koordinatları kaydedilmez; yalnızca olay adı, sayfa ve tarih anonim toplu sayım için tutulur.</p>
-   <p><b>Saklama süresi:</b> Analitik olayları en fazla 90 gün tutulacak şekilde planlanır. Süre sonunda her gün çalışan zamanlanmış temizlik görevi kayıtları siler. Veri silme talebi için site iletişim kanalından başvurabilirsiniz.</p>
+   <p><b>Saklama süresi:</b> Analitik olayları en fazla 90 gün tutulacak şekilde planlanır. Süre sonunda her gün çalışan zamanlanmış temizlik görevi kayıtları siler. Kabul edilmiş analitik oturum verilerinizi aşağıdaki düğmeyle silebilirsiniz. Silme işlemi mevcut cihazdaki anonim oturum kimliği üzerinden yapılır.</p>
    <p><b>Tercihinizi değiştirin:</b> Aşağıdaki seçeneklerden birini seçerek analitik iznini güncelleyebilirsiniz.</p>
-   <div className="analytics-consent-actions legal-consent"><button type="button" onClick={()=>{localStorage.setItem('yt_analytics_consent','accepted');window.location.reload();}}>Analitiği kabul et</button><button type="button" onClick={()=>{localStorage.setItem('yt_analytics_consent','essential');localStorage.removeItem('yt_analytics_session');window.location.reload();}}>Sadece zorunlu</button></div>
+   <div className="analytics-consent-actions legal-consent"><button type="button" onClick={()=>{setAnalyticsConsent('accepted');window.location.reload();}}>Analitiği kabul et</button><button type="button" onClick={()=>{setAnalyticsConsent('essential');window.location.reload();}}>İzni geri çek ve izlemeyi durdur</button><button type="button" onClick={deleteMyAnalytics}>Verilerimi sil</button></div><p role="status" aria-live="polite">{deleteStatus}</p>
    <p><b>Önemli:</b> Nöbetçi eczane durumu, resmi/güvenilir yapılandırılmış veri kaynağı doğrulanmadan “nöbetçi” olarak gösterilmez.</p>
  </section>
  </main>
