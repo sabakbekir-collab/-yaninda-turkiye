@@ -23,3 +23,9 @@ CREATE INDEX IF NOT EXISTS idx_events_session_ts ON events(session_id, ts);
 CREATE INDEX IF NOT EXISTS idx_events_event_ts ON events(event, ts);
 CREATE INDEX IF NOT EXISTS idx_events_path_ts ON events(path, ts);
 CREATE INDEX IF NOT EXISTS idx_events_target_ts ON events(target_type, target_id, ts);
+
+-- Additive admin metadata; existing ads/submissions are preserved.
+ALTER TABLE ads ADD COLUMN starts_at TEXT;
+ALTER TABLE ads ADD COLUMN ends_at TEXT;
+ALTER TABLE submissions ADD COLUMN admin_note TEXT;
+CREATE INDEX IF NOT EXISTS idx_ads_schedule ON ads(status, starts_at, ends_at);
