@@ -118,14 +118,14 @@ export function getAnalyticsConsent():AnalyticsConsent{
   try{const v=localStorage.getItem('yt_analytics_consent');return v==='accepted'||v==='essential'?v:null;}catch{return null;}
 }
 export function setAnalyticsConsent(value:Exclude<AnalyticsConsent,null>){
-  try{localStorage.setItem('yt_analytics_consent',value);}catch{/* Preference storage may be unavailable. */}
+  try{localStorage.setItem('yt_analytics_consent',value);if(value==='essential')localStorage.removeItem('yt_analytics_session');}catch{/* Preference storage may be unavailable. */}
 }
 function analyticsSessionId(consent:boolean){
   if(!consent)return '';
   try{
     const key='yt_analytics_session';
-    let id=localStorage.getItem(key);
-    if(!id){id=typeof crypto.randomUUID==='function'?crypto.randomUUID():`s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;localStorage.setItem(key,id);}
+    let id=localStorage.getItem(key),created=Number(localStorage.getItem(key+'_created')||0);
+    if(!id||!created||Date.now()-created>30*60*1000){id=typeof crypto.randomUUID==='function'?crypto.randomUUID():`s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;localStorage.setItem(key,id);localStorage.setItem(key+'_created',String(Date.now()));}
     return id;
   }catch{return '';}
 }
