@@ -147,8 +147,9 @@ function analyticsSessionId(consent:boolean){
     return id;
   }catch{return '';}
 }
+export function isAnalyticsTrackingEnabled(){return getAnalyticsConsent()!=='essential';}
 export function track(event:AnalyticsEvent,props:Record<string,string|number|boolean>={}){
-  if(getAnalyticsConsent()==='essential')return;
+  if(!isAnalyticsTrackingEnabled())return;
   const consent=getAnalyticsConsent()==='accepted';
   const safeProps=consent?props:{};
   const payload=JSON.stringify({event,props:safeProps,consent,path:typeof location!=='undefined'?location.pathname:'/',referrer:consent&&typeof document!=='undefined'?document.referrer:'',session_id:analyticsSessionId(consent)});
