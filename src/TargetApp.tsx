@@ -774,6 +774,31 @@ function Admin(){
  const[email,setEmail]=useState(''),[password,setPassword]=useState(''),[ok,setOk]=useState(false),[data,setData]=useState<AdminData>(),[error,setError]=useState(''),[notice,setNotice]=useState(''),[loading,setLoading]=useState(false);
  const[editingId,setEditingId]=useState<number|null>(null);
  const[adForm,setAdForm]=useState({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});
+ const[analytics,setAnalytics]=useState<Record<string,unknown>|null>(null);
+ const[analyticsRange,setAnalyticsRange]=useState<'today'|'7'|'30'>('7');
+ const[analyticsLoading,setAnalyticsLoading]=useState(false);
+ const[heatmapPath,setHeatmapPath]=useState('/');
+ useEffect(()=>{
+  if(!ok)return;
+  let active=true;setAnalyticsLoading(true);
+  const end=new Date();const start=new Date(end);
+  if(analyticsRange==='today')start.setHours(0,0,0,0);else start.setDate(start.getDate()-(Number(analyticsRange)-1));
+  const from=start.toISOString().slice(0,10),to=end.toISOString().slice(0,10);
+  fetch('/api/admin/analytics?from='+from+'&to='+to,{cache:'no-store'}).then(async response=>{
+   if(!response.ok)throw new Error('Analitik verileri alınamadı.');
+   return await response.json() as Record<string,unknown>;
+  }).then(value=>{if(active)setAnalytics(value);}).catch(()=>{if(active)setAnalytics(null);}).finally(()=>{if(active)setAnalyticsLoading(false);});
+  return()=>{active=false;};
+ },[ok,analyticsRange]);
+ const analyticsRows=(key:string):Record<string,unknown>[]=>Array.isArray(analytics?.[key])?analytics[key] as Record<string,unknown>[]:[];
+ const exportAnalytics=()=>{
+  if(!analytics)return;
+  const rows=analyticsRows('live');if(!rows.length){setNotice('Dışa aktarılacak olay bulunamadı.');return;}
+  const cols=['ts','event','path','target_label','city','device'];
+  const csv=[cols.join(','),...rows.map(row=>cols.map(col=>JSON.stringify(row[col]??'')).join(','))].join('\\n');
+  const blob=new Blob(['\\ufeff'+csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=url;link.download='yaninda-turkiye-analitik.csv';link.click();URL.revokeObjectURL(url);
+ };
  const refresh=async()=>{
    const r=await fetch('/api/admin',{cache:'no-store'});
    if(!r.ok)throw new Error(r.status===401?'Oturum süresi dolmuş. Yeniden giriş yap.':'Yönetim verileri alınamadı.');
@@ -814,6 +839,22 @@ function Admin(){
     {[['Toplam ziyaret',stats?.visitorsTotal],['Bugünkü ziyaret',stats?.visitorsToday],['Toplam arama',stats?.searchesTotal],['Bugünkü arama',stats?.searchesToday]].map(([label,value])=><article key={String(label)}><small>{label}</small><strong>{typeof value==='number'?value.toLocaleString('tr-TR'):'Veri yok'}</strong></article>)}
    </div>
    {!stats&&<p className="admin-data-note">İstatistikler henüz alınamadı; tahmini rakam gösterilmiyor.</p>}
+   <section className="panel admin-analytics">
+    <div className="analytics-head"><div><h2>Analitik ve Ziyaretçi Davranışı</h2><p>Gerçek kullanıcı olayları üzerinden site performansını inceleyin.</p></div><div className="analytics-controls"><select aria-label="Analitik tarih aralığı" value={analyticsRange} onChange={e=>setAnalyticsRange(e.target.value as 'today'|'7'|'30')}><option value="today">Bugün</option><option value="7">Son 7 gün</option><option value="30">Son 30 gün</option></select><button type="button" onClick={exportAnalytics}>CSV indir</button></div></div>
+    {analyticsLoading?<p role="status">Analitik verileri yükleniyor…</p>:!analytics?<p>Analitik verisi alınamadı veya henüz kayıt yok.</p>:<>
+     <div className="analytics-kpis">{(['page_views','sessions','visitors','searches','zero_searches'] as const).map(key=><article key={key}><small title={key==='visitors'?'IP hash ile ölçülen izinli tekil tarayıcılar':key==='sessions'?'İzin verilmiş anonim oturumlar':key==='page_views'?'Kaydedilen sayfa görüntülemeleri':key==='searches'?'Arama olaylarının sayısı':'Sonuçsuz arama sayısı'}>{({page_views:'Sayfa görüntüleme',sessions:'Oturum',visitors:'Tekil ziyaretçi',searches:'Arama',zero_searches:'0 sonuçlu arama'})[key]}</small><strong>{String((analytics.summary as Record<string,unknown>|undefined)?.[key]??'0')}</strong></article>)}</div>
+     <div className="analytics-grid">
+      <article><h3>En çok tıklanan yerler</h3>{analyticsRows('topTargets').length?analyticsRows('topTargets').slice(0,20).map((row,i)=><p key={String(row.id??i)}>{String(row.name||'Adsız')} <b>{String(row.clicks||0)}</b> · Ara {String(row.calls||0)} · Yol {String(row.directions||0)} · Favori {String(row.favorites||0)}</p>):<p>Henüz yer tıklaması yok.</p>}</article>
+      <article><h3>En çok arananlar</h3>{analyticsRows('searches').length?analyticsRows('searches').map((row,i)=><p key={i}>{String(row.query||'Arama terimi yok')} <b>{String(row.count||0)}</b></p>):<p>Henüz arama kaydı yok.</p>}<h3>0 sonuç verenler</h3>{analyticsRows('zeroSearches').length?analyticsRows('zeroSearches').map((row,i)=><p key={i}>{String(row.query||'Arama terimi yok')} <b>{String(row.count||0)}</b></p>):<p>Sonuçsuz arama yok.</p>}</article>
+      <article><h3>Kategoriler</h3>{analyticsRows('categories').length?analyticsRows('categories').map((row,i)=><p key={i}>{String(row.category||'Belirtilmedi')} <b>{String(row.count||0)}</b></p>):<p>Kategori olayı yok.</p>}</article>
+      <article><h3>İl dağılımı</h3>{analyticsRows('locations').length?analyticsRows('locations').map((row,i)=><p key={i}>{String(row.city||'Belirtilmedi')} <b>{String(row.count||0)}</b></p>):<p>İzinli konum verisi yok.</p>}</article>
+      <article><h3>Buton kullanımı</h3>{analyticsRows('actions').length?analyticsRows('actions').map((row,i)=><p key={i}>{String(row.event)} <b>{String(row.count)}</b></p>):<p>Henüz aksiyon olayı yok.</p>}</article>
+      <article><h3>Sayfa görüntülemeleri</h3>{analyticsRows('pages').length?analyticsRows('pages').map((row,i)=><p key={i}>{String(row.path)} <b>{String(row.views)}</b></p>):<p>Sayfa görüntülemesi yok.</p>}</article>
+     </div>
+     <article className="analytics-heatmap"><h3>Tıklama ısı haritası</h3><select value={heatmapPath} onChange={e=>setHeatmapPath(e.target.value)} aria-label="Isı haritası sayfası"><option value="/">Ana sayfa</option>{analyticsRows('heatmap').map(row=>String(row.path)).filter((v,i,a)=>a.indexOf(v)===i&&v!=='/').map(path=><option key={path} value={path}>{path}</option>)}</select><svg viewBox="0 0 100 100" role="img" aria-label="Sayfa üzerindeki tıklama yoğunluğu">{analyticsRows('heatmap').filter(row=>row.path===heatmapPath).map((row,i)=><circle key={i} cx={Number(row.x)||0} cy={Number(row.y)||0} r={Math.min(8,2+Number(row.weight||1))} fill="#e11d48" fillOpacity=".45"/>)}</svg>{!analyticsRows('heatmap').some(row=>row.path===heatmapPath)&&<p>Bu sayfa için ısı haritası verisi yok.</p>}</article>
+     <article><h3>Canlı olay akışı</h3><span className="analytics-live">Son 50 kayıt</span>{analyticsRows('live').length?analyticsRows('live').map((row,i)=><p key={i}>{String(row.ts||'')} · {String(row.event||'')} · {String(row.path||'')} · {String(row.city||'Konum yok')} · {String(row.device||'Cihaz yok')}</p>):<p>Henüz olay kaydı yok.</p>}</article>
+    </>}
+   </section>
    <div className="panel ads">
     <div className="panel-title"><div><h2>Reklam Yönetimi</h2><p>Gerçek reklam kayıtlarını ekle, düzenle, duraklat veya sil.</p></div></div>
     <form className="admin-ad-form" onSubmit={saveAd}>
