@@ -75,4 +75,9 @@ test('Worker schedule and Wrangler cron both wire the reminder without running i
   assert.equal(previewMigrations.d1_databases[0].binding, 'PREVIEW_DB');
   assert.equal(previewMigrations.d1_databases[0].database_id, config.previews.d1_databases[0].database_id);
   assert.notEqual(previewMigrations.d1_databases[0].database_id, config.d1_databases[0].database_id);
+  const preview = JSON.parse(readFileSync(new URL('../wrangler.preview.jsonc', import.meta.url), 'utf8'));
+  assert.equal(preview.name, 'yaninda-turkiye-pr31-preview');
+  assert.equal(preview.d1_databases[0].binding, 'DB');
+  assert.equal(preview.d1_databases[0].database_id, config.previews.d1_databases[0].database_id);
+  assert.equal('triggers' in preview, false);
 });
