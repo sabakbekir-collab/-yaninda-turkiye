@@ -1,6 +1,6 @@
 import type {Env} from '../lib/types';
-import {sameOrigin,secureCompare} from '../lib/auth';
-import {rateLimited,clientIp} from '../lib/ratelimit';
+import {sameOrigin} from '../lib/auth';
+import {rateLimited} from '../lib/ratelimit';
 
 const MAX_BYTES=4096;
 const allowed=new Set(['page_view','search','search_zero_results','category_click','place_click','phone_click','directions_click','whatsapp_click','website_click','favorite_click','share_click','ad_impression','ad_click','ai_open','ai_message','location_permission','scroll_depth','time_on_page','error','heatmap_click']);
@@ -18,15 +18,17 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
  try{
   const body=await request.json() as Record<string,unknown>;
   const event=clean(body.event,48);if(!allowed.has(event))return new Response(null,{status:400});
-  const props=body.props&&typeof body.props==='object'&&!Array.isArray(body.props)?body.props as Record<string,unknown>:{};
+  const consent=body.consent===true;
+  const props=consent&&body.props&&typeof body.props==='object'&&!Array.isArray(body.props)?body.props as Record<string,unknown>:{};
   const safeProps=Object.fromEntries(Object.entries(props).slice(0,16).map(([k,v])=>[clean(k,40),typeof v==='number'&&Number.isFinite(v)?v:typeof v==='boolean'?v:clean(String(v),160)]));
   const ip=request.headers.get('CF-Connecting-IP')||'unknown';
-  const ipHash=env.ADMIN_SESSION_SECRET?await hashIp(ip,env.ADMIN_SESSION_SECRET):null;
+  const ipHash=consent&&env.ADMIN_SESSION_SECRET?await hashIp(ip,env.ADMIN_SESSION_SECRET):null;
   const path=clean(body.path,240)||new URL(request.url).pathname;
-  const session=clean(body.session_id,80);
-  const targetType=clean(body.target_type,40)||null,targetId=clean(body.target_id,100)||null,targetLabel=clean(body.target_label,160)||null;
-  const city=clean(body.city,80)||null,referrer=clean(body.referrer,300)||null;
-  const device=uaClass(ua),browser=browserClass(ua),ts=new Date().toISOString(),propsJson=JSON.stringify(safeProps);
+  const session=consent?clean(body.session_id,80):'';
+  const targetType=consent?clean(body.target_type,40)||null:null,targetId=consent?clean(body.target_id,100)||null:null,targetLabel=consent?clean(body.target_label,160)||null:null;
+  const cf=(request as Request & {cf?:{city?:string;region?:string}}).cf;
+  const city=consent?clean(cf?.city||cf?.region||'',80)||null:null,referrer=consent?clean(body.referrer,300)||null:null;
+  const device=consent?uaClass(ua):null,browser=consent?browserClass(ua):null,ts=new Date().toISOString(),propsJson=consent?JSON.stringify(safeProps):'{}';
   await env.DB.prepare('INSERT INTO events(type,metadata,city,created_at,ts,session_id,user_id,event,path,target_type,target_id,target_label,props_json,device,browser,referrer,ip_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
    .bind(event,propsJson,city,ts,ts,session||null,null,event,path,targetType,targetId,targetLabel,propsJson,device,browser,referrer,ipHash).run();
  }catch{return new Response(null,{status:204});}
