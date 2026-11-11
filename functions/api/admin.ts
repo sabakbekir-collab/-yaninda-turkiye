@@ -140,7 +140,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
   const [visitorsToday,visitorsTotal,searchesToday,searchesTotal,phoneClicks,directionsClicks,emergencyClicks,favoriteClicks,submissions,reports,ads]=await Promise.all([
     count('page_view',today),count('page_view'),count('search',today),count('search'),count('phone_click'),count('directions_click'),count('emergency_click'),count('favorite_click'),
     env.DB.prepare('SELECT * FROM submissions ORDER BY created_at DESC LIMIT 50').all(),
-    env.DB.prepare("SELECT * FROM reports WHERE status='open' ORDER BY created_at DESC LIMIT 50").all(),
+    env.DB.prepare("SELECT * FROM reports ORDER BY created_at DESC LIMIT 50").all(),
     env.DB.prepare('SELECT * FROM ads ORDER BY updated_at DESC LIMIT 50').all()
   ]);
   return Response.json({stats:{visitorsToday,visitorsTotal,searchesToday,searchesTotal,phoneClicks,directionsClicks,emergencyClicks,favoriteClicks},submissions:submissions.results,reports:reports.results,ads:ads.results});
