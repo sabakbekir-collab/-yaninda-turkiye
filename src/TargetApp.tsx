@@ -12,6 +12,7 @@ import {findPlaces,resolveLocationArea,track} from './api';
 import {getCurrentLocation,getLocationPermissionState,LocationError} from './location';
 import type {Place,Position} from './types';
 import ChatWidget from './ChatWidget';
+import AnalyticsConsentBanner from './AnalyticsConsent';
 import AdminAI from './AdminAI';
 import FavoritesPage from './FavoritesPage';
 import CalendarPage from './CalendarPage';
@@ -839,6 +840,10 @@ function Legal({type}:{type:'kvkk'|'privacy'}){
    <p>İl, ilçe, kategori ve yarıçap seçimleri yalnızca kullanıcı deneyimini kolaylaştırmak için cihazda saklanır. Kullanıcı bunları tarayıcı verilerini temizleyerek silebilir.</p>
    <p>Harita ve açık veri sonuçlarında OpenStreetMap kaynakları kullanılabilir. Sonuçların kaynağı kart üzerinde gösterilir; işletme bilgilerinin güncelliği veri sağlayıcısına bağlıdır.</p>
    <p>İletişim veya işletme başvurusu sırasında gönderilen bilgiler yalnızca başvurunun değerlendirilmesi ve hizmetin yürütülmesi amacıyla işlenir.</p>
+   <p><b>Analitik verileri:</b> Kabul tercihiyle sayfa görüntüleme, arama terimi, tıklanan öğe, cihaz/tarayıcı türü ve oturum süresi ölçülebilir. Sadece zorunlu tercihinde oturum kimliği, kullanıcı kimliği, IP özeti, yönlendiren adres ve ısı haritası koordinatları kaydedilmez; yalnızca olay adı, sayfa ve tarih anonim toplu sayım için tutulur.</p>
+   <p><b>Saklama süresi:</b> Analitik olayları en fazla 90 gün tutulacak şekilde planlanır. Süre sonunda zamanlanmış temizlik görevi kayıtları siler. Veri silme talebi için site iletişim kanalından başvurabilirsiniz. Otomatik silme görevi henüz eklenmedi.</p>
+   <p><b>Tercihinizi değiştirin:</b> Aşağıdaki seçeneklerden birini seçerek analitik iznini güncelleyebilirsiniz.</p>
+   <div className="analytics-consent-actions legal-consent"><button type="button" onClick={()=>{localStorage.setItem('yt_analytics_consent','accepted');window.location.reload();}}>Analitiği kabul et</button><button type="button" onClick={()=>{localStorage.setItem('yt_analytics_consent','essential');localStorage.removeItem('yt_analytics_session');window.location.reload();}}>Sadece zorunlu</button></div>
    <p><b>Önemli:</b> Nöbetçi eczane durumu, resmi/güvenilir yapılandırılmış veri kaynağı doğrulanmadan “nöbetçi” olarak gösterilmez.</p>
  </section>
  </main>
@@ -849,5 +854,5 @@ function Simple({title}:{title:string}){return <main className="simple"><h1>{tit
 export default function TargetApp(){
  const location=useLocation();
  useEffect(()=>{track('page_view',{path:location.pathname});},[location.pathname]);
- return <div><Header/><Routes><Route path="/" element={<Home/>}/><Route path="/nearby" element={<Nearby/>}/><Route path="/services" element={<Services/>}/><Route path="/ads" element={<AdCampaigns/>}/><Route path="/emergency" element={<Emergency/>}/><Route path="/add-business" element={<AddBusiness/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/admin" element={<Admin/>}/><Route path="/favorites" element={<FavoritesPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/news" element={<Simple title="Haberler"/>}/><Route path="/contact" element={<Simple title="İletişim"/>}/><Route path="/kvkk" element={<Legal type="kvkk"/>}/><Route path="/gizlilik" element={<Legal type="privacy"/>}/><Route path="*" element={<Home/>}/></Routes><MobileNav/><ChatWidget/></div>
+ return <div><Header/><Routes><Route path="/" element={<Home/>}/><Route path="/nearby" element={<Nearby/>}/><Route path="/services" element={<Services/>}/><Route path="/ads" element={<AdCampaigns/>}/><Route path="/emergency" element={<Emergency/>}/><Route path="/add-business" element={<AddBusiness/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/admin" element={<Admin/>}/><Route path="/favorites" element={<FavoritesPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/news" element={<Simple title="Haberler"/>}/><Route path="/contact" element={<Simple title="İletişim"/>}/><Route path="/kvkk" element={<Legal type="kvkk"/>}/><Route path="/gizlilik" element={<Legal type="privacy"/>}/><Route path="*" element={<Home/>}/></Routes><MobileNav/><ChatWidget/><AnalyticsConsentBanner/></div>
 }
