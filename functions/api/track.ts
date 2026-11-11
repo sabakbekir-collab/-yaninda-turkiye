@@ -4,7 +4,7 @@ import {rateLimited,clientIp} from '../lib/ratelimit';
 
 const MAX_BYTES=4096;
 const allowed=new Set(['page_view','search','search_zero_results','category_click','place_click','phone_click','directions_click','whatsapp_click','website_click','favorite_click','share_click','ad_impression','ad_click','ai_open','ai_message','location_permission','scroll_depth','time_on_page','error','heatmap_click']);
-const clean=(v:unknown,max=180)=>typeof v==='string'?v.replace(/[\u0000-\u001f<>]/g,'').slice(0,max):'';
+const clean=(v:unknown,max=180)=>typeof v==='string'?[...v].filter(ch=>{const code=ch.charCodeAt(0);return code>=32&&ch!=='<'&&ch!=='>';}).join('').slice(0,max):'';
 const uaClass=(ua:string)=>/android|iphone|ipad|mobile/i.test(ua)?'mobil':'masaüstü';
 const browserClass=(ua:string)=>/edg\//i.test(ua)?'Edge':/firefox\//i.test(ua)?'Firefox':/chrome\//i.test(ua)?'Chrome':/safari\//i.test(ua)?'Safari':'Diğer';
 async function hashIp(ip:string,salt:string){const data=new TextEncoder().encode(salt+':'+ip);const digest=await crypto.subtle.digest('SHA-256',data);return [...new Uint8Array(digest)].map(x=>x.toString(16).padStart(2,'0')).join('');}
