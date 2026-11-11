@@ -7,6 +7,7 @@ import { onRequestPost as postSubmissions } from "../functions/api/submissions";
 import { onRequestPost as postReports } from "../functions/api/reports";
 import { onRequestPost as postAiChat } from "../functions/api/ai";
 import { onRequestPost as postAdminAi } from "../functions/api/admin-ai";
+import { onRequestGet as getAdminAnalytics } from "../functions/api/admin-analytics";
 import type { Env } from "../functions/lib/types";
 import { ensureSchema } from "../functions/lib/schema";
 import { validSession } from "../functions/lib/auth";
@@ -120,6 +121,10 @@ export default {
 
       if (path === "/api/track" && request.method === "POST") {
         return await postTrack({ request, env });
+      }
+
+      if (path === "/api/admin/analytics" && request.method === "GET") {
+        return await getAdminAnalytics({ request, env });
       }
 
       if (path === "/api/admin/ai" && request.method === "POST") {
