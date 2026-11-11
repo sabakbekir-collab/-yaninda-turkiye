@@ -219,7 +219,7 @@ function Home(){
   }
 };
 
- const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){track('search',{source:'home'});const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
+ const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){track('search',{source:'home',query});const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
  const cards=[
   ['pharmacy','Nöbetçi Eczaneler','Yakınınızdaki nöbetçi eczaneleri görüntüleyin','red',Pill,imgs.pharmacy],
   ['hospital','Hastaneler','En yakın hastaneler, poliklinikler ve aciller','blue',Hospital,imgs.hospital],
@@ -464,7 +464,7 @@ function Nearby(){
    setLoading(true);setErr('');
    if(submitted.category==='pharmacy'){setDutyFeedDate(null);setDutyError(false);}
    findPlaces(submitted.category,submitted.pos,submitted.province,submitted.district,{radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts,anchor:submitted.anchor,forceRefresh:submitted.forceRefresh,onFeedDate:submitted.category==='pharmacy'?(date)=>{if(!cancelled)setDutyFeedDate(date)}:undefined})
-     .then(r=>{if(!cancelled){setPlaces(r);track(r.length?'search':'search_zero_results',{category:submitted.category,province:submitted.province,district:submitted.district,result_count:r.length});if(submitted.category==='pharmacy')setDutyError(false)}})
+     .then(r=>{if(!cancelled){setPlaces(r);track(r.length?'search':'search_zero_results',{category:submitted.category,query:submitted.category,province:submitted.province,district:submitted.district,result_count:r.length});if(submitted.category==='pharmacy')setDutyError(false)}})
      .catch((error:unknown)=>{if(!cancelled){const message=error instanceof Error&&error.message.trim()?error.message:'Nöbetçi eczane kaynağına ulaşılamadı.';setPlaces([]);setErr(message);if(submitted.category==='pharmacy')setDutyError(true)}})
      .finally(()=>{if(!cancelled)setLoading(false)});
    return()=>{cancelled=true};
@@ -488,7 +488,7 @@ function Nearby(){
 
  const search=async(forceRefresh=false,categoryOverride=cat)=>{
    setErr('');setLocationNotice('');setPlaces([]);setLoading(true);
-   track('search',{category:categoryOverride,province:canonProvince,district:canonDistrict});
+   track('search',{category:categoryOverride,query:categoryOverride,province:canonProvince,district:canonDistrict});
    let searchPosition=pos;
    let searchProvince=canonProvince;
    let searchDistrict=canonDistrict;
