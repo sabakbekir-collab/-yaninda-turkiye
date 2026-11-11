@@ -28,6 +28,14 @@ type CfLocation = {
 const json404 = () => Response.json({ error: "not_found" }, { status: 404 });
 
 export default {
+  async scheduled(_event: ScheduledController, env: RuntimeEnv): Promise<void> {
+    if (!env.DB) return;
+    try {
+      await env.DB.prepare("DELETE FROM events WHERE COALESCE(ts, created_at) < datetime('now', '-90 days')").run();
+    } catch (error) {
+      console.error("Analytics retention cleanup failed", error);
+    }
+  },
   async fetch(request: Request, env: RuntimeEnv): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
