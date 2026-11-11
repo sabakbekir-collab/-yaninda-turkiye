@@ -1,3 +1,5 @@
+-- The base schema (0001_init.sql) already defines events.city; this migration reuses it.
+-- New accepted-consent events populate city from Cloudflare request.cf.city (region fallback).
 -- Expand the existing events table without dropping legacy analytics data.
 ALTER TABLE events ADD COLUMN ts TEXT;
 ALTER TABLE events ADD COLUMN session_id TEXT;
