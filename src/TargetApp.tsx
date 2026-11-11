@@ -789,11 +789,13 @@ function Admin(){
   const end=new Date();const start=new Date(end);
   if(analyticsRange==='today')start.setHours(0,0,0,0);else if(analyticsRange!=='custom')start.setDate(start.getDate()-(Number(analyticsRange)-1));
   const from=analyticsRange==='custom'?analyticsFrom:start.toISOString().slice(0,10),to=analyticsRange==='custom'?analyticsTo:end.toISOString().slice(0,10);
-  fetch('/api/admin/analytics?from='+from+'&to='+to,{cache:'no-store'}).then(async response=>{
+  const load=()=>fetch('/api/admin/analytics?from='+from+'&to='+to,{cache:'no-store'}).then(async response=>{
    if(!response.ok)throw new Error('Analitik verileri alınamadı.');
    return await response.json() as Record<string,unknown>;
   }).then(value=>{if(active)setAnalytics(value);}).catch(()=>{if(active)setAnalytics(null);}).finally(()=>{if(active)setAnalyticsLoading(false);});
-  return()=>{active=false;};
+  void load();
+  const timer=window.setInterval(()=>{void load();},30000);
+  return()=>{active=false;window.clearInterval(timer);};
  },[ok,analyticsRange,analyticsFrom,analyticsTo]);
  const analyticsRows=(key:string):Record<string,unknown>[]=>Array.isArray(analytics?.[key])?analytics[key] as Record<string,unknown>[]:[];
  const exportAnalytics=()=>{
