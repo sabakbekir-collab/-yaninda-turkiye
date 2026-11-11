@@ -31,7 +31,7 @@ export async function onRequestGet({request,env}:{request:Request;env:Env}){
    all(env,"SELECT referrer,COUNT(*) count FROM events WHERE ts>=? AND ts<? AND referrer IS NOT NULL AND referrer<>'' GROUP BY referrer ORDER BY count DESC LIMIT 20",start,end),
    all(env,"SELECT ts,event,path,target_label,city,device FROM events WHERE ts>=? AND ts<? ORDER BY ts DESC LIMIT 50",start,end)
   ]);
-  const previousSummary=await all(env,\"SELECT COUNT(CASE WHEN event='page_view' THEN 1 END) page_views,COUNT(DISTINCT session_id) sessions,COUNT(DISTINCT ip_hash) visitors,COUNT(CASE WHEN event='search' THEN 1 END) searches FROM events WHERE ts>=? AND ts<?\",previousStart,previousEnd);
+  const previousSummary=await all(env,"SELECT COUNT(CASE WHEN event='page_view' THEN 1 END) page_views,COUNT(DISTINCT session_id) sessions,COUNT(DISTINCT ip_hash) visitors,COUNT(CASE WHEN event='search' THEN 1 END) searches FROM events WHERE ts>=? AND ts<?",previousStart,previousEnd);
   return Response.json({range:{from,to},summary:summary[0]||{},previousSummary:previousSummary[0]||{},topTargets,searches,zeroSearches,categories,locations,actions,pages,heatmap,ads,ai,traffic,devices,browsers,sources,live},{headers:{'Cache-Control':'no-store'}});
  }catch{return Response.json({error:'analytics_query_failed'},{status:503});}
 }
