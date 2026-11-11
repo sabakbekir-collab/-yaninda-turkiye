@@ -112,7 +112,15 @@ export async function findPlaces(
   return cleaned;
 }
 
-function analyticsSessionId(){
+export type AnalyticsConsent='accepted'|'essential'|null;
+export function getAnalyticsConsent():AnalyticsConsent{
+  try{const v=localStorage.getItem('yt_analytics_consent');return v==='accepted'||v==='essential'?v:null;}catch{return null;}
+}
+export function setAnalyticsConsent(value:Exclude<AnalyticsConsent,null>){
+  try{localStorage.setItem('yt_analytics_consent',value);}catch{/* Preference storage may be unavailable. */}
+}
+function analyticsSessionId(consent:boolean){
+  if(!consent)return '';
   try{
     const key='yt_analytics_session';
     let id=localStorage.getItem(key);
@@ -121,7 +129,9 @@ function analyticsSessionId(){
   }catch{return '';}
 }
 export function track(event:string,props:Record<string,string|number|boolean>={}){
-  const payload=JSON.stringify({event,props,path:typeof location!=='undefined'?location.pathname:'/',referrer:typeof document!=='undefined'?document.referrer:'',session_id:analyticsSessionId()});
+  const consent=getAnalyticsConsent()==='accepted';
+  const safeProps=consent?props:{};
+  const payload=JSON.stringify({event,props:safeProps,consent,path:typeof location!=='undefined'?location.pathname:'/',referrer:consent&&typeof document!=='undefined'?document.referrer:'',session_id:analyticsSessionId(consent)});
   try{
     const blob=new Blob([payload],{type:'application/json'});
     if(typeof navigator!=='undefined'&&typeof navigator.sendBeacon==='function'&&navigator.sendBeacon('/api/track',blob))return;
