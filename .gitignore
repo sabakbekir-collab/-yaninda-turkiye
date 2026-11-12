@@ -5,3 +5,6 @@ dist
 android/.gradle
 android/app/build
 *.jks
+
+# Local database exports and production backups
+/backups/
