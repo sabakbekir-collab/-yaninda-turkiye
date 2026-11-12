@@ -2,6 +2,8 @@ import { onRequestGet as getPlaces, onRequestAreaGet as getLocationArea } from "
 import { onRequestGet as getAds } from "../functions/api/ads";
 import { onRequestPost as postEvents } from "../functions/api/events";
 import { onRequestPost as postTrack } from "../functions/api/track";
+import { onRequestPost as postTelegram } from "../functions/api/telegram";
+import { onRequestPost as postDeleteRequest } from "../functions/api/delete-request";
 import { onRequestGet as getAdmin, onRequestPost as postAdmin } from "../functions/api/admin";
 import { onRequestPost as postSubmissions } from "../functions/api/submissions";
 import { onRequestPost as postReports } from "../functions/api/reports";
@@ -125,6 +127,14 @@ export default {
             { status: 503, headers: { "Cache-Control": "no-store" } },
           );
         }
+      }
+
+      if (path === "/api/telegram" && request.method === "POST") {
+        return await postTelegram({ request, env });
+      }
+
+      if (path === "/api/delete-request" && request.method === "POST") {
+        return await postDeleteRequest({ request, env });
       }
 
       if (path === "/api/track" && request.method === "POST") {
