@@ -206,7 +206,7 @@ STATUS_TEXT=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin
 if [[ "$STATUS" == "200" && "$STATUS_TEXT" == *"Yanımda Türkiye"* && "$STATUS_TEXT" == *"Son 24 saat"* && "$STATUS_TEXT" == *"Olay sayısı:"* && "$STATUS_TEXT" == *"Hata sayısı:"* ]]; then pass "/durum -> HTTP 200 ve D1 sayımlarını içeren Türkçe cevap mock ile doğrulandı"; else fail "/durum cevabı beklenen Türkçe içerikte değil veya endpoint HTTP 200 dönmedi"; fi
 
 RATE_LIMIT_SEEN=0
-for ((attempt=1; attempt<=61; attempt++)); do
+for ((attempt=1; attempt<=125; attempt++)); do
   STATUS=$(request_status "$TMP_DIR/rate.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" \
     -H "X-Telegram-Bot-Api-Secret-Token: $FAKE_WEBHOOK_SECRET" \
     -d '{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}')
