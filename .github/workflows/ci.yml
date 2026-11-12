@@ -31,11 +31,10 @@ jobs:
           shellcheck --shell=bash scripts/telegram-webhook.sh
           shellcheck --shell=bash scripts/local-e2e.sh
           shellcheck --shell=bash scripts/d1-readonly-audit.sh
-      - name: Apply base migrations to local test database
+      - name: Seed base schema in local D1 for PRAGMA preflight
         run: |
-          mkdir -p "$RUNNER_TEMP/migrations-base"
-          cp migrations/0001_init.sql migrations/0002_admin_logs.sql "$RUNNER_TEMP/migrations-base/"
-          npx --yes wrangler@4 d1 migrations apply DB --local --config ./wrangler.jsonc --migrations-dir "$RUNNER_TEMP/migrations-base"
+          npx --yes wrangler@4 d1 execute DB --local --config ./wrangler.jsonc --file migrations/0001_init.sql
+          npx --yes wrangler@4 d1 execute DB --local --config ./wrangler.jsonc --file migrations/0002_admin_logs.sql
       - name: Check analytics ALTER columns before migration
         run: node scripts/check-analytics-migration-preconditions.mjs
       - name: Apply remaining D1 migrations to local test database
