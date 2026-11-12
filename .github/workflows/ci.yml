@@ -36,3 +36,40 @@ jobs:
       - run: npx tsc -b
       - run: npm run lint
       - run: npm run build
+
+  e2e:
+    name: Local Worker E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize E2E report
+        run: |
+          {
+            echo "INFO  E2E CI job started"
+            echo "INFO  Real Telegram credentials are intentionally unset"
+          } > e2e-report.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run local Worker E2E without Telegram secrets
+        run: env -u TELEGRAM_BOT_TOKEN -u TELEGRAM_TEST_CHAT_ID bash scripts/local-e2e.sh
+      - name: Add E2E report to job summary
+        if: always()
+        run: |
+          if [ -f e2e-report.txt ]; then
+            cat e2e-report.txt | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "FAIL  e2e-report.txt was not created" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: e2e-report.txt
+          if-no-files-found: error
+          retention-days: 14
