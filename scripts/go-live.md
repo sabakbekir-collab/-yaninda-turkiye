@@ -4,6 +4,12 @@
 >
 > **Sıralama zorunludur:** Webhook'u deploy'dan **ÖNCE kurmayın**. Önce PR #32'yi elle merge edin ve Cloudflare deploy'un tamamlandığını doğrulayın; ancak bundan sonra `telegram-webhook.sh set` çalıştırın.
 
+## Betik statik kontrolü
+
+- GitHub Actions CI, `scripts/telegram-webhook.sh` dosyasını ShellCheck ile denetler.
+- Yerel olarak da `shellcheck --shell=bash scripts/telegram-webhook.sh` komutuyla aynı kontrolü çalıştırabilirsiniz.
+- Bu hazırlık oturumunda betik çalıştırılmadı; yalnızca Bash sözdizimi `bash -n` ile kontrol edildi.
+
 ## 0. Ön koşullar ve BotFather token kontrolü
 
 - [ ] BotFather'da eski bot tokeninin `/revoke` komutuyla iptal edildiğini doğrulayın.
