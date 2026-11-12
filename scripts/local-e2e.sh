@@ -200,6 +200,10 @@ probe_route() {
 }
 
 info "Worker üzerinden endpoint rota denetimi başlıyor"
+probe_route "health" GET "/api/health"
+probe_route "location" GET "/api/location"
+probe_route "location-area" GET "/api/location/area?lat=0&lon=0"
+probe_route "duty-check" GET "/api/duty-check"
 probe_route "places" GET "/api/places?category=__route_probe_invalid__"
 probe_route "ads" GET "/api/ads"
 probe_route "events" POST "/api/events" '{"type":"__route_probe_invalid__"}'
@@ -212,7 +216,8 @@ probe_route "admin-analytics" GET "/api/admin/analytics"
 probe_route "admin-ai" POST "/api/admin/ai" '{}'
 probe_route "submissions" POST "/api/submissions" '{}'
 probe_route "reports" POST "/api/reports" '{}'
-probe_route "ai" POST "/api/ai/chat" '{}'
+probe_route "ai/chat" POST "/api/ai/chat" '{}'
+probe_route "ai alias" POST "/api/ai" '{}'
 
 NO_SECRET_PAYLOAD='{"message":{"chat":{"id":111,"type":"private"},"text":"/yardim"}}'
 STATUS=$(request_status "$TMP_DIR/no-secret.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -d "$NO_SECRET_PAYLOAD")
@@ -226,7 +231,7 @@ MOCK_BEFORE=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin
 UNAUTHORIZED_PAYLOAD='{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}'
 STATUS=$(request_status "$TMP_DIR/unauthorized.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H "X-Telegram-Bot-Api-Secret-Token: $FAKE_WEBHOOK_SECRET" -d "$UNAUTHORIZED_PAYLOAD")
 MOCK_AFTER=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>console.log(JSON.parse(s).length))')
-if [[ "$STATUS" == "200" && "$MOCK_BEFORE" == "$MOCK_AFTER" ]]; then pass "Yetkisiz chat -> sessiz HTTP 200, mock Telegram'a mesaj gitmedi"; else fail "Yetkisiz chat beklenen sessiz 200; status=$STATUS, mock_before=$MOCK_BEFORE, mock_after=$MOCK_AFTER"; fi
+if [[ "$STATUS" == "200" && "$MOCK_BEFORE" == "$MOCK_AFTER" ]]; then pass "Yetkisiz chat -> HTTP $STATUS; mock_messages_before=$MOCK_BEFORE, mock_messages_after=$MOCK_AFTER (sessiz)"; else fail "Yetkisiz chat beklenen sessiz 200; status=$STATUS, mock_before=$MOCK_BEFORE, mock_after=$MOCK_AFTER"; fi
 
 send_admin_command() {
   local command="$1" outfile="$2"
