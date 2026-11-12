@@ -184,9 +184,10 @@ WRONG_SECRET_PAYLOAD='{"message":{"chat":{"id":111,"type":"private"},"text":"/ya
 STATUS=$(request_status "$TMP_DIR/wrong-secret.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H 'X-Telegram-Bot-Api-Secret-Token: wrong-secret' -d "$WRONG_SECRET_PAYLOAD")
 if [[ "$STATUS" == "401" ]]; then pass "Telegram yanlış secret -> HTTP 401"; else fail "Telegram yanlış secret beklenen 401, alındı $STATUS"; fi
 
-MOCK_BEFORE="$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).length)))')"
-STATUS=$(request_status "$TMP_DIR/unauthorized.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H "X-Telegram-Bot-Api-Secret-Token: $FAKE_WEBHOOK_SECRET" -d '{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}')"
-MOCK_AFTER="$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).length)))')
+MOCK_BEFORE=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).length)))')
+UNAUTHORIZED_PAYLOAD='{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}'
+STATUS=$(request_status "$TMP_DIR/unauthorized.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H "X-Telegram-Bot-Api-Secret-Token: $FAKE_WEBHOOK_SECRET" -d "$UNAUTHORIZED_PAYLOAD")
+MOCK_AFTER=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).length))')
 if [[ "$STATUS" == "200" && "$MOCK_BEFORE" == "$MOCK_AFTER" ]]; then pass "Yetkisiz chat -> sessiz HTTP 200, mock Telegram'a mesaj gitmedi"; else fail "Yetkisiz chat beklenen sessiz 200; status=$STATUS, mock_before=$MOCK_BEFORE, mock_after=$MOCK_AFTER"; fi
 
 send_admin_command() {
@@ -196,19 +197,19 @@ send_admin_command() {
     -d "{\"message\":{\"chat\":{\"id\":111,\"type\":\"private\"},\"text\":\"$command\"}}"
 }
 
-STATUS=$(send_admin_command '/yardim' "$TMP_DIR/help.body")"
-HELP_TEXT="$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s);process.stdout.write(a.length?a[a.length-1].text:"")})')
+STATUS=$(send_admin_command /yardim "$TMP_DIR/help.body")
+HELP_TEXT=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s);process.stdout.write(a.length?a[a.length-1].text:"")})')
 if [[ "$STATUS" == "200" && "$HELP_TEXT" == *"Yanımda Türkiye yönetim botu"* && "$HELP_TEXT" == *"/durum"* && "$HELP_TEXT" == *"/yardim"* ]]; then pass "/yardim -> HTTP 200 ve doğru Türkçe yardım mesajı mock ile doğrulandı"; else fail "/yardim cevabı beklenen Türkçe metin değil veya endpoint HTTP 200 dönmedi"; fi
 
-STATUS=$(send_admin_command '/durum' "$TMP_DIR/status.body")"
-STATUS_TEXT="$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s);process.stdout.write(a.length?a[a.length-1].text:"")})')
+STATUS=$(send_admin_command /durum "$TMP_DIR/status.body")
+STATUS_TEXT=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s);process.stdout.write(a.length?a[a.length-1].text:"")})')
 if [[ "$STATUS" == "200" && "$STATUS_TEXT" == *"Yanımda Türkiye"* && "$STATUS_TEXT" == *"Son 24 saat"* && "$STATUS_TEXT" == *"Olay sayısı:"* && "$STATUS_TEXT" == *"Hata sayısı:"* ]]; then pass "/durum -> HTTP 200 ve D1 sayımlarını içeren Türkçe cevap mock ile doğrulandı"; else fail "/durum cevabı beklenen Türkçe içerikte değil veya endpoint HTTP 200 dönmedi"; fi
 
 RATE_LIMIT_SEEN=0
 for ((attempt=1; attempt<=61; attempt++)); do
   STATUS=$(request_status "$TMP_DIR/rate.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" \
     -H "X-Telegram-Bot-Api-Secret-Token: $FAKE_WEBHOOK_SECRET" \
-    -d '{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}')"
+    -d '{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}')
   if [[ "$STATUS" == "429" ]]; then RATE_LIMIT_SEEN=1; break; fi
   if [[ "$STATUS" != "200" ]]; then break; fi
 done
