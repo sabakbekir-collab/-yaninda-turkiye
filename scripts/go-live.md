@@ -251,7 +251,15 @@ Telegram API çağrıları testlerde mock edilmelidir; bu testlerde gerçek Tele
 Bu adımlar PR hazırlığında çalıştırılmaz. Merge ve deploy sonrasında operatör uygular:
 
 1. BotFather'da eski tokeni `/revoke` ile iptal edin. Yeni tokeni yalnızca Cloudflare secret olarak saklayın.
-2. `getMe` ile bot kimliğini doğrulayın. Tokeni komut satırına yazmayın; ortam değişkeninden kullanan bir istek tercih edin ve çıktıda token içeren URL'yi göstermeyin. Yalnızca `ok`, `result.id` ve `result.username` alanlarını görüntüleyin.
+2. `getMe` ile bot kimliğini doğrulayın. Tokeni komut satırına sabit olarak yazmayın; `TELEGRAM_BOT_TOKEN` ortam değişkeninden kullanın. URL'yi veya ham cevabı ekrana/loga basmayın; yalnızca güvenli alanları seçin:
+
+   ```bash
+   curl --silent --show-error \
+     "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe" \
+     | jq '{ok, result: {id: .result.id, username: .result.username}}'
+   ```
+
+   Komut geçmişine tokeni yazmayın; shell history'de yalnızca değişken adı bulunan komut satırını tutun.
 3. `scripts/telegram-webhook.sh set` sonrasında `info` veya Telegram `getWebhookInfo` sonucunda `pending_update_count` ve `last_error_message` alanlarını kontrol edin. Webhook URL'si doğru Worker adresinin `/api/telegram` yoluna gitmeli.
 4. Yetkili hesaptan @YanindaTurkiyeBot'a `/durum` ve `/yardim` yazın; beklenen Türkçe yanıtları doğrulayın.
 5. Yetkisiz hesaptan komut gönderin; botun yanıt vermediğini doğrulayın.
