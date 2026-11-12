@@ -190,7 +190,9 @@ probe_route() {
   fi
   local body
   body=$(head -c 160 "$TMP_DIR/route.body" | paste -sd ' ' -)
-  if [[ "$status" != "404" && "$status" != "000" && ! "$status" =~ ^5[0-9][0-9]$ ]]; then
+  if [[ "$status" == "503" && "$label" == "admin POST" ]]; then
+    pass "Worker route $label ($method $path) -> HTTP $status; body=$body (admin credentials intentionally absent)"
+  elif [[ "$status" != "404" && "$status" != "000" && ! "$status" =~ ^5[0-9][0-9]$ ]]; then
     pass "Worker route $label ($method $path) -> HTTP $status; body=$body"
   else
     fail "Worker route $label ($method $path) -> HTTP $status; body=$body"
@@ -220,10 +222,10 @@ WRONG_SECRET_PAYLOAD='{"message":{"chat":{"id":111,"type":"private"},"text":"/ya
 STATUS=$(request_status "$TMP_DIR/wrong-secret.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H 'X-Telegram-Bot-Api-Secret-Token: wrong-secret' -d "$WRONG_SECRET_PAYLOAD")
 if [[ "$STATUS" == "401" ]]; then pass "Telegram yanlış secret -> HTTP 401"; else fail "Telegram yanlış secret beklenen 401, alındı $STATUS"; fi
 
-MOCK_BEFORE=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).length)))')
+MOCK_BEFORE=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>console.log(JSON.parse(s).length))')
 UNAUTHORIZED_PAYLOAD='{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}'
 STATUS=$(request_status "$TMP_DIR/unauthorized.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H "X-Telegram-Bot-Api-Secret-Token: $FAKE_WEBHOOK_SECRET" -d "$UNAUTHORIZED_PAYLOAD")
-MOCK_AFTER=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).length))')
+MOCK_AFTER=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d);process.stdin.on("end",()=>console.log(JSON.parse(s).length))')
 if [[ "$STATUS" == "200" && "$MOCK_BEFORE" == "$MOCK_AFTER" ]]; then pass "Yetkisiz chat -> sessiz HTTP 200, mock Telegram'a mesaj gitmedi"; else fail "Yetkisiz chat beklenen sessiz 200; status=$STATUS, mock_before=$MOCK_BEFORE, mock_after=$MOCK_AFTER"; fi
 
 send_admin_command() {
