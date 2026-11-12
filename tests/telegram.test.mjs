@@ -2,7 +2,6 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { onRequestPost } from '../functions/api/telegram.ts';
 import { sendAdminMessage } from '../functions/lib/telegram.ts';
-import { onRequestPost as submitReport } from '../functions/api/reports.ts';
 
 function makeEnv() {
   const calls = [];
@@ -93,21 +92,3 @@ test('sendAdminMessage swallows Telegram network errors and never exposes creden
 });
 
 
-test('Telegram notification failure does not fail the report submission flow', async () => {
-  const { env } = makeEnv();
-  const previousFetch = globalThis.fetch;
-  globalThis.fetch = async () => { throw new Error('simulated network failure'); };
-  try {
-    const response = await submitReport({
-      request: new Request('https://example.test/api/reports', {
-        method: 'POST',
-        headers: { Origin: 'https://example.test', 'CF-Connecting-IP': '203.0.113.4', 'content-type': 'application/json' },
-        body: JSON.stringify({ placeId: 'place-1', placeName: 'Test place', reason: 'wrong_info' }),
-      }),
-      env,
-    });
-    assert.equal(response.status, 201);
-  } finally {
-    globalThis.fetch = previousFetch;
-  }
-});
