@@ -44,6 +44,8 @@ test('repeated-error throttle persists across Worker instances and sends at most
   const env1 = makePersistentEnv(store);
   const previousFetch = globalThis.fetch;
   const previousWarn = console.warn;
+  const previousNow = Date.now;
+  Date.now = () => 1794500000000;
   let sent = 0;
   globalThis.fetch = async () => { sent += 1; return new Response('{}', { status: 200 }); };
   console.warn = () => {};
@@ -58,5 +60,6 @@ test('repeated-error throttle persists across Worker instances and sends at most
   } finally {
     globalThis.fetch = previousFetch;
     console.warn = previousWarn;
+    Date.now = previousNow;
   }
 });
