@@ -246,7 +246,7 @@ INITIAL_COUNT="$(sql_count "SELECT COUNT(*) AS count FROM events WHERE session_i
 if [[ "$INITIAL_COUNT" == "1" ]]; then pass "D1: ilk onaylı olay session_id için kaydedildi"; else fail "D1: ilk olay sayısı 1 bekleniyordu, alındı $INITIAL_COUNT"; fi
 
 DELETE_BODY="$(printf '{"session_id":"%s"}' "$SESSION_ID")"
-DELETE_STATUS=$(request_status "$TMP_DIR/delete.body" -X POST "$DELETE_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H 'CF-Connecting-IP: 192.0.2.44' --data "$DELETE_BODY")"
+DELETE_STATUS=$(request_status "$TMP_DIR/delete.body" -X POST "$DELETE_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H 'CF-Connecting-IP: 192.0.2.44' --data "$DELETE_BODY")
 if [[ "$DELETE_STATUS" == "200" ]] && grep -q '"ok":true' "$TMP_DIR/delete.body"; then pass "/api/delete-request -> HTTP 200 ve ok:true"; else fail "/api/delete-request beklenen HTTP 200/ok:true, alındı $DELETE_STATUS"; fi
 
 AFTER_DELETE="$(sql_count "SELECT COUNT(*) AS count FROM events WHERE session_id='$SESSION_ID';" "$TMP_DIR/count-deleted.json")"
