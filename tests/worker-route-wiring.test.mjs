@@ -6,8 +6,8 @@ const worker = await readFile(new URL('../worker/index.ts', import.meta.url), 'u
 const telegram = await readFile(new URL('../functions/api/telegram.ts', import.meta.url), 'utf8');
 
 test('Worker exposes Telegram webhook and analytics deletion endpoints', () => {
-  assert.match(worker, /postTelegram\s+from\s+["'][^"']*api\/telegram["']/);
-  assert.match(worker, /postDeleteRequest\s+from\s+["'][^"']*api\/delete-request["']/);
+  assert.match(worker, /as\s+postTelegram\s*}\s+from\s+["'][^"']*api\/telegram["']/);
+  assert.match(worker, /as\s+postDeleteRequest\s*}\s+from\s+["'][^"']*api\/delete-request["']/);
   assert.match(worker, /path\s*===\s*["']\/api\/telegram["'][\s\S]*?postTelegram\(/);
   assert.match(worker, /path\s*===\s*["']\/api\/delete-request["'][\s\S]*?postDeleteRequest\(/);
 });
