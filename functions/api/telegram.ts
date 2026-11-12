@@ -38,7 +38,7 @@ function boundedTelegramText(value: string): string {
 async function telegramReply(env: Env, chatId: string, text: string): Promise<void> {
   if (!env.TELEGRAM_BOT_TOKEN) return;
   try {
-    const apiBase = (env.TELEGRAM_API_BASE_URL || API).replace(/\\/+$/, '');
+    const apiBase = (env.TELEGRAM_API_BASE_URL || API).replace(/\/+$/, '');
     const response = await fetch(`${apiBase}/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
