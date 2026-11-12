@@ -45,46 +45,30 @@ git check-ignore -v ./backups/yaninda-turkiye-db-before-pr32.sql
 
 Dosyanın boyutu ve `git check-ignore` çıktısı doğrulanmadan devam etmeyin.
 
-## 2. Canlı D1 migration'larını uygulayın
+## 2. Canlı D1 migration denetimi — uygulama YASAK
 
-PR #32 dalında 0003 ve 0004 migration'ları bulunuyor. **0003 tek başına yeterli değil:** silme talebi endpoint'i `analytics_session_revocations` tablosuna ihtiyaç duyar; bu tablo ve tetikleyici 0004 ile eklenir. Wrangler komutu bekleyen migration'ları sırayla uygular.
+**Önce yalnızca salt-okunur denetim yapın.** Migration numaraları, main/feature branch geçmişi ve canlı D1 durumu doğrulanmadan canlıya migration uygulamayın.
 
-```bash
-npx wrangler d1 migrations apply yaninda-turkiye-db --remote --config ./wrangler.jsonc
-```
-
-**Doğrulama 1 — migration geçmişi:**
+Repo kökünde:
 
 ```bash
-npx wrangler d1 execute yaninda-turkiye-db --remote --config ./wrangler.jsonc --command "SELECT name FROM d1_migrations ORDER BY id;"
+bash scripts/d1-readonly-audit.sh
 ```
 
-Çıktıda `0003_analytics_events.sql` ve `0004_analytics_session_revocations.sql` görünmeli.
+Bu betik yalnızca migration listesini, `d1_migrations` adlarını, `sqlite_master` nesne adlarını ve her nesne için şema amaçlı `PRAGMA table_info` çıktısını alır. Rapor `d1-audit-report.txt` dosyasına yazılır; kullanıcı verisi satırları sorgulanmaz.
 
-**Doğrulama 2 — yeni sütunlar:**
+- [ ] Denetim raporu eksiksiz oluştu.
+- [ ] Canlıda uygulanmış en yüksek migration numarası belirlendi.
+- [ ] Repoda bulunmayan uygulanmış migration varsa dosya eksikliği ve canlı şema çıktısı kaydedildi.
+- [ ] PR #32'nin henüz uygulanmamış analitik migration'ları, denetim sonucuna göre sonraki uygun numaralara taşındı.
+- [ ] Uygulanmış migration dosyalarının adı/içeriği değiştirilmedi.
+- [ ] CI, `PRAGMA table_info` ile `ALTER TABLE ADD COLUMN` hedeflerinin migration öncesinde mevcut olmadığını doğruladı.
 
-```bash
-npx wrangler d1 execute yaninda-turkiye-db --remote --config ./wrangler.jsonc --command "PRAGMA table_info(events);"
-npx wrangler d1 execute yaninda-turkiye-db --remote --config ./wrangler.jsonc --command "PRAGMA table_info(ads);"
-npx wrangler d1 execute yaninda-turkiye-db --remote --config ./wrangler.jsonc --command "PRAGMA table_info(submissions);"
-```
+**Bu maddeler tamamlanmadan canlı D1 için migration apply komutu çalıştırmayın.** Migration numaralandırma kararı için `scripts/d1-migration-resequence.md` belgesini izleyin. Canlıya yazma, yedek, migration, deploy ve merge işlemleri bu PR hazırlık çalışmasının kapsamı dışındadır.
 
-Beklenen ek sütunlar:
-- `events`: `ts, session_id, user_id, event, path, target_type, target_id, target_label, props_json, device, browser, referrer, ip_hash`
-- `ads`: `starts_at, ends_at`
-- `submissions`: `admin_note`
+## 2A. PR #32 izole test ortamı
 
-**Doğrulama 3 — 0004 tablosu, indeks ve trigger:**
-
-```bash
-npx wrangler d1 execute yaninda-turkiye-db --remote --config ./wrangler.jsonc --command "PRAGMA table_info(analytics_session_revocations);"
-npx wrangler d1 execute yaninda-turkiye-db --remote --config ./wrangler.jsonc --command "SELECT type, name FROM sqlite_master WHERE name IN ('idx_analytics_revocations_revoked_at','events_ignore_revoked_analytics_sessions') ORDER BY type, name;"
-```
-
-- [ ] Tablo sütunları, indeks ve trigger listeleniyor.
-- [ ] Migration geçmişinde 0003 ve 0004 kayıtlı.
-
-Herhangi bir doğrulama başarısızsa deploy'a geçmeyin; çıktıları saklayıp nedeni araştırın.
+Gerçek cihaz testi için yalnızca `env.pr32-test` ve `yaninda-turkiye-pr32-test` D1 veritabanı kullanılmalıdır. Kurulum sırası ve her komutun güvenlik gerekçesi `scripts/pr32-test-setup.md` içindedir. Eski preview ve canlı DB kullanılmaz.
 
 ## 3. Cloudflare Telegram secret'larını kontrol edin
 
