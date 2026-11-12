@@ -7,7 +7,7 @@ function adminChatIds(env: Env): string[] {
   return (env.TELEGRAM_ADMIN_CHAT_IDS || '')
     .split(',')
     .map((value) => value.trim())
-    .filter((value) => /^-?\\d+$/.test(value));
+    .filter((value) => /^-?\d+$/.test(value));
 }
 
 /** Send a privacy-safe operational message; notification failures never escape. */
