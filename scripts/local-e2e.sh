@@ -67,7 +67,7 @@ pass "Proje yapılandırması ve DB binding bulundu"
 
 if grep -Eq '"pages_build_output_dir"[[:space:]]*:' wrangler.jsonc; then
   RUNTIME="pages"
-  PAGES_DIR="$(node -e 'const fs=require("fs");const s=fs.readFileSync("wrangler.jsonc","utf8");const m=s.match(/"pages_build_output_dir"\\s*:\\s*"([^"]+)"/);if(!m)process.exit(2);process.stdout.write(m[1])')"
+  PAGES_DIR="$(node -e 'const fs=require("fs");const s=fs.readFileSync("wrangler.jsonc","utf8");const m=s.match(/"pages_build_output_dir"\s*:\s*"([^"]+)"/);if(!m)process.exit(2);process.stdout.write(m[1])')"
   pass "wrangler.jsonc algılandı: Pages ($PAGES_DIR)"
 elif grep -Eq '"main"[[:space:]]*:' wrangler.jsonc; then
   RUNTIME="worker"
@@ -203,7 +203,7 @@ STATUS_TEXT="$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdi
 if [[ "$STATUS" == "200" && "$STATUS_TEXT" == *"Yanımda Türkiye"* && "$STATUS_TEXT" == *"Son 24 saat"* && "$STATUS_TEXT" == *"Olay sayısı:"* && "$STATUS_TEXT" == *"Hata sayısı:"* ]]; then pass "/durum -> HTTP 200 ve D1 sayımlarını içeren Türkçe cevap mock ile doğrulandı"; else fail "/durum cevabı beklenen Türkçe içerikte değil veya endpoint HTTP 200 dönmedi"; fi
 
 RATE_LIMIT_SEEN=0
-for i in $(seq 1 61); do
+for ((attempt=1; attempt<=61; attempt++)); do
   STATUS="$(request_status "$TMP_DIR/rate.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" \
     -H "X-Telegram-Bot-Api-Secret-Token: $FAKE_WEBHOOK_SECRET" \
     -d '{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}')"
