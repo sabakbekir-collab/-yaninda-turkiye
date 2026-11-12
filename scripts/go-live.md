@@ -209,3 +209,52 @@ Kod incelemesinde:
 - [ ] Bu testlerde response/log çıktılarında bot tokeni veya webhook secret bulunmadığını kontrol edin.
 
 **Raporlama ayrımı:** Kodun rate limit arkasında olduğu kaynak kodundan doğrulandı; preview ortamında gerçek HTTP 429 testi henüz yapılmadı. iPhone görsel/etkileşim testleri de kullanıcı tarafından yapılmalıdır.
+
+
+## Telegram bot duman testi (sahte verilerle yerel / gerçek botta operatör kontrolü)
+
+Bu bölümdeki yerel testler sahte token/secret/chat ID kullanır ve Telegram API çağrısını mock'lar. Gerçek botta yapılacak adımlar yalnızca deploy sonrasında operatör tarafından uygulanır; tokeni sohbete veya loglara yazmayın.
+
+### BotFather komutları
+
+BotFather'da `/setcommands` seçin ve aşağıdaki iki satırı gönderin:
+
+```text
+durum - Sistem durumu
+yardim - Komut listesi
+```
+
+### Yerel webhook duman testi
+
+Yerel Worker/Pages ortamında yalnızca sahte değerler tanımlayın:
+
+```bash
+export TELEGRAM_BOT_TOKEN='fake-local-token'
+export TELEGRAM_WEBHOOK_SECRET='fake-local-webhook-secret'
+export TELEGRAM_ADMIN_CHAT_IDS='12345'
+```
+
+Telegram API çağrıları testlerde mock edilmelidir; bu testlerde gerçek Telegram ağına istek gönderilmez. Sahte webhook update senaryoları:
+
+- [ ] Eksik veya yanlış `X-Telegram-Bot-Api-Secret-Token`: HTTP 401.
+- [ ] İzin listesinde olmayan chat ID: HTTP 200, Telegram'a yanıt gönderilmez.
+- [ ] Yetkili chat'ten `/yardim`: kısa Türkçe komut listesi.
+- [ ] Yetkili chat'ten `/durum`: D1 tablolarından gelen olay, hata, bekleyen başvuru ve açık bildirim sayıları.
+- [ ] Dakikada 60 isteği aşan webhook: HTTP 429.
+- [ ] Boş mesaj ve komut dışı metin: yanıt gönderilmez.
+- [ ] Bilinmeyen slash komutu: kısa yardım yönlendirmesi.
+- [ ] Grup/süpergrup: yalnızca chat ID allowlist'te ise yanıt.
+- [ ] Uzun metin: Telegram 4096 karakter sınırının altında tutulur.
+
+### Deploy sonrasında gerçek bot doğrulaması
+
+Bu adımlar PR hazırlığında çalıştırılmaz. Merge ve deploy sonrasında operatör uygular:
+
+1. BotFather'da eski tokeni `/revoke` ile iptal edin. Yeni tokeni yalnızca Cloudflare secret olarak saklayın.
+2. `getMe` ile bot kimliğini doğrulayın. Tokeni komut satırına yazmayın; ortam değişkeninden kullanan bir istek tercih edin ve çıktıda token içeren URL'yi göstermeyin. Yalnızca `ok`, `result.id` ve `result.username` alanlarını görüntüleyin.
+3. `scripts/telegram-webhook.sh set` sonrasında `info` veya Telegram `getWebhookInfo` sonucunda `pending_update_count` ve `last_error_message` alanlarını kontrol edin. Webhook URL'si doğru Worker adresinin `/api/telegram` yoluna gitmeli.
+4. Yetkili hesaptan @YanindaTurkiyeBot'a `/durum` ve `/yardim` yazın; beklenen Türkçe yanıtları doğrulayın.
+5. Yetkisiz hesaptan komut gönderin; botun yanıt vermediğini doğrulayın.
+6. BotFather'da eski tokenin `/revoke` ile iptal edildiğini tekrar teyit edin.
+
+Gerçek Telegram doğrulaması tamamlanmadan bu adımları tamamlandı olarak işaretlemeyin.
