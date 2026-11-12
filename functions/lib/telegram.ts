@@ -1,12 +1,13 @@
 import type { Env } from './types';
 
 const TELEGRAM_API = 'https://api.telegram.org';
+const TELEGRAM_MAX_MESSAGE_CODEPOINTS = 4000;
 
 function adminChatIds(env: Env): string[] {
   return (env.TELEGRAM_ADMIN_CHAT_IDS || '')
     .split(',')
     .map((value) => value.trim())
-    .filter((value) => /^-?\d+$/.test(value));
+    .filter((value) => /^-?\\d+$/.test(value));
 }
 
 /** Send a privacy-safe operational message; notification failures never escape. */
@@ -16,7 +17,13 @@ export async function sendAdminMessage(env: Env, text: string): Promise<void> {
   const chatIds = adminChatIds(env);
   if (!chatIds.length) return;
 
-  const message = [...text].filter((character) => { const code = character.charCodeAt(0); return code >= 32 && code !== 127; }).join('').slice(0, 3500);
+  const message = Array.from(text)
+    .filter((character) => {
+      const code = character.codePointAt(0) || 0;
+      return code >= 32 && code !== 127;
+    })
+    .slice(0, TELEGRAM_MAX_MESSAGE_CODEPOINTS)
+    .join('');
   try {
     await Promise.all(chatIds.map(async (chatId) => {
       const response = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
@@ -36,6 +43,10 @@ export async function sendAdminMessage(env: Env, text: string): Promise<void> {
 /**
  * Alert after repeated client-side error events. Fingerprints are one-way
  * hashes of a bounded error code, never user text, IP, or session data.
+ *
+ * Counts and the one-hour notification lease live in D1 api_cache, so the
+ * throttle survives Worker isolates/restarts. The conditional upsert makes
+ * claiming the one-hour lease atomic across concurrent Worker instances.
  */
 export async function notifyRepeatedClientError(env: Env, errorCode: unknown): Promise<void> {
   if (!env.DB) return;
@@ -56,11 +67,16 @@ export async function notifyRepeatedClientError(env: Env, errorCode: unknown): P
     const row = await env.DB.prepare('SELECT payload FROM api_cache WHERE cache_key=? LIMIT 1')
       .bind(countKey).first<{ payload: string }>();
     if (Number(row?.payload) < 5) return;
-    const existing = await env.DB.prepare('SELECT 1 FROM api_cache WHERE cache_key=? AND expires_at>? LIMIT 1')
-      .bind(cooldownKey, new Date(now).toISOString()).first<Record<string, unknown>>();
-    if (existing) return;
-    await env.DB.prepare('INSERT INTO api_cache(cache_key,payload,expires_at) VALUES(?,?,?) ON CONFLICT(cache_key) DO UPDATE SET payload=excluded.payload,expires_at=excluded.expires_at')
-      .bind(cooldownKey, '1', new Date(now + 3600000).toISOString()).run();
+
+    const nowIso = new Date(now).toISOString();
+    const leaseUntil = new Date(now + 3600000).toISOString();
+    const lease = await env.DB.prepare(
+      'INSERT INTO api_cache(cache_key,payload,expires_at) VALUES(?,?,?) ' +
+      'ON CONFLICT(cache_key) DO UPDATE SET payload=excluded.payload,expires_at=excluded.expires_at ' +
+      'WHERE api_cache.expires_at<=?',
+    ).bind(cooldownKey, '1', leaseUntil, nowIso).run() as { meta?: { changes?: number } };
+    if (Number(lease.meta?.changes || 0) !== 1) return;
+
     await sendAdminMessage(env, '⚠️ Yanımda Türkiye: Aynı istemci hata kodu kısa sürede 5 kez tekrarlandı. Yönetim panelinden hata kayıtlarını kontrol edin.');
   } catch {
     console.warn('[telegram] repeated-error alert preparation failed');
