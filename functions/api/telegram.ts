@@ -28,7 +28,7 @@ async function constantTimeEqual(left: string, right: string): Promise<boolean> 
 
 function adminIds(env: Env): Set<string> {
   return new Set((env.TELEGRAM_ADMIN_CHAT_IDS || '')
-    .split(',').map((value) => value.trim()).filter((value) => /^-?\\d+$/.test(value)));
+    .split(',').map((value) => value.trim()).filter((value) => /^-?\d+$/.test(value)));
 }
 
 function boundedTelegramText(value: string): string {
@@ -69,10 +69,10 @@ async function statusText(env: Env): Promise<string> {
     `• Hata sayısı: ${Number(events?.errors || 0)}`,
     `• Bekleyen işletme başvurusu: ${Number(pending?.total || 0)}`,
     `• Hatalı bildirim: ${Number(reports?.total || 0)}`,
-  ].join('\\n');
+  ].join('\n');
 }
 
-const HELP_TEXT = '🤖 Yanımda Türkiye yönetim botu\\n/durum — Son 24 saat özeti\\n/yardim — Komut listesi';
+const HELP_TEXT = '🤖 Yanımda Türkiye yönetim botu\n/durum — Son 24 saat özeti\n/yardim — Komut listesi';
 
 export async function onRequestPost({ request, env }: { request: Request; env: Env }): Promise<Response> {
   const expected = env.TELEGRAM_WEBHOOK_SECRET || '';
@@ -94,7 +94,7 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
   const chatId = message?.chat?.id;
   if (chatId === undefined || chatId === null) return new Response(null, { status: 200 });
   const chat = String(chatId);
-  if (!/^-?\\d+$/.test(chat) || !adminIds(env).has(chat)) return new Response(null, { status: 200 });
+  if (!/^-?\d+$/.test(chat) || !adminIds(env).has(chat)) return new Response(null, { status: 200 });
 
   // Group and supergroup chats are accepted only when their chat ID is
   // explicitly allowlisted in TELEGRAM_ADMIN_CHAT_IDS. Channel posts are ignored.
@@ -104,7 +104,7 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
   const rawText = typeof message?.text === 'string' ? message.text.trim() : '';
   if (!rawText) return new Response(null, { status: 200 });
 
-  const firstToken = rawText.split(/\\s+/, 1)[0];
+  const firstToken = rawText.split(/\s+/, 1)[0];
   // Ignore ordinary conversation text; only slash commands are actionable.
   if (!firstToken.startsWith('/')) return new Response(null, { status: 200 });
   const command = firstToken.split('@', 1)[0].toLocaleLowerCase('en-US');
