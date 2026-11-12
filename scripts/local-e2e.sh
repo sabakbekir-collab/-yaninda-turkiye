@@ -192,6 +192,8 @@ probe_route() {
   body=$(head -c 160 "$TMP_DIR/route.body" | paste -sd ' ' -)
   if [[ "$status" == "503" && "$label" == "admin POST" ]]; then
     pass "Worker route $label ($method $path) -> HTTP $status; body=$body (admin credentials intentionally absent)"
+  elif [[ "$status" == "503" && "$label" == "location" ]]; then
+    pass "Worker route $label ($method $path) -> HTTP $status; body=$body (Cloudflare geolocation metadata is absent locally)"
   elif [[ "$status" != "404" && "$status" != "000" && ! "$status" =~ ^5[0-9][0-9]$ ]]; then
     pass "Worker route $label ($method $path) -> HTTP $status; body=$body"
   else
