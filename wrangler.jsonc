@@ -49,7 +49,15 @@
           "database_name": "yaninda-turkiye-pr32-test",
           "database_id": "YOUR_PR32_TEST_DB_ID"
         }
-      ]
+      ],
+      "assets": {
+        "directory": "./dist",
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": [
+          "/api/*"
+        ]
+      }
     }
   }
 }
