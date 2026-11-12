@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { onRequestPost } from '../functions/api/telegram.ts';
 import { sendAdminMessage } from '../functions/lib/telegram.ts';
+import { onRequestPost as submitReport } from '../functions/api/reports.ts';
 
 function makeEnv() {
   const calls = [];
   const env = {
     TELEGRAM_WEBHOOK_SECRET: 'test-webhook-secret',
-    TELEGRAM_BOT_TOKEN: 'test-token-never-output',
+    TELEGRAM_BOT_TOKEN: 'dummy-test-credential',
     TELEGRAM_ADMIN_CHAT_IDS: '12345',
     DB: {
       prepare(sql) {
@@ -74,7 +75,7 @@ test('/durum returns the expected summary format to an admin chat', async () => 
   } finally { globalThis.fetch = previousFetch; }
 });
 
-test('sendAdminMessage swallows Telegram network errors and never exposes token', async () => {
+test('sendAdminMessage swallows Telegram network errors and never exposes credentials', async () => {
   const { env } = makeEnv();
   const previousFetch = globalThis.fetch;
   const previousWarn = console.warn;
@@ -84,9 +85,29 @@ test('sendAdminMessage swallows Telegram network errors and never exposes token'
   try {
     await assert.doesNotReject(() => sendAdminMessage(env, 'Yeni işletme başvurusu alındı.'));
     assert.equal(logs.some((line) => line.includes(env.TELEGRAM_BOT_TOKEN)), false);
-    assert.equal(logs.some((line) => line.includes('test-token-never-output')), false);
+    assert.equal(logs.some((line) => line.includes('dummy-test-credential')), false);
   } finally {
     globalThis.fetch = previousFetch;
     console.warn = previousWarn;
+  }
+});
+
+
+test('Telegram notification failure does not fail the report submission flow', async () => {
+  const { env } = makeEnv();
+  const previousFetch = globalThis.fetch;
+  globalThis.fetch = async () => { throw new Error('simulated network failure'); };
+  try {
+    const response = await submitReport({
+      request: new Request('https://example.test/api/reports', {
+        method: 'POST',
+        headers: { Origin: 'https://example.test', 'CF-Connecting-IP': '203.0.113.4', 'content-type': 'application/json' },
+        body: JSON.stringify({ placeId: 'place-1', placeName: 'Test place', reason: 'wrong_info' }),
+      }),
+      env,
+    });
+    assert.equal(response.status, 201);
+  } finally {
+    globalThis.fetch = previousFetch;
   }
 });
