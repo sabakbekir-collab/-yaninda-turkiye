@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, fix/security-health-admin-ai, feat/telegram-admin-bot]
+    branches: [main, fix/security-health-admin-ai, feat/telegram-admin-bot, feat/admin-analytics-ux-kvkk]
     paths-ignore:
       - 'yaninda-turkiye-fixed*.zip'
   pull_request:
