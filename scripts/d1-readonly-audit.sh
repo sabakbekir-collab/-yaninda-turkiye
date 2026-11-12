@@ -77,6 +77,7 @@ audit_database() {
   local object_json="$TMP_DIR/$prefix-objects.json"
   local migration_list="$TMP_DIR/$prefix-migration-list.txt"
   local object_list="$TMP_DIR/$prefix-object-list.txt"
+  local schema_file="$TMP_DIR/$prefix-schema.txt"
   local table
 
   {
@@ -88,14 +89,15 @@ audit_database() {
 
   printf '\n-- d1_migrations names --\n' | tee -a "$REPORT"
   run_sql "$database" "SELECT name FROM d1_migrations ORDER BY id" "$migration_json"
-  cat "$migration_json" | tee -a "$REPORT"
+  tee -a "$REPORT" <"$migration_json"
   extract_names "$migration_json" >"$TMP_DIR/$prefix-migration-names.txt"
 
   printf '\n-- sqlite_master object names (table/trigger/index) --\n' | tee -a "$REPORT"
   run_sql "$database" "SELECT name FROM sqlite_master WHERE type IN ('table','trigger','index') ORDER BY name" "$object_json"
-  cat "$object_json" | tee -a "$REPORT"
+  tee -a "$REPORT" <"$object_json"
   extract_names "$object_json" >"$object_list"
 
+  : >"$schema_file"
   printf '\n-- PRAGMA table_info for each sqlite_master name --\n' | tee -a "$REPORT"
   while IFS= read -r table; do
     [[ -n "$table" ]] || continue
@@ -105,7 +107,8 @@ audit_database() {
     fi
     printf '\n### %s\n' "$table" | tee -a "$REPORT"
     run_sql "$database" "PRAGMA table_info($table)" "$TMP_DIR/$prefix-pragma.json"
-    cat "$TMP_DIR/$prefix-pragma.json" | tee -a "$REPORT"
+    { printf '%s\n' "$table"; cat "$TMP_DIR/$prefix-pragma.json"; } >>"$schema_file"
+    tee -a "$REPORT" <"$TMP_DIR/$prefix-pragma.json"
   done <"$object_list"
 
   cp "$migration_list" "$TMP_DIR/$prefix-wrangler-migrations.txt"
@@ -123,6 +126,8 @@ if [[ "$MODE" == "preview" ]]; then
     diff -u "$TMP_DIR/db-0-wrangler-migrations.txt" "$TMP_DIR/db-1-wrangler-migrations.txt" || true
     printf '\n===== LIVE vs EXISTING PREVIEW: applied migration-name comparison =====\n'
     diff -u "$TMP_DIR/db-0-migration-names.txt" "$TMP_DIR/db-1-migration-names.txt" || true
+    printf '\n===== LIVE vs EXISTING PREVIEW: schema comparison =====\n'
+    diff -u "$TMP_DIR/db-0-schema.txt" "$TMP_DIR/db-1-schema.txt" || true
   } | tee -a "$REPORT"
 fi
 
