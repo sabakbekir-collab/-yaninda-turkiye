@@ -11,18 +11,20 @@ function makeEnv() {
     TELEGRAM_ADMIN_CHAT_IDS: '12345',
     DB: {
       prepare(sql) {
+        const first = async (values = []) => {
+          calls.push({ sql, values });
+          if (sql.includes('SUM(CASE')) return { total: 12, errors: 2 };
+          if (sql.includes('submissions')) return { total: 3 };
+          if (sql.includes('reports')) return { total: 4 };
+          if (sql.includes('api_cache')) return { payload: '1' };
+          return null;
+        };
         return {
+          first: () => first(),
           bind(...values) {
             return {
               async run() { calls.push({ sql, values }); return { meta: { changes: 1 } }; },
-              async first() {
-                calls.push({ sql, values });
-                if (sql.includes('SUM(CASE')) return { total: 12, errors: 2 };
-                if (sql.includes('submissions')) return { total: 3 };
-                if (sql.includes('reports')) return { total: 4 };
-                if (sql.includes('api_cache')) return { payload: '1' };
-                return null;
-              },
+              first: () => first(values),
               async all() { return { results: [] }; },
             };
           },
