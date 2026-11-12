@@ -10,6 +10,8 @@
 - Yerel olarak da `shellcheck --shell=bash scripts/telegram-webhook.sh` komutuyla aynı kontrolü çalıştırabilirsiniz. ShellCheck yerelde kurulu değilse, PR dalının CI kontrolündeki ShellCheck adımının başarılı olmasını bekleyin.
 - Bu hazırlık oturumunda betik çalıştırılmadı; yalnızca Bash sözdizimi `bash -n` ile kontrol edildi.
 
+> **Telegram API güvenliği:** `TELEGRAM_API_BASE_URL` yalnızca `http://127.0.0.1` veya `http://localhost` loopback adresleriyle yerel testte kullanılabilir. Harici/HTTPS adresleri yok sayılır ve `https://api.telegram.org` kullanılır. **`TELEGRAM_API_BASE_URL` değişkenini Cloudflare'a eklemeyin.** Üretimde Telegram tokeni yalnızca resmi Telegram API adresine gönderilmelidir.
+
 ## 0. Ön koşullar ve BotFather token kontrolü
 
 - [ ] BotFather'da eski bot tokeninin `/revoke` komutuyla iptal edildiğini doğrulayın.
