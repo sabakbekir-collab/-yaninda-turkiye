@@ -176,6 +176,42 @@ request_status() {
   curl -sS -o "$output" -w '%{http_code}' "$@"
 }
 
+probe_route() {
+  local label="$1" method="$2" path="$3" payload="${4:-}" extra_header="${5:-}"
+  local status
+  if [[ "$method" == "GET" ]]; then
+    status=$(request_status "$TMP_DIR/route.body" "$BASE_URL$path" -H "$ORIGIN_HEADER")
+  else
+    if [[ -n "$extra_header" ]]; then
+      status=$(request_status "$TMP_DIR/route.body" -X "$method" "$BASE_URL$path" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H "$extra_header" --data "$payload")
+    else
+      status=$(request_status "$TMP_DIR/route.body" -X "$method" "$BASE_URL$path" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" --data "$payload")
+    fi
+  fi
+  local body
+  body=$(head -c 160 "$TMP_DIR/route.body" | tr '\\n' ' ')
+  if [[ "$status" != "404" && "$status" != "000" && ! "$status" =~ ^5[0-9][0-9]$ ]]; then
+    pass "Worker route $method $path -> HTTP $status; body=$body"
+  else
+    fail "Worker route $method $path -> HTTP $status; body=$body"
+  fi
+}
+
+info "Worker üzerinden endpoint rota denetimi başlıyor"
+probe_route "places" GET "/api/places?category=__route_probe_invalid__"
+probe_route "ads" GET "/api/ads"
+probe_route "events" POST "/api/events" '{"type":"__route_probe_invalid__"}'
+probe_route "track" POST "/api/track" '{"event":"__route_probe_invalid__","consent":true,"session_id":"route_probe_session_123"}' "$UA_HEADER"
+probe_route "telegram" POST "/api/telegram" '{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}' "X-Telegram-Bot-Api-Secret-Token: $FAKE_WEBHOOK_SECRET"
+probe_route "delete-request" POST "/api/delete-request" '{"session_id":"invalid"}'
+probe_route "admin GET" GET "/api/admin"
+probe_route "admin POST" POST "/api/admin" '{"action":"login"}'
+probe_route "admin-analytics" GET "/api/admin/analytics"
+probe_route "admin-ai" POST "/api/admin/ai" '{}'
+probe_route "submissions" POST "/api/submissions" '{}'
+probe_route "reports" POST "/api/reports" '{}'
+probe_route "ai" POST "/api/ai/chat" '{}'
+
 NO_SECRET_PAYLOAD='{"message":{"chat":{"id":111,"type":"private"},"text":"/yardim"}}'
 STATUS=$(request_status "$TMP_DIR/no-secret.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -d "$NO_SECRET_PAYLOAD")
 if [[ "$STATUS" == "401" ]]; then pass "Telegram eksik secret -> HTTP 401"; else fail "Telegram eksik secret beklenen 401, alındı $STATUS"; fi
