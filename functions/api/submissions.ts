@@ -1,6 +1,7 @@
 import type {Env} from '../lib/types';
 import {sameOrigin} from '../lib/auth';
 import {rateLimited} from '../lib/ratelimit';
+import {sendAdminMessage} from '../lib/telegram';
 import {districtsFor,districtMap} from '../../src/turkeyDistricts';
 import {resolveName} from '../../src/text';
 import {OSM_FILTERS} from '../../src/osmQuery';
@@ -16,6 +17,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
     if(name.length<2||address.length<10||!province||!district||!OSM_FILTERS[category]||!/^[-+() 0-9]{10,20}$/.test(phone))return Response.json({error:'invalid_input'},{status:400});
     if(!env.DB)return Response.json({error:'database_unavailable'},{status:503});
     await env.DB.prepare('INSERT INTO submissions(name,category,phone,whatsapp,address,province,district,description,hours) VALUES(?,?,?,?,?,?,?,?,?)').bind(name,category,phone,text(b.whatsapp,25)||null,address,province,district,text(b.description,800)||null,text(b.hours,150)||null).run();
+    await sendAdminMessage(env,'📥 Yanımda Türkiye: Yeni işletme başvurusu alındı. Yönetim panelinden inceleyin.');
     return Response.json({ok:true},{status:201});
   }catch{return Response.json({error:'service_unavailable'},{status:503});}
 }
