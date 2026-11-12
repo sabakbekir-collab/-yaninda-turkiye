@@ -15,11 +15,10 @@ test('PR32 test environment is isolated from production and existing preview D1'
   assert.ok(isolated, 'env.pr32-test must exist');
   assert.equal(isolated.name, 'yaninda-turkiye-pr32-test');
   assert.equal(isolated.workers_dev, true);
-  assert.deepEqual(isolated.d1_databases, [{
-    binding: 'DB',
-    database_name: 'yaninda-turkiye-pr32-test',
-    database_id: 'YOUR_PR32_TEST_DB_ID',
-  }]);
+  assert.equal(isolated.d1_databases?.length, 1);
+  assert.equal(isolated.d1_databases[0].binding, 'DB');
+  assert.equal(isolated.d1_databases[0].database_name, 'yaninda-turkiye-pr32-test');
+  assert.match(isolated.d1_databases[0].database_id, /^(YOUR_PR32_TEST_DB_ID|[0-9a-fA-F-]{36})$/);
   assert.notEqual(isolated.d1_databases[0].database_name, live.database_name);
   assert.notEqual(isolated.d1_databases[0].database_name, oldPreview.database_name);
   assert.notEqual(isolated.d1_databases[0].database_id, live.database_id);
