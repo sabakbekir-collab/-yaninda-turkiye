@@ -189,11 +189,11 @@ probe_route() {
     fi
   fi
   local body
-  body=$(head -c 160 "$TMP_DIR/route.body" | tr '\\n' ' ')
+  body=$(head -c 160 "$TMP_DIR/route.body" | paste -sd ' ' -)
   if [[ "$status" != "404" && "$status" != "000" && ! "$status" =~ ^5[0-9][0-9]$ ]]; then
-    pass "Worker route $method $path -> HTTP $status; body=$body"
+    pass "Worker route $label ($method $path) -> HTTP $status; body=$body"
   else
-    fail "Worker route $method $path -> HTTP $status; body=$body"
+    fail "Worker route $label ($method $path) -> HTTP $status; body=$body"
   fi
 }
 
@@ -235,11 +235,11 @@ send_admin_command() {
 
 STATUS=$(send_admin_command /yardim "$TMP_DIR/help.body")
 HELP_TEXT=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s);process.stdout.write(a.length?a[a.length-1].text:"")})')
-if [[ "$STATUS" == "200" && "$HELP_TEXT" == *"Yanımda Türkiye yönetim botu"* && "$HELP_TEXT" == *"/durum"* && "$HELP_TEXT" == *"/yardim"* ]]; then pass "/yardim -> HTTP 200 ve doğru Türkçe yardım mesajı mock ile doğrulandı"; else fail "/yardim cevabı beklenen Türkçe metin değil veya endpoint HTTP 200 dönmedi"; fi
+if [[ "$STATUS" == "200" && "$HELP_TEXT" == *"Yanımda Türkiye yönetim botu"* && "$HELP_TEXT" == *"/durum"* && "$HELP_TEXT" == *"/yardim"* ]]; then pass "/yardim -> HTTP $STATUS; Telegram mock cevabı: $HELP_TEXT"; else fail "/yardim cevabı beklenen Türkçe metin değil veya endpoint HTTP 200 dönmedi"; fi
 
 STATUS=$(send_admin_command /durum "$TMP_DIR/status.body")
 STATUS_TEXT=$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s);process.stdout.write(a.length?a[a.length-1].text:"")})')
-if [[ "$STATUS" == "200" && "$STATUS_TEXT" == *"Yanımda Türkiye"* && "$STATUS_TEXT" == *"Son 24 saat"* && "$STATUS_TEXT" == *"Olay sayısı:"* && "$STATUS_TEXT" == *"Hata sayısı:"* ]]; then pass "/durum -> HTTP 200 ve D1 sayımlarını içeren Türkçe cevap mock ile doğrulandı"; else fail "/durum cevabı beklenen Türkçe içerikte değil veya endpoint HTTP 200 dönmedi"; fi
+if [[ "$STATUS" == "200" && "$STATUS_TEXT" == *"Yanımda Türkiye"* && "$STATUS_TEXT" == *"Son 24 saat"* && "$STATUS_TEXT" == *"Olay sayısı:"* && "$STATUS_TEXT" == *"Hata sayısı:"* ]]; then pass "/durum -> HTTP $STATUS; Telegram mock cevabı: $STATUS_TEXT"; else fail "/durum cevabı beklenen Türkçe içerikte değil veya endpoint HTTP 200 dönmedi"; fi
 
 RATE_LIMIT_SEEN=0
 for ((attempt=1; attempt<=125; attempt++)); do
@@ -287,16 +287,16 @@ if [[ "$DELETE_STATUS" == "200" ]] && grep -q '"ok":true' "$TMP_DIR/delete.body"
 
 AFTER_DELETE="$(sql_count "SELECT COUNT(*) AS count FROM events WHERE session_id='$SESSION_ID';" "$TMP_DIR/count-deleted.json")"
 REVOKED_COUNT="$(sql_count "SELECT COUNT(*) AS count FROM analytics_session_revocations WHERE session_id='$SESSION_ID';" "$TMP_DIR/count-revoked.json")"
-if [[ "$AFTER_DELETE" == "0" && "$REVOKED_COUNT" == "1" ]]; then pass "D1: silme sonrası events=0 ve revocation kaydı=1"; else fail "Silme sonrası beklenen events=0/revocation=1, alındı events=$AFTER_DELETE revoked=$REVOKED_COUNT"; fi
+if [[ "$AFTER_DELETE" == "0" && "$REVOKED_COUNT" == "1" ]]; then pass "D1 silme doğrulaması: events=$AFTER_DELETE; revocation=$REVOKED_COUNT"; else fail "Silme sonrası beklenen events=0/revocation=1, alındı events=$AFTER_DELETE revoked=$REVOKED_COUNT"; fi
 
 TRACK_AFTER_STATUS=$(request_status "$TMP_DIR/track-after.body" -X POST "$TRACK_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H "$UA_HEADER" -H 'CF-Connecting-IP: 192.0.2.44' --data "$TRACK_BODY")
 AFTER_TRACK_COUNT="$(sql_count "SELECT COUNT(*) AS count FROM events WHERE session_id='$SESSION_ID';" "$TMP_DIR/count-after-track.json")"
-if [[ ( "$TRACK_AFTER_STATUS" == "204" || "$TRACK_AFTER_STATUS" == "200" ) && "$AFTER_TRACK_COUNT" == "0" ]]; then pass "İptal sonrası aynı session_id ile /api/track -> HTTP $TRACK_AFTER_STATUS, yeni event yok"; else fail "İptal sonrası /api/track beklenen 200/204 ve events=0; status=$TRACK_AFTER_STATUS count=$AFTER_TRACK_COUNT"; fi
+if [[ ( "$TRACK_AFTER_STATUS" == "204" || "$TRACK_AFTER_STATUS" == "200" ) && "$AFTER_TRACK_COUNT" == "0" ]]; then pass "Silme sonrası /api/track -> HTTP $TRACK_AFTER_STATUS; events_count=$AFTER_TRACK_COUNT (500 beklenmiyor)"; else fail "İptal sonrası /api/track beklenen 200/204 ve events=0; status=$TRACK_AFTER_STATUS count=$AFTER_TRACK_COUNT"; fi
 
 TRIGGER_INSERT_SQL="INSERT INTO events(type,session_id,event,created_at,ts) VALUES('page_view','$SESSION_ID','page_view',datetime('now'),datetime('now'));"
 if npx wrangler d1 execute DB --local --config ./wrangler.jsonc --command "$TRIGGER_INSERT_SQL" >"$TMP_DIR/trigger-insert.log" 2>&1; then
   TRIGGER_COUNT="$(sql_count "SELECT COUNT(*) AS count FROM events WHERE session_id='$SESSION_ID';" "$TMP_DIR/count-trigger.json")"
-  if [[ "$TRIGGER_COUNT" == "0" ]]; then pass "0004 trigger: iptal edilmiş session_id için doğrudan INSERT engellendi"; else fail "0004 trigger INSERT'i engellemedi; events count=$TRIGGER_COUNT"; fi
+  if [[ "$TRIGGER_COUNT" == "0" ]]; then pass "0004 trigger doğrudan INSERT: events_count=$TRIGGER_COUNT (öncesi 0, artış beklenmiyor)"; else fail "0004 trigger INSERT'i engellemedi; events count=$TRIGGER_COUNT"; fi
 else
   fail "0004 trigger doğrudan INSERT denemesi SQL hatası verdi"
 fi
