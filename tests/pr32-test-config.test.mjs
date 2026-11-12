@@ -24,7 +24,11 @@ test('PR32 test environment is isolated from production and existing preview D1'
   assert.notEqual(isolated.d1_databases[0].database_name, oldPreview.database_name);
   assert.notEqual(isolated.d1_databases[0].database_id, live.database_id);
   assert.notEqual(isolated.d1_databases[0].database_id, oldPreview.database_id);
+  assert.equal(JSON.stringify(isolated).includes(live.database_id), false);
+  assert.equal(JSON.stringify(isolated).includes(oldPreview.database_id), false);
   assert.equal(isolated.triggers?.crons?.length ?? 0, 0);
+  assert.equal(isolated.vars, undefined);
+  assert.equal(isolated.secrets, undefined);
   assert.equal(isolated.routes, undefined);
   assert.equal(isolated.route, undefined);
   assert.equal(isolated.workers_dev, true);
