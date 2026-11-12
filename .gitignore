@@ -6,5 +6,6 @@ android/.gradle
 android/app/build
 *.jks
 
-# Local database exports and production backups
+# Local database exports, production backups, and local E2E reports
+/e2e-report.txt
 /backups/
