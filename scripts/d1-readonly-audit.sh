@@ -29,7 +29,9 @@ done
 assert_readonly_sql() {
   local sql="$1"
   case "$sql" in
-    "SELECT name FROM d1_migrations ORDER BY id" |
+    "SELECT name FROM d1_migrations ORDER BY id")
+      return 0
+      ;;
     "SELECT name FROM sqlite_master WHERE type IN ('table','trigger','index') ORDER BY name")
       return 0
       ;;
