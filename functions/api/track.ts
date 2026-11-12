@@ -2,6 +2,7 @@ import type {Env} from '../lib/types';
 import {ANALYTICS_EVENTS} from '../../shared/analyticsEvents.ts';
 import {sameOrigin} from '../lib/auth.ts';
 import {rateLimited} from '../lib/ratelimit.ts';
+import {notifyRepeatedClientError} from '../lib/telegram.ts';
 
 const MAX_BYTES=4096;
 const allowed=new Set<string>(ANALYTICS_EVENTS);
@@ -40,6 +41,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
   const device=consent?uaClass(ua):null,browser=consent?browserClass(ua):null,ts=new Date().toISOString(),propsJson=consent?JSON.stringify(safeProps):'{}';
   await env.DB.prepare('INSERT INTO events(type,metadata,city,created_at,ts,session_id,user_id,event,path,target_type,target_id,target_label,props_json,device,browser,referrer,ip_hash) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)')
    .bind(event,propsJson,city,ts,ts,session||null,null,event,path,targetType,targetId,targetLabel,propsJson,device,browser,referrer,ipHash).run();
+  if(event==='error')await notifyRepeatedClientError(env,safeProps.error_code??safeProps.code);
  }catch{return new Response(null,{status:204});}
  return new Response(null,{status:204});
 }

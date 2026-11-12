@@ -1,0 +1,99 @@
+import type { Env } from '../lib/types';
+import { rateLimited } from '../lib/ratelimit.ts';
+
+type TelegramUpdate = {
+  message?: {
+    text?: unknown;
+    chat?: { id?: number | string };
+  };
+};
+
+const API = 'https://api.telegram.org';
+
+async function constantTimeEqual(left: string, right: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest('SHA-256', encoder.encode(left)),
+    crypto.subtle.digest('SHA-256', encoder.encode(right)),
+  ]);
+  const x = new Uint8Array(a);
+  const y = new Uint8Array(b);
+  let mismatch = 0;
+  for (let index = 0; index < x.length; index += 1) mismatch |= x[index] ^ y[index];
+  return mismatch === 0;
+}
+
+function adminIds(env: Env): Set<string> {
+  return new Set((env.TELEGRAM_ADMIN_CHAT_IDS || '')
+    .split(',').map((value) => value.trim()).filter((value) => /^-?\d+$/.test(value)));
+}
+
+async function telegramReply(env: Env, chatId: string, text: string): Promise<void> {
+  if (!env.TELEGRAM_BOT_TOKEN) return;
+  try {
+    await fetch(`${API}/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: chatId, text }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    console.warn('[telegram] command reply failed');
+  }
+}
+
+async function statusText(env: Env): Promise<string> {
+  if (!env.DB) return 'Durum alınamadı: veritabanı kullanılamıyor.';
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const [events, pending, reports] = await Promise.all([
+    env.DB.prepare(
+      "SELECT COUNT(*) AS total, SUM(CASE WHEN event='error' OR type='error' THEN 1 ELSE 0 END) AS errors FROM events WHERE COALESCE(ts,created_at)>=?",
+    ).bind(since).first<{ total: number; errors: number }>(),
+    env.DB.prepare("SELECT COUNT(*) AS total FROM submissions WHERE status='pending'")
+      .first<{ total: number }>(),
+    env.DB.prepare("SELECT COUNT(*) AS total FROM reports WHERE status='open'")
+      .first<{ total: number }>(),
+  ]);
+  return [
+    '📊 Yanımda Türkiye — Son 24 saat',
+    `• Olay sayısı: ${Number(events?.total || 0)}`,
+    `• Hata sayısı: ${Number(events?.errors || 0)}`,
+    `• Bekleyen işletme başvurusu: ${Number(pending?.total || 0)}`,
+    `• Hatalı bildirim: ${Number(reports?.total || 0)}`,
+  ].join('\n');
+}
+
+export async function onRequestPost({ request, env }: { request: Request; env: Env }): Promise<Response> {
+  const expected = env.TELEGRAM_WEBHOOK_SECRET || '';
+  const supplied = request.headers.get('X-Telegram-Bot-Api-Secret-Token') || '';
+  if (!expected || !supplied || !(await constantTimeEqual(supplied, expected))) {
+    return new Response(null, { status: 401, headers: { 'Cache-Control': 'no-store' } });
+  }
+  if (await rateLimited(env, request, 'telegram-webhook', 60, 60)) {
+    return new Response(null, { status: 429, headers: { 'Retry-After': '60', 'Cache-Control': 'no-store' } });
+  }
+
+  let update: TelegramUpdate;
+  try {
+    update = await request.json() as TelegramUpdate;
+  } catch {
+    return new Response(null, { status: 200 });
+  }
+  const message = update.message;
+  const chatId = message?.chat?.id;
+  if (chatId === undefined || chatId === null) return new Response(null, { status: 200 });
+  const chat = String(chatId);
+  if (!adminIds(env).has(chat)) return new Response(null, { status: 200 });
+
+  const command = typeof message?.text === 'string' ? message.text.trim().split(/\s+/, 1)[0].split('@', 1)[0] : '';
+  try {
+    if (command === '/durum') {
+      await telegramReply(env, chat, await statusText(env));
+    } else if (command === '/yardim') {
+      await telegramReply(env, chat, '🤖 Yanımda Türkiye yönetim botu\n/durum — Son 24 saat özeti\n/yardim — Komut listesi');
+    }
+  } catch {
+    console.warn('[telegram] status command failed');
+  }
+  return new Response(null, { status: 200 });
+}

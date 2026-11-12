@@ -7,6 +7,9 @@ export type Env = {
   OPENAI_API_KEY?: string;
   OPENAI_MODEL?: string;
   COMMIT_SHA?: string;
+  TELEGRAM_BOT_TOKEN?: string;
+  TELEGRAM_WEBHOOK_SECRET?: string;
+  TELEGRAM_ADMIN_CHAT_IDS?: string;
 };
 export type D1Result<T=Record<string, unknown>>={results:T[];success?:boolean;meta?:Record<string,unknown>};
 export type D1Prepared={bind(...values:unknown[]):D1Prepared;first<T=Record<string,unknown>>(column?:string):Promise<T|null>;all<T=Record<string,unknown>>():Promise<D1Result<T>>;run():Promise<unknown>};
