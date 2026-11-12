@@ -16,7 +16,7 @@ export async function sendAdminMessage(env: Env, text: string): Promise<void> {
   const chatIds = adminChatIds(env);
   if (!chatIds.length) return;
 
-  const message = text.replace(/[\u0000-\u001f\u007f]/g, ' ').slice(0, 3500);
+  const message = [...text].filter((character) => { const code = character.charCodeAt(0); return code >= 32 && code !== 127; }).join('').slice(0, 3500);
   try {
     await Promise.all(chatIds.map(async (chatId) => {
       const response = await fetch(`${TELEGRAM_API}/bot${token}/sendMessage`, {
