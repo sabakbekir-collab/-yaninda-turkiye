@@ -176,15 +176,17 @@ request_status() {
   curl -sS -o "$output" -w '%{http_code}' "$@"
 }
 
-STATUS="$(request_status "$TMP_DIR/no-secret.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -d '{"message":{"chat":{"id":111,"type":"private"},"text":"/yardim"}}")"
+NO_SECRET_PAYLOAD='{"message":{"chat":{"id":111,"type":"private"},"text":"/yardim"}}'
+STATUS=$(request_status "$TMP_DIR/no-secret.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -d "$NO_SECRET_PAYLOAD")
 if [[ "$STATUS" == "401" ]]; then pass "Telegram eksik secret -> HTTP 401"; else fail "Telegram eksik secret beklenen 401, alındı $STATUS"; fi
 
-STATUS="$(request_status "$TMP_DIR/wrong-secret.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H 'X-Telegram-Bot-Api-Secret-Token: wrong-secret' -d '{"message":{"chat":{"id":111,"type":"private"},"text":"/yardim"}}")"
+WRONG_SECRET_PAYLOAD='{"message":{"chat":{"id":111,"type":"private"},"text":"/yardim"}}'
+STATUS=$(request_status "$TMP_DIR/wrong-secret.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H 'X-Telegram-Bot-Api-Secret-Token: wrong-secret' -d "$WRONG_SECRET_PAYLOAD")
 if [[ "$STATUS" == "401" ]]; then pass "Telegram yanlış secret -> HTTP 401"; else fail "Telegram yanlış secret beklenen 401, alındı $STATUS"; fi
 
 MOCK_BEFORE="$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).length)))')"
-STATUS="$(request_status "$TMP_DIR/unauthorized.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H "X-Telegram-Bot-Api-Secret-Token: $FAKE_WEBHOOK_SECRET" -d '{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}')"
-MOCK_AFTER="$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).length)))')"
+STATUS=$(request_status "$TMP_DIR/unauthorized.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H "X-Telegram-Bot-Api-Secret-Token: $FAKE_WEBHOOK_SECRET" -d '{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}')"
+MOCK_AFTER="$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(String(JSON.parse(s).length)))')
 if [[ "$STATUS" == "200" && "$MOCK_BEFORE" == "$MOCK_AFTER" ]]; then pass "Yetkisiz chat -> sessiz HTTP 200, mock Telegram'a mesaj gitmedi"; else fail "Yetkisiz chat beklenen sessiz 200; status=$STATUS, mock_before=$MOCK_BEFORE, mock_after=$MOCK_AFTER"; fi
 
 send_admin_command() {
@@ -194,17 +196,17 @@ send_admin_command() {
     -d "{\"message\":{\"chat\":{\"id\":111,\"type\":\"private\"},\"text\":\"$command\"}}"
 }
 
-STATUS="$(send_admin_command '/yardim' "$TMP_DIR/help.body")"
-HELP_TEXT="$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s);process.stdout.write(a.length?a[a.length-1].text:"")})')"
+STATUS=$(send_admin_command '/yardim' "$TMP_DIR/help.body")"
+HELP_TEXT="$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s);process.stdout.write(a.length?a[a.length-1].text:"")})')
 if [[ "$STATUS" == "200" && "$HELP_TEXT" == *"Yanımda Türkiye yönetim botu"* && "$HELP_TEXT" == *"/durum"* && "$HELP_TEXT" == *"/yardim"* ]]; then pass "/yardim -> HTTP 200 ve doğru Türkçe yardım mesajı mock ile doğrulandı"; else fail "/yardim cevabı beklenen Türkçe metin değil veya endpoint HTTP 200 dönmedi"; fi
 
-STATUS="$(send_admin_command '/durum' "$TMP_DIR/status.body")"
-STATUS_TEXT="$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s);process.stdout.write(a.length?a[a.length-1].text:"")})')"
+STATUS=$(send_admin_command '/durum' "$TMP_DIR/status.body")"
+STATUS_TEXT="$(curl -fsS "$MOCK_URL/__messages" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const a=JSON.parse(s);process.stdout.write(a.length?a[a.length-1].text:"")})')
 if [[ "$STATUS" == "200" && "$STATUS_TEXT" == *"Yanımda Türkiye"* && "$STATUS_TEXT" == *"Son 24 saat"* && "$STATUS_TEXT" == *"Olay sayısı:"* && "$STATUS_TEXT" == *"Hata sayısı:"* ]]; then pass "/durum -> HTTP 200 ve D1 sayımlarını içeren Türkçe cevap mock ile doğrulandı"; else fail "/durum cevabı beklenen Türkçe içerikte değil veya endpoint HTTP 200 dönmedi"; fi
 
 RATE_LIMIT_SEEN=0
 for ((attempt=1; attempt<=61; attempt++)); do
-  STATUS="$(request_status "$TMP_DIR/rate.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" \
+  STATUS=$(request_status "$TMP_DIR/rate.body" -X POST "$TELEGRAM_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" \
     -H "X-Telegram-Bot-Api-Secret-Token: $FAKE_WEBHOOK_SECRET" \
     -d '{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}')"
   if [[ "$STATUS" == "429" ]]; then RATE_LIMIT_SEEN=1; break; fi
@@ -216,7 +218,7 @@ SESSION_ID="local_e2e_$(date +%s)_$$"
 TRACK_BODY="$(printf '{"event":"page_view","consent":true,"session_id":"%s","path":"/local-e2e"}' "$SESSION_ID")"
 TRACK_URL="$BASE_URL/api/track"
 DELETE_URL="$BASE_URL/api/delete-request"
-TRACK_STATUS="$(request_status "$TMP_DIR/track-before.body" -X POST "$TRACK_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H "$UA_HEADER" -H 'CF-Connecting-IP: 192.0.2.44' --data "$TRACK_BODY")"
+TRACK_STATUS=$(request_status "$TMP_DIR/track-before.body" -X POST "$TRACK_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H "$UA_HEADER" -H 'CF-Connecting-IP: 192.0.2.44' --data "$TRACK_BODY")
 if [[ "$TRACK_STATUS" == "204" || "$TRACK_STATUS" == "200" ]]; then pass "Onaylı ilk /api/track -> HTTP $TRACK_STATUS"; else fail "İlk /api/track beklenen 200/204, alındı $TRACK_STATUS"; fi
 
 sql_count() {
@@ -243,14 +245,14 @@ INITIAL_COUNT="$(sql_count "SELECT COUNT(*) AS count FROM events WHERE session_i
 if [[ "$INITIAL_COUNT" == "1" ]]; then pass "D1: ilk onaylı olay session_id için kaydedildi"; else fail "D1: ilk olay sayısı 1 bekleniyordu, alındı $INITIAL_COUNT"; fi
 
 DELETE_BODY="$(printf '{"session_id":"%s"}' "$SESSION_ID")"
-DELETE_STATUS="$(request_status "$TMP_DIR/delete.body" -X POST "$DELETE_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H 'CF-Connecting-IP: 192.0.2.44' --data "$DELETE_BODY")"
+DELETE_STATUS=$(request_status "$TMP_DIR/delete.body" -X POST "$DELETE_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H 'CF-Connecting-IP: 192.0.2.44' --data "$DELETE_BODY")"
 if [[ "$DELETE_STATUS" == "200" ]] && grep -q '"ok":true' "$TMP_DIR/delete.body"; then pass "/api/delete-request -> HTTP 200 ve ok:true"; else fail "/api/delete-request beklenen HTTP 200/ok:true, alındı $DELETE_STATUS"; fi
 
 AFTER_DELETE="$(sql_count "SELECT COUNT(*) AS count FROM events WHERE session_id='$SESSION_ID';" "$TMP_DIR/count-deleted.json")"
 REVOKED_COUNT="$(sql_count "SELECT COUNT(*) AS count FROM analytics_session_revocations WHERE session_id='$SESSION_ID';" "$TMP_DIR/count-revoked.json")"
 if [[ "$AFTER_DELETE" == "0" && "$REVOKED_COUNT" == "1" ]]; then pass "D1: silme sonrası events=0 ve revocation kaydı=1"; else fail "Silme sonrası beklenen events=0/revocation=1, alındı events=$AFTER_DELETE revoked=$REVOKED_COUNT"; fi
 
-TRACK_AFTER_STATUS="$(request_status "$TMP_DIR/track-after.body" -X POST "$TRACK_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H "$UA_HEADER" -H 'CF-Connecting-IP: 192.0.2.44' --data "$TRACK_BODY")"
+TRACK_AFTER_STATUS=$(request_status "$TMP_DIR/track-after.body" -X POST "$TRACK_URL" -H "$ORIGIN_HEADER" -H "$CONTENT_HEADER" -H "$UA_HEADER" -H 'CF-Connecting-IP: 192.0.2.44' --data "$TRACK_BODY")
 AFTER_TRACK_COUNT="$(sql_count "SELECT COUNT(*) AS count FROM events WHERE session_id='$SESSION_ID';" "$TMP_DIR/count-after-track.json")"
 if [[ ( "$TRACK_AFTER_STATUS" == "204" || "$TRACK_AFTER_STATUS" == "200" ) && "$AFTER_TRACK_COUNT" == "0" ]]; then pass "İptal sonrası aynı session_id ile /api/track -> HTTP $TRACK_AFTER_STATUS, yeni event yok"; else fail "İptal sonrası /api/track beklenen 200/204 ve events=0; status=$TRACK_AFTER_STATUS count=$AFTER_TRACK_COUNT"; fi
 
