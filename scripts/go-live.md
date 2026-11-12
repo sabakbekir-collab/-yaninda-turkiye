@@ -7,7 +7,7 @@
 ## Betik statik kontrolü
 
 - GitHub Actions CI, `scripts/telegram-webhook.sh` dosyasını ShellCheck ile denetler.
-- Yerel olarak da `shellcheck --shell=bash scripts/telegram-webhook.sh` komutuyla aynı kontrolü çalıştırabilirsiniz.
+- Yerel olarak da `shellcheck --shell=bash scripts/telegram-webhook.sh` komutuyla aynı kontrolü çalıştırabilirsiniz. ShellCheck yerelde kurulu değilse, PR dalının CI kontrolündeki ShellCheck adımının başarılı olmasını bekleyin.
 - Bu hazırlık oturumunda betik çalıştırılmadı; yalnızca Bash sözdizimi `bash -n` ile kontrol edildi.
 
 ## 0. Ön koşullar ve BotFather token kontrolü
