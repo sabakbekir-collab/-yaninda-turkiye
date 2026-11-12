@@ -26,6 +26,20 @@ async function constantTimeEqual(left: string, right: string): Promise<boolean> 
   return mismatch === 0;
 }
 
+export function telegramApiBase(env: Env): string {
+  const configured = env.TELEGRAM_API_BASE_URL;
+  if (!configured) return API;
+  try {
+    const candidate = new URL(configured);
+    const isLocalHost = candidate.protocol === 'http:' &&
+      (candidate.hostname === '127.0.0.1' || candidate.hostname === 'localhost') &&
+      !candidate.username && !candidate.password;
+    return isLocalHost ? candidate.origin : API;
+  } catch {
+    return API;
+  }
+}
+
 function adminIds(env: Env): Set<string> {
   return new Set((env.TELEGRAM_ADMIN_CHAT_IDS || '')
     .split(',').map((value) => value.trim()).filter((value) => /^-?\d+$/.test(value)));
@@ -38,7 +52,7 @@ function boundedTelegramText(value: string): string {
 async function telegramReply(env: Env, chatId: string, text: string): Promise<void> {
   if (!env.TELEGRAM_BOT_TOKEN) return;
   try {
-    const apiBase = (env.TELEGRAM_API_BASE_URL || API).replace(/\/+$/, '');
+    const apiBase = telegramApiBase(env);
     const response = await fetch(`${apiBase}/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
