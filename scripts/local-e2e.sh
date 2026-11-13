@@ -211,7 +211,7 @@ probe_route "location-area" GET "/api/location/area?lat=0&lon=0"
 probe_route "duty-check" GET "/api/duty-check"
 probe_route "places" GET "/api/places?category=__route_probe_invalid__"
 probe_route "ads" GET "/api/ads"
-probe_route "events" POST "/api/events" '{"type":"__route_probe_invalid__"}'
+probe_route "events" POST "/api/events" '{"type":"page_view","metadata":{"source":"local-e2e"}}'
 probe_route "track" POST "/api/track" '{"event":"__route_probe_invalid__","consent":true,"session_id":"route_probe_session_123"}' "$UA_HEADER"
 probe_route "telegram" POST "/api/telegram" '{"message":{"chat":{"id":999,"type":"private"},"text":"/durum"}}' "X-Telegram-Bot-Api-Secret-Token: $FAKE_WEBHOOK_SECRET"
 probe_route "delete-request" POST "/api/delete-request" '{"session_id":"invalid"}'
