@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 REPORT="${E2E_REPORT:-$ROOT/e2e-report.txt}"
+WRANGLER_CONFIG="${WRANGLER_CONFIG:-./wrangler.jsonc}"
 TMP_DIR="$(mktemp -d)"
 PORT="${E2E_PORT:-8787}"
 MOCK_PORT="${E2E_MOCK_PORT:-8799}"
@@ -78,7 +79,9 @@ else
 fi
 
 info "Yerel D1 migration'ları uygulanıyor (--local; --remote kullanılmıyor)"
-if npx wrangler d1 migrations apply DB --local --config ./wrangler.jsonc; then
+if [[ "${E2E_SKIP_MIGRATIONS:-0}" == "1" ]]; then
+  pass "Migration apply skipped: caller prepared isolated D1 schema"
+elif npx wrangler d1 migrations apply DB --local --config "$WRANGLER_CONFIG"; then
   pass "0001-0004 yerel D1 migration komutu başarılı"
 else
   fail "Yerel D1 migration komutu başarısız"
@@ -134,7 +137,7 @@ fi
 pass "Telegram sendMessage yerel HTTP mock'u hazır"
 
 if [[ "$RUNTIME" == "worker" ]]; then
-  npx wrangler dev --config ./wrangler.jsonc --local --port "$PORT" \
+  npx wrangler dev --config "$WRANGLER_CONFIG" --local --port "$PORT" \
     --var "TELEGRAM_BOT_TOKEN:$FAKE_BOT_TOKEN" \
     --var "TELEGRAM_WEBHOOK_SECRET:$FAKE_WEBHOOK_SECRET" \
     --var "TELEGRAM_ADMIN_CHAT_IDS:$FAKE_ADMIN_CHAT_IDS" \
@@ -142,7 +145,7 @@ if [[ "$RUNTIME" == "worker" ]]; then
     --var "ADMIN_SESSION_SECRET:local-e2e-admin-secret" \
     >"$TMP_DIR/worker.log" 2>&1 &
 else
-  npx wrangler pages dev "$PAGES_DIR" --config ./wrangler.jsonc --d1 DB --local --port "$PORT" \
+  npx wrangler pages dev "$PAGES_DIR" --config "$WRANGLER_CONFIG" --d1 DB --local --port "$PORT" \
     --binding "TELEGRAM_BOT_TOKEN=$FAKE_BOT_TOKEN" \
     --binding "TELEGRAM_WEBHOOK_SECRET=$FAKE_WEBHOOK_SECRET" \
     --binding "TELEGRAM_ADMIN_CHAT_IDS=$FAKE_ADMIN_CHAT_IDS" \
@@ -269,7 +272,7 @@ if [[ "$TRACK_STATUS" == "204" || "$TRACK_STATUS" == "200" ]]; then pass "Onayl�
 
 sql_count() {
   local sql="$1" json_file="$2"
-  npx wrangler d1 execute DB --local --config ./wrangler.jsonc --json --command "$sql" >"$json_file"
+  npx wrangler d1 execute DB --local --config "$WRANGLER_CONFIG" --json --command "$sql" >"$json_file"
   node - "$json_file" <<'NODE'
 const fs = require('node:fs');
 const input = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
@@ -303,7 +306,7 @@ AFTER_TRACK_COUNT="$(sql_count "SELECT COUNT(*) AS count FROM events WHERE sessi
 if [[ ( "$TRACK_AFTER_STATUS" == "204" || "$TRACK_AFTER_STATUS" == "200" ) && "$AFTER_TRACK_COUNT" == "0" ]]; then pass "Silme sonrası /api/track -> HTTP $TRACK_AFTER_STATUS; events_count=$AFTER_TRACK_COUNT (500 beklenmiyor)"; else fail "İptal sonrası /api/track beklenen 200/204 ve events=0; status=$TRACK_AFTER_STATUS count=$AFTER_TRACK_COUNT"; fi
 
 TRIGGER_INSERT_SQL="INSERT INTO events(type,session_id,event,created_at,ts) VALUES('page_view','$SESSION_ID','page_view',datetime('now'),datetime('now'));"
-if npx wrangler d1 execute DB --local --config ./wrangler.jsonc --command "$TRIGGER_INSERT_SQL" >"$TMP_DIR/trigger-insert.log" 2>&1; then
+if npx wrangler d1 execute DB --local --config "$WRANGLER_CONFIG" --command "$TRIGGER_INSERT_SQL" >"$TMP_DIR/trigger-insert.log" 2>&1; then
   TRIGGER_COUNT="$(sql_count "SELECT COUNT(*) AS count FROM events WHERE session_id='$SESSION_ID';" "$TMP_DIR/count-trigger.json")"
   if [[ "$TRIGGER_COUNT" == "0" ]]; then pass "0004 trigger doğrudan INSERT: events_count=$TRIGGER_COUNT (öncesi 0, artış beklenmiyor)"; else fail "0004 trigger INSERT'i engellemedi; events count=$TRIGGER_COUNT"; fi
 else
