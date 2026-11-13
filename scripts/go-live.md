@@ -45,30 +45,26 @@ git check-ignore -v ./backups/yaninda-turkiye-db-before-pr32.sql
 
 Dosyanın boyutu ve `git check-ignore` çıktısı doğrulanmadan devam etmeyin.
 
-## 2. Canlı D1 migration denetimi — uygulama YASAK
+## 2. Canlı D1 — migration komutu YASAK, elle dosya uygulaması
 
-**Önce yalnızca salt-okunur denetim yapın.** Migration numaraları, main/feature branch geçmişi ve canlı D1 durumu doğrulanmadan canlıya migration uygulamayın.
+Canlı D1'de `d1_migrations` tablosu bulunmadığı için **canlıda `wrangler d1 migrations apply --remote` KESİNLİKLE ÇALIŞTIRILMAYACAKTIR.** 0001/0002'yi de canlıda tekrar çalıştırmayın.
 
-Repo kökünde:
+Ön koşul: tam ve veri içermeyen `live-schema.sql` dosyası repoya eklenmemiştir. Bu nedenle tam şema diff'i tamamlanmamış ve canlı şemadaki indeks/trigger eşitliği kanıtlanmamıştır. `scripts/live/live-schema-diff.md` durum raporunu okuyun. Canlıya geçişten önce tam şema-only export ile bu eksikliği giderin.
 
-```bash
-bash scripts/d1-readonly-audit.sh
-```
+Canlı uygulama ancak operatörün ayrı bakım penceresinde, doğrulanmış yedek ve sütun kontrollerinden sonra yapılabilir:
 
-Bu betik yalnızca migration listesini, `d1_migrations` adlarını, `sqlite_master` nesne adlarını ve her nesne için şema amaçlı `PRAGMA table_info` çıktısını alır. Rapor `d1-audit-report.txt` dosyasına yazılır; kullanıcı verisi satırları sorgulanmaz.
+1. Yedeği alın ve doğrulayın (Bölüm 1).
+2. Her sütun için `PRAGMA table_info(table_name)` çalıştırın. Sütun zaten varsa ilgili ALTER dosyasını atlayın.
+3. Yalnızca eksik sütunlara karşılık gelen `scripts/live/columns/*.sql` dosyalarını tek tek `wrangler d1 execute yaninda-turkiye-db --remote --file <dosya> --config ./wrangler.jsonc` ile çalıştırın. Her ALTER dosyası tek seferliktir; körlemesine tekrar çalıştırmayın.
+4. `scripts/live/apply-0003-0004.sql` dosyasını `wrangler d1 execute yaninda-turkiye-db --remote --file scripts/live/apply-0003-0004.sql --config ./wrangler.jsonc` ile çalıştırın. Bu dosyadaki CREATE nesneleri IF NOT EXISTS kullanır; backfill tekrar çalıştırılabilir.
+5. `scripts/live/verify.sql` dosyasını `wrangler d1 execute yaninda-turkiye-db --remote --file scripts/live/verify.sql --config ./wrangler.jsonc` ile çalıştırın. Her `ok` değeri 1 olmalıdır.
+6. Herhangi bir beklenmeyen şema farkında durun; `scripts/live/rollback.md` prosedürünü izleyin. Otomatik rollback yoktur.
 
-- [ ] Denetim raporu eksiksiz oluştu.
-- [ ] Canlıda uygulanmış en yüksek migration numarası belirlendi.
-- [ ] Repoda bulunmayan uygulanmış migration varsa dosya eksikliği ve canlı şema çıktısı kaydedildi.
-- [ ] PR #32'nin henüz uygulanmamış analitik migration'ları, denetim sonucuna göre sonraki uygun numaralara taşındı.
-- [ ] Uygulanmış migration dosyalarının adı/içeriği değiştirilmedi.
-- [ ] CI, `PRAGMA table_info` ile `ALTER TABLE ADD COLUMN` hedeflerinin migration öncesinde mevcut olmadığını doğruladı.
-
-**Bu maddeler tamamlanmadan canlı D1 için migration apply komutu çalıştırmayın.** Migration numaralandırma kararı için `scripts/d1-migration-resequence.md` belgesini izleyin. Canlıya yazma, yedek, migration, deploy ve merge işlemleri bu PR hazırlık çalışmasının kapsamı dışındadır.
+**YASAK:** Canlı hedefte `wrangler d1 migrations apply --remote` kullanmayın. `d1_migrations` tablosu oluşturup geçmişi işaretleme de bu PR'ın parçası değildir; yalnızca `scripts/live/baseline-migrations.md` belgesinde geleceğe dönük risk açıklaması vardır.
 
 ## 2A. PR #32 izole test ortamı
 
-Gerçek cihaz testi için yalnızca `env.pr32-test` ve `yaninda-turkiye-pr32-test` D1 veritabanı kullanılmalıdır. Kurulum sırası ve her komutun güvenlik gerekçesi `scripts/pr32-test-setup.md` içindedir. Eski preview ve canlı DB kullanılmaz.
+Eski preview DB'ye dokunmayın. `yaninda-turkiye-pr32-test` ayrı D1 veritabanı kullanılmalıdır. Şu an kökte `live-schema.sql` bulunmadığından canlı şemanın birebir kopyası kurulamaz; kullanıcı tarafından sağlanan tablo DDL'leri indeks/trigger envanterini içermediği için bunlardan tam şema uydurulmayacaktır. Tam şema-only export güvenli şekilde sağlandıktan sonra izole test D1'ine yükleyin; ardından yukarıdaki eksik sütun dosyalarını, `apply-0003-0004.sql` ve `verify.sql` sırasıyla uygulayın. PR32 test Worker'ını ancak ayrı test D1'i ve ID'si doğrulandıktan sonra operatör deploy edebilir. Canlı ve eski preview ortamları bu işlemde kullanılmaz.
 
 ## 3. Cloudflare Telegram secret'larını kontrol edin
 
