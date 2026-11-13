@@ -12,16 +12,35 @@ export WRANGLER_CONFIG="./.wrangler-live-test.jsonc"
 export E2E_SKIP_MIGRATIONS=1
 export E2E_REPORT="$REPORT"
 : > "$REPORT"
-echo "INFO  live-schema.sql absent; using 0001+0002 as an explicitly limited baseline fixture" | tee -a "$REPORT"
-npx wrangler d1 execute DB --local --config "$WRANGLER_CONFIG" --file migrations/0001_init.sql
-npx wrangler d1 execute DB --local --config "$WRANGLER_CONFIG" --file migrations/0002_admin_logs.sql
+
+run_sql() { npx wrangler d1 execute DB --local --config "$WRANGLER_CONFIG" --file "$1"; }
+echo "INFO  Loading exact observed live schema fixture into isolated local D1" | tee -a "$REPORT"
+run_sql scripts/live/fixtures/live-schema.sql
+echo "INFO  Applying only fixture-proven missing columns" | tee -a "$REPORT"
 for file in scripts/live/columns/*.sql; do
-  npx wrangler d1 execute DB --local --config "$WRANGLER_CONFIG" --file "$file"
+  run_sql "$file"
 done
-npx wrangler d1 execute DB --local --config "$WRANGLER_CONFIG" --file scripts/live/apply-0003-0004.sql
-npx wrangler d1 execute DB --local --config "$WRANGLER_CONFIG" --file scripts/live/verify.sql
-# Repeat only the idempotent aggregate file. ALTER files are one-shot by design.
-npx wrangler d1 execute DB --local --config "$WRANGLER_CONFIG" --file scripts/live/apply-0003-0004.sql
-npx wrangler d1 execute DB --local --config "$WRANGLER_CONFIG" --file scripts/live/verify.sql
-echo "PASS  additive SQL repeatability and schema verification" | tee -a "$REPORT"
+run_sql scripts/live/apply-0003-0004.sql
+run_sql scripts/live/verify.sql
+
+echo "INFO  Re-running one-shot ALTER files: failure is expected because columns now exist" | tee -a "$REPORT"
+for file in scripts/live/columns/*.sql; do
+  if run_sql "$file" > /tmp/live-alter-repeat.log 2>&1; then
+    echo "FAIL  ALTER unexpectedly succeeded on second application: $file" | tee -a "$REPORT"
+    cat /tmp/live-alter-repeat.log
+    exit 1
+  else
+    if ! grep -Eqi 'duplicate column name|already exists' /tmp/live-alter-repeat.log; then
+      echo "FAIL  ALTER failed for an unexpected reason: $file" | tee -a "$REPORT"
+      cat /tmp/live-alter-repeat.log
+      exit 1
+    fi
+    echo "PASS  expected duplicate-column rejection: $file" | tee -a "$REPORT"
+  fi
+done
+echo "INFO  Re-running idempotent object SQL and verification" | tee -a "$REPORT"
+run_sql scripts/live/apply-0003-0004.sql
+run_sql scripts/live/verify.sql
+echo "PASS  fixture schema + additive objects are repeatable (ALTER reruns rejected as expected)" | tee -a "$REPORT"
+
 env -u TELEGRAM_BOT_TOKEN -u TELEGRAM_TEST_CHAT_ID bash scripts/local-e2e.sh
