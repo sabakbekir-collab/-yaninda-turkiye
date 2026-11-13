@@ -5,8 +5,11 @@ set +x
 SITE_URL="${SITE_URL%/}"
 if [[ "$SITE_URL" =~ ^https://[^/]+$ ]]; then
   :
-elif [[ "${ALLOW_LOCAL_HTTP:-0}" == "1" && "$SITE_URL" =~ ^http://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?$ ]]; then
-  :
+elif [[ "${ALLOW_LOCAL_HTTP:-0}" == "1" ]]; then
+  case "$SITE_URL" in
+    http://127.0.0.1|http://127.0.0.1:*|http://localhost|http://localhost:*) ;;
+    *) echo 'FAIL SITE_URL'; exit 2 ;;
+  esac
 else
   echo 'FAIL SITE_URL'; exit 2
 fi
