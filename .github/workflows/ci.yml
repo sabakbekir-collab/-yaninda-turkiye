@@ -67,7 +67,18 @@ jobs:
           cache: npm
       - run: npm ci
       - name: Apply compatible npm audit fixes without force
-        run: npm audit fix --package-lock-only --no-fund
+        run: npm audit fix --no-fund || true
+      - name: Record remaining audit findings after compatible fixes
+        if: always()
+        run: npm audit --json > npm-audit-after-fix.json || true
+      - name: Upload post-fix audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-after-fix
+          path: npm-audit-after-fix.json
+          if-no-files-found: warn
+          retention-days: 7
       - name: Upload proposed lockfile
         uses: actions/upload-artifact@v4
         with:
