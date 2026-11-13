@@ -22,6 +22,8 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Assert CI workflows cannot access live D1
+        run: node scripts/test-ci-no-live-access.mjs
       - name: Install ShellCheck
         run: |
           sudo apt-get update
