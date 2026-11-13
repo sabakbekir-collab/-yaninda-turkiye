@@ -1,0 +1,56 @@
+name: PR #32 — Read-only live D1 preflight
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr32-live-d1-preflight
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Verify target, read schema and create ephemeral backup
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout reviewed PR #32 commit
+        uses: actions/checkout@v4
+        with:
+          ref: 6a8a6494db35c9279955cd688204c4c72134e45b
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Confirm required Cloudflare credentials exist
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -eu
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN repository secret is not configured."
+            exit 1
+          fi
+          echo "PASS Cloudflare API token is present (value hidden)"
+
+      - name: Run read-only preflight only
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DB_TARGET: remote
+          GO_LIVE_CONFIRM: ""
+        run: |
+          set -eu
+          unset GO_LIVE_CONFIRM
+          bash scripts/live/go-live.sh preflight
+
+      - name: Remove ephemeral database backup
+        if: always()
+        run: |
+          rm -rf backups
+          echo "INFO Temporary runner backup removed; no artifact uploaded."
+
