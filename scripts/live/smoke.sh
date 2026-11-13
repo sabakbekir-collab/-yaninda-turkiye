@@ -3,7 +3,13 @@ set -euo pipefail
 set +x
 : "${SITE_URL:?SITE_URL gerekli}"
 SITE_URL="${SITE_URL%/}"
-[[ "$SITE_URL" =~ ^https://[^/]+$ ]] || { echo 'FAIL SITE_URL'; exit 2; }
+if [[ "$SITE_URL" =~ ^https://[^/]+$ ]]; then
+  :
+elif [[ "${ALLOW_LOCAL_HTTP:-0}" == "1" && "$SITE_URL" =~ ^http://(127\\.0\\.0\\.1|localhost)(:[0-9]+)?$ ]]; then
+  :
+else
+  echo 'FAIL SITE_URL'; exit 2
+fi
 tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 pass=0; fail=0
 check(){
