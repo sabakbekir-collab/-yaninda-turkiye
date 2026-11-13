@@ -24,15 +24,32 @@ if [ "$DB_TARGET" = remote ]; then
 fi
 d1(){ if [ "$DB_TARGET" = remote ]; then npx --yes wrangler@4 d1 execute "$DB_NAME" --remote "$@"; else npx --yes wrangler@4 d1 execute "$DB_NAME" --local --config "$CONFIG" "$@"; fi; }
 has_col(){
-  local out rc
-  out="$(d1 --json --command "PRAGMA table_info($1);" 2>/dev/null)" || die "PRAGMA okunamadı"
-  if printf '%s' "$out" | node scripts/live/parse-pragma.mjs "$1" "$2"; then
-    return 0
-  else
-    rc=$?
-    [ "$rc" -eq 1 ] && return 1
-    die "PRAGMA JSON çıktısı geçersiz; güvenli biçimde durduruldu"
+  local out rc err attempt
+  err="$(mktemp)"
+  for attempt in 1 2 3; do
+    if out="$(d1 --json --command "PRAGMA table_info($1);" 2>"$err")"; then
+      rm -f "$err"
+      if printf '%s' "$out" | node scripts/live/parse-pragma.mjs "$1" "$2"; then
+        return 0
+      else
+        rc=$?
+        [ "$rc" -eq 1 ] && return 1
+        die "PRAGMA JSON çıktısı geçersiz; güvenli biçimde durduruldu"
+      fi
+    fi
+    if [ "$attempt" -lt 3 ]; then
+      printf 'WARN PRAGMA isteği başarısız (%s.%s), tekrar %s/3\n' "$1" "$2" "$attempt" >&2
+      sleep "$attempt"
+    fi
+  done
+  printf 'FAIL PRAGMA sorgusu 3 denemede başarısız (%s.%s); güvenli biçimde durduruldu\n' "$1" "$2" >&2
+  if [ -s "$err" ]; then
+    printf '%s\n' '--- Wrangler hata ayrıntısı (gizli değerler maskelenmiştir) ---' >&2
+    tail -n 12 "$err" | sed -E 's/(Bearer[[:space:]]+)[A-Za-z0-9._-]+/\1[REDACTED]/g; s/(api[_-]?token[=: ]+)[^[:space:]]+/\1[REDACTED]/Ig' >&2
+    printf '%s\n' '--- hata ayrıntısı sonu ---' >&2
   fi
+  rm -f "$err"
+  die "PRAGMA okunamadı"
 }
 columns(){ printf '%s\n' events:ts events:session_id events:user_id events:event events:path events:target_type events:target_id events:target_label events:props_json events:device events:browser events:referrer events:ip_hash ads:starts_at ads:ends_at submissions:admin_note; }
 preflight(){
