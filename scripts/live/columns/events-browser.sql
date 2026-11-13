@@ -1,3 +1,3 @@
--- One-time additive change. Check PRAGMA table_info(events) first.
--- SQLite/D1 has no ADD COLUMN IF NOT EXISTS; do not rerun if the column exists.
+-- canlıda eksik: fixture'da events tanımında browser yok (live-schema.sql satır 8).
+-- SQLite/D1 does not support ADD COLUMN IF NOT EXISTS; apply once only.
 ALTER TABLE events ADD COLUMN browser TEXT;
