@@ -1,20 +1,35 @@
-name: PR #32 — Read-only live D1 preflight
+name: PR #32 — Live D1 backup and guarded schema rollout
 
 on:
   workflow_dispatch:
+    inputs:
+      operation:
+        description: "Choose backup first; apply only after backup is reviewed"
+        type: choice
+        required: true
+        default: backup
+        options:
+          - backup
+          - apply
+          - verify
+      confirmation:
+        description: 'For apply only, type exactly: EVET - CANLI D1 ŞEMA UYGULA'
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: pr32-live-d1-preflight
+  group: pr32-live-d1-rollout
   cancel-in-progress: false
 
 jobs:
-  preflight:
-    name: Verify target, read schema and create ephemeral backup
+  rollout:
+    name: Backup, guarded apply, or read-only verify
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - name: Checkout reviewed PR #32 commit
         uses: actions/checkout@v4
@@ -38,19 +53,61 @@ jobs:
           fi
           echo "PASS Cloudflare API token is present (value hidden)"
 
-      - name: Run read-only preflight only
+      - name: Read-only preflight and fresh remote backup
+        if: ${{ inputs.operation == 'backup' || inputs.operation == 'apply' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           DB_TARGET: remote
-          GO_LIVE_CONFIRM: ""
         run: |
           set -eu
           unset GO_LIVE_CONFIRM
           bash scripts/live/go-live.sh preflight
+          test -s backups/backup-$(date +%F).sql
 
-      - name: Remove ephemeral database backup
-        if: always()
+      - name: Preserve verified backup as workflow artifact
+        if: ${{ inputs.operation == 'backup' || inputs.operation == 'apply' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr32-live-d1-backup-${{ github.run_id }}
+          path: backups/backup-*.sql
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Stop after backup (no database writes)
+        if: ${{ inputs.operation == 'backup' }}
+        run: echo "PASS Backup completed and retained as a workflow artifact. No D1 writes performed."
+
+      - name: Require exact live-write confirmation
+        if: ${{ inputs.operation == 'apply' }}
+        env:
+          CONFIRMATION: ${{ inputs.confirmation }}
         run: |
-          rm -rf backups
-          echo "INFO Temporary runner backup removed; no artifact uploaded."
+          set -eu
+          if [ "${CONFIRMATION:-}" != "EVET - CANLI D1 ŞEMA UYGULA" ]; then
+            echo "::error::Exact confirmation phrase missing. Refusing all live D1 writes."
+            exit 1
+          fi
+          echo "PASS Exact live-write confirmation received."
 
+      - name: Apply additive schema changes
+        if: ${{ inputs.operation == 'apply' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DB_TARGET: remote
+          GO_LIVE_CONFIRM: EVET
+        run: |
+          set -eu
+          bash scripts/live/go-live.sh apply
+
+      - name: Verify live schema (read-only)
+        if: ${{ inputs.operation == 'apply' || inputs.operation == 'verify' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          DB_TARGET: remote
+        run: |
+          set -eu
+          bash scripts/live/go-live.sh verify
+
+      - name: Remove runner-local backup copy
+        if: always()
+        run: rm -rf backups
