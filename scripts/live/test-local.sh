@@ -5,7 +5,8 @@ cd "$ROOT"
 CONFIG="$ROOT/.wrangler-live-test.jsonc"
 TMP_ID="$(cat /proc/sys/kernel/random/uuid)"
 REPORT="${E2E_REPORT:-$ROOT/e2e-live-schema-report.txt}"
-cleanup() { rm -f "$CONFIG"; }
+FIXTURE_LOCAL="$ROOT/.live-schema-local.sql"
+cleanup() { rm -f "$CONFIG" "$FIXTURE_LOCAL"; }
 trap cleanup EXIT
 sed "s/3edba257-0694-4b38-adb4-865e4aa9dac4/$TMP_ID/" wrangler.jsonc > "$CONFIG"
 export WRANGLER_CONFIG="./.wrangler-live-test.jsonc"
@@ -15,7 +16,10 @@ export E2E_REPORT="$REPORT"
 
 run_sql() { npx wrangler d1 execute DB --local --config "$WRANGLER_CONFIG" --file "$1"; }
 echo "INFO  Loading exact observed live schema fixture into isolated local D1" | tee -a "$REPORT"
-run_sql scripts/live/fixtures/live-schema.sql
+# D1 owns its internal _cf_KV table; creating it from SQL is rejected with SQLITE_AUTH.
+# Seed every application table/index from the fixture, while leaving that system table to D1.
+sed '/^CREATE TABLE _cf_KV /d' scripts/live/fixtures/live-schema.sql > "$FIXTURE_LOCAL"
+run_sql "$FIXTURE_LOCAL"
 echo "INFO  Applying only fixture-proven missing columns" | tee -a "$REPORT"
 for file in scripts/live/columns/*.sql; do
   run_sql "$file"
