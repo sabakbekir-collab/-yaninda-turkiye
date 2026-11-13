@@ -29,4 +29,4 @@ for (const file of files) {
   }
 }
 
-console.log(`PASS CI workflows are local-only (${files.length - (files.includes(deployWorkflow) ? 1 : 0)} checked; dedicated deploy workflow excluded)`);
+process.stdout.write(`PASS CI workflows are local-only (${files.length - (files.includes(deployWorkflow) ? 1 : 0)} checked; dedicated deploy workflow excluded)\\n`);
