@@ -1,3 +1,3 @@
--- One-time additive change. Check PRAGMA table_info(events) first.
--- SQLite/D1 has no ADD COLUMN IF NOT EXISTS; do not rerun if the column exists.
+-- canlıda eksik: live-schema.sql satır 8 tablosu events sütun listesinde event yok.
+-- Source snapshot: scripts/live/fixtures/live-schema.sql; verified against captured CREATE TABLE at line 8.
 ALTER TABLE events ADD COLUMN event TEXT;
