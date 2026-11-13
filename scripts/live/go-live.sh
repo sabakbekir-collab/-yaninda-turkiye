@@ -25,8 +25,20 @@ fi
 d1(){ if [ "$DB_TARGET" = remote ]; then npx --yes wrangler@4 d1 execute "$DB_NAME" --remote "$@"; else npx --yes wrangler@4 d1 execute "$DB_NAME" --local --config "$CONFIG" "$@"; fi; }
 has_col(){
   local out
-  out="$(d1 --command "PRAGMA table_info($1);" 2>/dev/null)" || die "PRAGMA okunamadı"
-  printf '%s\n' "$out" | grep -Eiq "(^|[|[:space:]])$2([|[:space:]]|$)"
+  out="$(d1 --json --command "PRAGMA table_info($1);" 2>/dev/null)" || die "PRAGMA okunamadı"
+  printf '%s' "$out" | node -e '
+let s=""; for (const c of process.stdin) s+=c;
+let data; try { data=JSON.parse(s); } catch { process.exit(2); }
+const wanted=process.argv[1]; let found=false;
+function walk(x){
+  if(Array.isArray(x)){ for(const v of x) walk(v); return; }
+  if(x && typeof x==="object"){
+    if(x.name===wanted) found=true;
+    for(const v of Object.values(x)) walk(v);
+  }
+}
+walk(data); process.exit(found?0:1);
+' "$2"
 }
 columns(){ printf '%s\n' events:ts events:session_id events:user_id events:event events:path events:target_type events:target_id events:target_label events:props_json events:device events:browser events:referrer events:ip_hash ads:starts_at ads:ends_at submissions:admin_note; }
 preflight(){
