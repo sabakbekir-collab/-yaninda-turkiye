@@ -16,7 +16,7 @@ ACTION="$1"
 case "$ACTION" in preflight|apply|verify) ;; *) die "Geçersiz komut" ;; esac
 [ "$DB_TARGET" = remote ] || [ "$DB_TARGET" = local ] || die "DB_TARGET remote/local olmalı"
 [ -f "$CONFIG" ] || die "Wrangler config bulunamadı"
-command -v npx >/dev/null && command -v node >/dev/null || die "npx ve node gerekli"
+if ! command -v npx >/dev/null || ! command -v node >/dev/null; then die "npx ve node gerekli"; fi
 if grep -RniE 'wrangler[[:space:]]+d1[[:space:]]+migrations[[:space:]]+apply' scripts/live --include='*.sh' --exclude='go-live.sh' >/dev/null 2>&1; then die "Yasak migration runner komutu bulundu"; fi
 if [ "$DB_TARGET" = remote ]; then
   grep -Eq '"database_name"[[:space:]]*:[[:space:]]*"yaninda-turkiye-db"' "$CONFIG" || die "Yalnızca yaninda-turkiye-db hedeflenebilir"
@@ -45,7 +45,8 @@ preflight(){
 }
 apply(){
  preflight
- read -r -p 'Şema değişikliği için EVET yazın: ' answer
+ answer="${GO_LIVE_CONFIRM:-}"
+ if [ -z "$answer" ]; then read -r -p 'Şema değişikliği için EVET yazın: ' answer; fi
  [ "$answer" = EVET ] || die "Onay verilmedi"
  for f in scripts/live/columns/*.sql; do
   b="$(basename "$f")"
