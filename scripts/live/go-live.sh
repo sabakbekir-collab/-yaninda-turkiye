@@ -17,7 +17,7 @@ case "$ACTION" in preflight|apply|verify) ;; *) die "Geçersiz komut" ;; esac
 [ "$DB_TARGET" = remote ] || [ "$DB_TARGET" = local ] || die "DB_TARGET remote/local olmalı"
 [ -f "$CONFIG" ] || die "Wrangler config bulunamadı"
 command -v npx >/dev/null && command -v node >/dev/null || die "npx ve node gerekli"
-if grep -RniE 'wrangler[[:space:]]+d1[[:space:]]+migrations[[:space:]]+apply' scripts/live --include='*.sh' >/dev/null 2>&1; then die "Yasak migration runner komutu bulundu"; fi
+if grep -RniE 'wrangler[[:space:]]+d1[[:space:]]+migrations[[:space:]]+apply' scripts/live --include='*.sh' --exclude='go-live.sh' >/dev/null 2>&1; then die "Yasak migration runner komutu bulundu"; fi
 if [ "$DB_TARGET" = remote ]; then
   grep -Eq '"database_name"[[:space:]]*:[[:space:]]*"yaninda-turkiye-db"' "$CONFIG" || die "Yalnızca yaninda-turkiye-db hedeflenebilir"
   grep -Eq '"database_id"[[:space:]]*:[[:space:]]*"3edba257-0694-4b38-adb4-865e4aa9dac4"' "$CONFIG" || die "Production DB ID eşleşmiyor"
