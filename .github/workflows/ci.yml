@@ -62,6 +62,9 @@ jobs:
       - name: ShellCheck live D1 scripts
         run: |
           shellcheck --shell=bash scripts/live/test-local.sh
+          shellcheck --shell=bash scripts/live/go-live.sh
+          shellcheck --shell=bash scripts/live/smoke.sh
+          shellcheck --shell=bash scripts/telegram-webhook.sh
           shellcheck --shell=bash scripts/local-e2e.sh
       - name: Test additive schema scripts twice and run Worker E2E on isolated local D1
         run: bash scripts/live/test-local.sh
