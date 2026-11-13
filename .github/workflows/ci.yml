@@ -44,6 +44,28 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
+  live-schema-additive-e2e:
+    name: Additive D1 schema smoke + Worker E2E (observed base)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes shellcheck
+      - name: ShellCheck live D1 scripts
+        run: |
+          shellcheck --shell=bash scripts/live/test-local.sh
+          shellcheck --shell=bash scripts/local-e2e.sh
+      - name: Test additive schema scripts twice and run Worker E2E on isolated local D1
+        run: bash scripts/live/test-local.sh
+
   e2e:
     name: Local Worker E2E
     runs-on: ubuntu-latest
