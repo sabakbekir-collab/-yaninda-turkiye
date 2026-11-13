@@ -34,7 +34,7 @@ jobs:
       - name: Checkout reviewed PR #32 commit
         uses: actions/checkout@v4
         with:
-          ref: 6a8a6494db35c9279955cd688204c4c72134e45b
+          ref: 809a88e7afcf9767c1840187a31d8ba6545bbeba
           persist-credentials: false
 
       - name: Setup Node.js
