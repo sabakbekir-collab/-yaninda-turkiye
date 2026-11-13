@@ -1,3 +1,5 @@
+import process from "node:process";
+
 /**
  * Parse Wrangler D1 --json PRAGMA table_info output.
  * Supports both array-of-result-envelopes (remote) and object.results (local).
