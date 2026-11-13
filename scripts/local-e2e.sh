@@ -169,6 +169,14 @@ if (( READY == 0 )); then
 fi
 pass "Yerel $RUNTIME sunucusu hazır (/api/health HTTP 200)"
 
+info "Yerel Worker smoke.sh kontrolleri başlıyor"
+if ALLOW_LOCAL_HTTP=1 SITE_URL="$BASE_URL" bash scripts/live/smoke.sh; then
+  pass "scripts/live/smoke.sh yerel Worker üzerinde başarılı"
+else
+  fail "scripts/live/smoke.sh yerel Worker üzerinde başarısız"
+  exit 1
+fi
+
 ORIGIN_HEADER="Origin: $BASE_URL"
 CONTENT_HEADER="Content-Type: application/json"
 UA_HEADER='User-Agent: Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1'
