@@ -1,8 +1,6 @@
--- Read-only post-apply verification. Every expected object should return 1.
-SELECT 'analytics_session_revocations table' AS check_name,
-       EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='analytics_session_revocations') AS ok;
-SELECT 'events revocation trigger' AS check_name,
-       EXISTS(SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='events_ignore_revoked_analytics_sessions') AS ok;
+-- Read-only verification; each row must report ok=1.
+SELECT 'analytics_session_revocations table' AS check_name, EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='analytics_session_revocations') AS ok;
+SELECT 'events revocation trigger' AS check_name, EXISTS(SELECT 1 FROM sqlite_master WHERE type='trigger' AND name='events_ignore_revoked_analytics_sessions') AS ok;
 SELECT 'events.ts' AS check_name, EXISTS(SELECT 1 FROM pragma_table_info('events') WHERE name='ts') AS ok;
 SELECT 'events.session_id' AS check_name, EXISTS(SELECT 1 FROM pragma_table_info('events') WHERE name='session_id') AS ok;
 SELECT 'events.user_id' AS check_name, EXISTS(SELECT 1 FROM pragma_table_info('events') WHERE name='user_id') AS ok;
@@ -19,6 +17,10 @@ SELECT 'events.ip_hash' AS check_name, EXISTS(SELECT 1 FROM pragma_table_info('e
 SELECT 'ads.starts_at' AS check_name, EXISTS(SELECT 1 FROM pragma_table_info('ads') WHERE name='starts_at') AS ok;
 SELECT 'ads.ends_at' AS check_name, EXISTS(SELECT 1 FROM pragma_table_info('ads') WHERE name='ends_at') AS ok;
 SELECT 'submissions.admin_note' AS check_name, EXISTS(SELECT 1 FROM pragma_table_info('submissions') WHERE name='admin_note') AS ok;
-SELECT 'events ts index' AS check_name, EXISTS(SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_events_ts') AS ok;
-SELECT 'events session index' AS check_name, EXISTS(SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_events_session_ts') AS ok;
-SELECT 'ads schedule index' AS check_name, EXISTS(SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_ads_schedule') AS ok;
+SELECT 'idx_analytics_revocations_revoked_at' AS check_name, EXISTS(SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_analytics_revocations_revoked_at') AS ok;
+SELECT 'idx_events_ts' AS check_name, EXISTS(SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_events_ts') AS ok;
+SELECT 'idx_events_session_ts' AS check_name, EXISTS(SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_events_session_ts') AS ok;
+SELECT 'idx_events_event_ts' AS check_name, EXISTS(SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_events_event_ts') AS ok;
+SELECT 'idx_events_path_ts' AS check_name, EXISTS(SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_events_path_ts') AS ok;
+SELECT 'idx_events_target_ts' AS check_name, EXISTS(SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_events_target_ts') AS ok;
+SELECT 'idx_ads_schedule' AS check_name, EXISTS(SELECT 1 FROM sqlite_master WHERE type='index' AND name='idx_ads_schedule') AS ok;
