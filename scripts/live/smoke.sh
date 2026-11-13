@@ -8,7 +8,7 @@ tmp="$(mktemp -d)"; trap 'rm -rf "$tmp"' EXIT
 pass=0; fail=0
 check(){
  local name="$1" want="$2" method="$3" path="$4" data="${5:-}" status ok=0
- if [ "$method" = POST ]; then status="$(curl -sS --max-time 20 -o "$tmp/body" -w '%{http_code}' -X POST "$SITE_URL$path" -H 'Content-Type: application/json' --data "$data" 2>/dev/null || true)"
+ if [ "$method" = POST ]; then status="$(curl -sS --max-time 20 -o "$tmp/body" -w '%{http_code}' -X POST "$SITE_URL$path" -H 'Content-Type: application/json' -H "Origin: $SITE_URL" -H 'Sec-Fetch-Site: same-origin' --data "$data" 2>/dev/null || true)"
  else status="$(curl -sS --max-time 20 -o "$tmp/body" -w '%{http_code}' -X "$method" "$SITE_URL$path" 2>/dev/null || true)"; fi
  [ "$status" = "$want" ] && ok=1
  if [ "$name" = health ]; then grep -Eq '"ok"[[:space:]]*:[[:space:]]*true' "$tmp/body" && grep -Eq '"database"[[:space:]]*:[[:space:]]*true' "$tmp/body" || ok=0; fi
