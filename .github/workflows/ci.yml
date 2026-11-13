@@ -55,6 +55,27 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
+  audit-fix-preview:
+    name: npm audit non-breaking fix preview
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Apply compatible npm audit fixes without force
+        run: npm audit fix --package-lock-only --no-fund
+      - name: Upload proposed lockfile
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-fixed-lockfile
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 7
+
   live-schema-additive-e2e:
     name: Additive D1 schema smoke + Worker E2E (observed base)
     runs-on: ubuntu-latest
