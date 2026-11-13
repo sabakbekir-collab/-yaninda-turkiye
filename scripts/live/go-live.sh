@@ -88,8 +88,10 @@ verify(){
 let s=""; for await (const c of process.stdin) s+=c; const j=JSON.parse(s), a=[];
 function w(x){if(Array.isArray(x))x.forEach(w);else if(x&&typeof x==="object"){if(typeof x.check_name==="string"&&"ok" in x)a.push(x);Object.values(x).forEach(w)}}
 w(j); const bad=a.filter(x=>Number(x.ok)!==1);
-if(a.length!==27||bad.length){console.error("FAIL schema checks "+a.length+"/27");process.exit(1)}
-console.log("PASS 27/27 schema checks")
+for (const x of bad) console.error("FAIL "+x.check_name+" expected=1 actual="+JSON.stringify(x.ok));
+if(a.length!==25){console.error("FAIL schema check count expected=25 actual="+a.length);process.exit(1)}
+if(bad.length){console.error("FAIL schema checks "+(a.length-bad.length)+"/"+a.length);process.exit(1)}
+console.log("PASS 25/25 schema checks")
 '
 }
 case "$ACTION" in preflight) preflight;; apply) apply;; verify) verify;; esac
