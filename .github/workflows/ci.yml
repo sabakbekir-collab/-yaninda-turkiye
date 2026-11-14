@@ -30,7 +30,9 @@ jobs:
           sudo apt-get install --yes shellcheck
       - name: Check Telegram and local E2E scripts
         run: |
+          shellcheck --shell=bash scripts/live/finish.sh
           shellcheck --shell=bash scripts/telegram-webhook.sh
+          bash scripts/live/finish.sh --dry-run
           shellcheck --shell=bash scripts/local-e2e.sh
           shellcheck --shell=bash scripts/d1-readonly-audit.sh
       - name: Seed base schema in local D1 for PRAGMA preflight
