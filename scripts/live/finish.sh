@@ -85,14 +85,14 @@ else
 fi
 
 # d) The operator performs merge/deploy manually. Never merge or deploy here.
-printf '\n%s\n' 'PR #32’yi şimdi GitHub’dan merge et ve deploy’un bitmesini bekle.'
-printf '%s\n' 'Deploy yöntemi tespiti: wrangler.jsonc Worker adını ve D1 binding’ini tanımlar; Workers Builds bağlantı durumunu içermez.'
+printf '\n%s\n' 'GitHub üzerinden PR #32 merge işlemini yap ve deploy tamamlanana kadar bekle.'
+printf '%s\n' 'Deploy yöntemi tespiti: wrangler.jsonc Worker adını ve D1 binding bilgisini tanımlar; Workers Builds bağlantı durumunu içermez.'
 if [[ -f .github/workflows/cloudflare-deploy.yml ]] && grep -q 'CLOUDFLARE_API_TOKEN' .github/workflows/cloudflare-deploy.yml; then
-  printf '%s\n' 'GitHub Actions deploy workflow’u CLOUDFLARE_API_TOKEN secret’ını bekliyor; bu secret silindiği için bu yol şu anda deploy edemez.'
+  printf '%s\n' 'GitHub Actions deploy workflow CLOUDFLARE_API_TOKEN secret gerektiriyor. Secret silindiği için bu yöntem şu anda deploy edemez.'
 fi
 printf '%s\n' 'Cloudflare Workers Builds etkinliği yalnızca Cloudflare Dashboard > Workers & Pages > yaninda-turkiye > Settings > Builds bölümünden doğrulanabilir.'
-printf '%s\n' 'Workers Builds bağlıysa merge sonrası otomatik deploy’u bekle. Bağlı değilse, deploy’u yalnızca operatör onayıyla bilgisayarda npx wrangler deploy --config ./wrangler.jsonc komutuyla yap.'
-printf '%s' 'Deploy tamamlandıktan sonra devam etmek için Enter’a basın: '
+printf '%s\n' 'Workers Builds bağlıysa merge sonrası otomatik deploy beklenir. Bağlı değilse, operatör onayıyla bilgisayarda npx wrangler deploy --config ./wrangler.jsonc komutu kullanılabilir.'
+printf '%s' 'Deploy tamamlandıktan sonra devam etmek için Enter tuşuna basın: '
 IFS= read -r _
 
 # e) Production smoke tests.
