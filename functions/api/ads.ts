@@ -49,7 +49,7 @@ export async function onRequestGet({
 
     const rows = await env.DB
       .prepare(
-        "SELECT id,title,text,image_url,target_url,placement FROM ads WHERE status='active' AND placement=? ORDER BY id DESC LIMIT 10",
+        "SELECT id,title,text,image_url,target_url,placement FROM ads WHERE status='active' AND placement=? AND (starts_at IS NULL OR starts_at<=date('now','+3 hours')) AND (ends_at IS NULL OR ends_at>=date('now')) ORDER BY id DESC LIMIT 10",
       )
       .bind(placement)
       .all();

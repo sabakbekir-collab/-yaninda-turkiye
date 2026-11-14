@@ -31,7 +31,10 @@ export async function rateLimited(
   try {
     const now = Date.now();
     const bucket = Math.floor(now / (windowSec * 1000));
-    const key = `rl:${name}:${clientIp(request)}:${bucket}`;
+    const rawIp=clientIp(request);
+    const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode((env.ADMIN_SESSION_SECRET||'rate-limit')+':'+rawIp));
+    const ipKey=[...new Uint8Array(digest)].map((b)=>b.toString(16).padStart(2,'0')).join('');
+    const key = `rl:${name}:${ipKey}:${bucket}`;
     const expires = new Date((bucket + 1) * windowSec * 1000 + 60_000).toISOString();
 
     await env.DB.prepare(

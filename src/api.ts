@@ -2,6 +2,7 @@ import type {Place,Position} from './types';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName} from './text';
 import { mapPlacesError } from './searchErrors';
+import type {AnalyticsEvent} from '../shared/analyticsEvents';
 
 export type PlaceSearchOptions={
   radiusKm?:number;
@@ -112,11 +113,4 @@ export async function findPlaces(
   return cleaned;
 }
 
-export function track(type:string,metadata:Record<string,string|number|boolean>={}){
-  fetch('/api/events',{
-    method:'POST',
-    headers:{'content-type':'application/json'},
-    body:JSON.stringify({type,metadata}),
-    keepalive:true
-  }).catch(()=>undefined);
-}
+export {getAnalyticsConsent,setAnalyticsConsent,requestAnalyticsDeletion,isAnalyticsTrackingEnabled,track} from './analyticsConsent';

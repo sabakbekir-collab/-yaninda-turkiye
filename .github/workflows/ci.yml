@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, fix/security-health-admin-ai]
+    branches: [main, fix/security-health-admin-ai, feat/telegram-admin-bot, feat/admin-analytics-ux-kvkk]
     paths-ignore:
       - 'yaninda-turkiye-fixed*.zip'
   pull_request:
@@ -22,7 +22,90 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      - name: Assert CI workflows cannot access live D1
+        run: node scripts/test-ci-no-live-access.mjs
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes shellcheck
+      - name: Check Telegram and local E2E scripts
+        run: |
+          shellcheck --shell=bash scripts/live/finish.sh
+          shellcheck --shell=bash scripts/telegram-webhook.sh
+          bash scripts/live/finish.sh --dry-run
+          shellcheck --shell=bash scripts/local-e2e.sh
+          shellcheck --shell=bash scripts/d1-readonly-audit.sh
+      - name: Seed base schema in local D1 for PRAGMA preflight
+        run: |
+          npx --yes wrangler@4 d1 execute DB --local --config ./wrangler.jsonc --file migrations/0001_init.sql
+          npx --yes wrangler@4 d1 execute DB --local --config ./wrangler.jsonc --file migrations/0002_admin_logs.sql
+      - name: Check analytics ALTER columns before migration
+        run: node scripts/check-analytics-migration-preconditions.mjs
+      - name: Apply remaining D1 migrations to local test database
+        run: npx --yes wrangler@4 d1 migrations apply DB --local --config ./wrangler.jsonc
       - run: npm test
       - run: npx tsc -b
       - run: npm run lint
       - run: npm run build
+
+  live-schema-additive-e2e:
+    name: Additive D1 schema smoke + Worker E2E (observed base)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes shellcheck
+      - name: ShellCheck live D1 scripts
+        run: |
+          shellcheck --shell=bash scripts/live/test-local.sh
+          shellcheck --shell=bash scripts/live/go-live.sh
+          shellcheck --shell=bash scripts/live/smoke.sh
+          shellcheck --shell=bash scripts/telegram-webhook.sh
+          shellcheck --shell=bash scripts/local-e2e.sh
+      - name: Test additive schema scripts twice and run Worker E2E on isolated local D1
+        run: bash scripts/live/test-local.sh
+
+  e2e:
+    name: Local Worker E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialize E2E report
+        run: |
+          {
+            echo "INFO  E2E CI job started"
+            echo "INFO  Real Telegram credentials are intentionally unset"
+          } > e2e-report.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run local Worker E2E without Telegram secrets
+        run: env -u TELEGRAM_BOT_TOKEN -u TELEGRAM_TEST_CHAT_ID bash scripts/local-e2e.sh
+      - name: Add E2E report to job summary
+        if: always()
+        run: |
+          if [ -f e2e-report.txt ]; then
+            cat e2e-report.txt | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "FAIL  e2e-report.txt was not created" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload E2E report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-report
+          path: e2e-report.txt
+          if-no-files-found: error
+          retention-days: 14

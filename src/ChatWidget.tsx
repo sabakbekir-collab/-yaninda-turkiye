@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from "react";
 import {MessageCircle,Send,X,LocateFixed,Navigation} from "lucide-react";
 import {getCurrentLocation,getLocationPermissionState,LocationError} from "./location";
 import "./chat.css";
+import {track} from "./api";
 
 type Msg={role:"user"|"assistant";content:string};
 type Place={name:string;address?:string;phone?:string;lat?:number;lon?:number;distance?:number;isDuty?:boolean};
@@ -29,6 +30,7 @@ export default function ChatWidget(){
    return current;
   }catch(error){
    const code=error instanceof LocationError?error.code:"unknown";
+   if(code==="permission_denied")track("location_permission",{result:"denied",source:"ai"});
    setLocationError(
     code==="permission_denied"
      ?"Konum izni reddedildi. iPhone Ayarlar → Gizlilik ve Güvenlik → Konum Servisleri → Safari bölümünü kontrol et."
@@ -44,6 +46,8 @@ export default function ChatWidget(){
 
  async function send(){
   const text=input.trim();if(!text||loading)return;
+  const topic=/eczane/i.test(text)?"eczane":/yol|rota|nasıl gider/i.test(text)?"yol tarifi":/market|mağaza|alışveriş/i.test(text)?"alışveriş":/konum|yakınım/i.test(text)?"konum":/hava/i.test(text)?"hava durumu":"diğer";
+  track("ai_message",{message_count:messages.filter(m=>m.role==="user").length+1,topic});
   setInput("");setResults([]);setRoute(undefined);setLocationError("");
   const next=[...messages,{role:"user" as const,content:text}].slice(-12);
   setMessages(m=>[...m,{role:"user",content:text}]);setLoading(true);
@@ -71,7 +75,7 @@ export default function ChatWidget(){
  const useLocation=()=>{void ensureLocation()};
 
  return <>
-  <button className="yai-launcher" onClick={()=>setOpen(true)} aria-label="Yanımda AI"><MessageCircle/><span>Yanımda AI</span></button>
+  <button className="yai-launcher" onClick={()=>{if(!open)track("ai_open");setOpen(true)}} aria-label="Yanımda AI"><MessageCircle/><span>Yanımda AI</span></button>
   {open&&<div className="yai-overlay" onClick={()=>setOpen(false)}>
    <section className="yai-panel" onClick={e=>e.stopPropagation()}>
     <header><div><b>Yanımda AI</b><small>Konum, hizmet ve yol tarifi yardımcın</small></div><button onClick={()=>setOpen(false)} aria-label="Kapat"><X/></button></header>

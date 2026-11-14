@@ -18,3 +18,7 @@
  .yai-launcher{right:16px!important;bottom:calc(var(--mobile-nav-height) + env(safe-area-inset-bottom) + 12px)!important;width:48px!important;height:48px!important;min-height:48px!important;padding:0!important;border-radius:50%!important;justify-content:center}
  .yai-launcher span{display:none!important}
 }
+
+/* Admin view: keep the assistant launcher compact and above the bottom navigation. */
+body:has(.admin) .yai-launcher{right:12px;bottom:92px;transform:scale(.82);transform-origin:bottom right}
+@media(max-width:760px){body:has(.admin) .yai-launcher{bottom:88px;right:10px}}

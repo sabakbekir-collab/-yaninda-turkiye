@@ -8,10 +8,11 @@ import L from 'leaflet';
 import {categories,keywordMap,provinces,services} from './data';
 import {districtsFor} from './turkeyDistricts';
 import {resolveName,trSlug} from './text';
-import {findPlaces,resolveLocationArea,track} from './api';
+import {findPlaces,resolveLocationArea,track,setAnalyticsConsent,requestAnalyticsDeletion} from './api';
 import {getCurrentLocation,getLocationPermissionState,LocationError} from './location';
 import type {Place,Position} from './types';
 import ChatWidget from './ChatWidget';
+import AnalyticsConsentBanner from './AnalyticsConsent';
 import AdminAI from './AdminAI';
 import FavoritesPage from './FavoritesPage';
 import CalendarPage from './CalendarPage';
@@ -71,7 +72,7 @@ function Header(){
  const nearbyActive=location.pathname==='/nearby'&&new URLSearchParams(location.search).get('view')!=='map';
  const mapActive=location.pathname==='/nearby'&&new URLSearchParams(location.search).get('view')==='map';
  const submitSearch=(e:FormEvent)=>{e.preventDefault();const query=q.trim();if(query)nav('/nearby',{state:{query}})};
- return <header className="yt-header"><div className="yt-head"><NavLink to="/" className="yt-logo"><span><MapPin fill="currentColor"/></span><b>YANINDA <i>TÜRKİYE</i></b></NavLink><form className="yt-search" onSubmit={submitSearch}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Ne arıyorsunuz? (Eczane, ATM, Hastane...)"/><span><MapPin/> {selection}</span><button type="submit">Ara</button></form><div className="yt-actions"><button type="button" aria-label="Tema" onClick={()=>{const next=theme==="dark"?"light":"dark";setTheme(next);saveTheme(next)}}><span aria-hidden="true">{theme==="dark"?"☀":"🌙"}</span></button><NavLink to="/admin">Giriş Yap</NavLink><button type="button" onClick={()=>nav('/menu')} aria-label="Menüyü aç"><Menu/></button></div></div><nav className="yt-nav"><NavLink to="/">⌂ Ana Sayfa</NavLink><NavLink className={nearbyActive?'active':''} to="/nearby"><Compass/>Yakınımda</NavLink><NavLink className={mapActive?'active':''} to="/nearby?view=map"><MapIcon/>Harita</NavLink><NavLink className="danger" to="/emergency"><Siren/>Acil</NavLink><NavLink to="/favorites"><Heart/>Favoriler</NavLink><NavLink to="/calendar"><CalendarDays/>Takvim</NavLink><NavLink to="/news"><Landmark/>Haberler</NavLink><NavLink to="/contact"><Phone/>İletişim</NavLink></nav></header>
+ return <header className="yt-header"><div className="yt-head"><NavLink to="/" className="yt-logo"><span><MapPin fill="currentColor"/></span><b>YANINDA <i>TÜRKİYE</i></b></NavLink><form className="yt-search" onSubmit={submitSearch}><Search/><input value={q} onChange={e=>setQ(e.target.value)} placeholder="Ne arıyorsunuz? (Eczane, ATM, Hastane...)"/><span><MapPin/> {selection}</span><button type="submit">Ara</button></form><div className="yt-actions"><button type="button" aria-label="Tema" onClick={()=>{const next=theme==="dark"?"light":"dark";setTheme(next);saveTheme(next)}}><span aria-hidden="true">{theme==="dark"?"☀":"🌙"}</span></button>{location.pathname==='/admin'?<span className="admin-header-label">Yönetim</span>:<NavLink to="/admin">Giriş Yap</NavLink>}<button type="button" onClick={()=>nav('/menu')} aria-label="Menüyü aç"><Menu/></button></div></div><nav className="yt-nav"><NavLink to="/">⌂ Ana Sayfa</NavLink><NavLink className={nearbyActive?'active':''} to="/nearby"><Compass/>Yakınımda</NavLink><NavLink className={mapActive?'active':''} to="/nearby?view=map"><MapIcon/>Harita</NavLink><NavLink className="danger" to="/emergency"><Siren/>Acil</NavLink><NavLink to="/favorites"><Heart/>Favoriler</NavLink><NavLink to="/calendar"><CalendarDays/>Takvim</NavLink><NavLink to="/news"><Landmark/>Haberler</NavLink><NavLink to="/contact"><Phone/>İletişim</NavLink></nav></header>
 }
 
 function MobileNav(){
@@ -81,17 +82,17 @@ function MobileNav(){
  return <nav className="mobile-nav"><NavLink to="/"><Activity/><small>Ana Sayfa</small></NavLink><NavLink className={nearbyActive||mapActive?'active':''} to="/nearby"><Compass/><small>Keşfet</small></NavLink><NavLink to="/favorites"><Heart/><small>Favoriler</small></NavLink><NavLink to="/calendar"><CalendarDays/><small>Takvim</small></NavLink><NavLink to="/menu"><UserCircle/><small>Hesabım</small></NavLink></nav>
 }
 
-type AdRow={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null};
+type AdRow={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null;placement?:string|null};
 const adPlacement={top:'home_top',mid:'home_mid',bottom:'home_bottom'} as const;
 const httpUrl=(v?:string|null)=>{try{const u=new URL(v||'');return u.protocol==='https:'||u.protocol==='http:'?u.toString():''}catch{return ''}};
 // Only real, admin-approved ads from /api/ads are shown. No placeholder brands: nothing renders when there is no ad.
 function Ad({kind}:{kind:'top'|'mid'|'bottom'}){
  const[ad,setAd]=useState<AdRow|null>(null);
- useEffect(()=>{let live=true;fetch('/api/ads?placement='+adPlacement[kind]).then(r=>r.ok?r.json():null).then((d:{ads?:AdRow[]}|null)=>{if(live&&d&&Array.isArray(d.ads)&&d.ads[0]&&typeof d.ads[0].title==='string')setAd(d.ads[0])}).catch(()=>undefined);return()=>{live=false}},[kind]);
+ useEffect(()=>{let live=true;fetch('/api/ads?placement='+adPlacement[kind]).then(r=>r.ok?r.json():null).then((d:{ads?:AdRow[]}|null)=>{if(live&&d&&Array.isArray(d.ads)&&d.ads[0]&&typeof d.ads[0].title==='string'){setAd(d.ads[0]);track('ad_impression',{target_id:String(d.ads[0].id),target_label:d.ads[0].title,placement:adPlacement[kind]})}}).catch(()=>undefined);return()=>{live=false}},[kind]);
  if(!ad)return null;
  const href=httpUrl(ad.target_url),img=httpUrl(ad.image_url);
  const body=<>{img&&<img src={img} alt="" loading="lazy"/>}<div><small>REKLAM</small><strong>{ad.title}</strong>{ad.text&&<b>{ad.text}</b>}</div></>;
- return href?<a href={href} target="_blank" rel="sponsored noopener noreferrer" className="yt-ad red">{body}</a>:<div className="yt-ad red">{body}</div>
+ return href?<a href={href} target="_blank" rel="sponsored noopener noreferrer" className="yt-ad red" data-track-id={"ad:"+ad.id} onClick={()=>track("ad_click",{target_id:String(ad.id),target_label:ad.title,placement:adPlacement[kind]})}>{body}</a>:<div className="yt-ad red">{body}</div>
 }
 
 const quick:[string,string,LucideIcon,string][]=[
@@ -218,7 +219,7 @@ function Home(){
   }
 };
 
- const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){track('search',{source:'home'});const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
+ const search=(e?:FormEvent)=>{e?.preventDefault();const query=q.trim();if(query){track('search',{source:'home',query});const saved=readNearbyMemory();nav('/nearby',{state:{query,category:resolveSearchCategory(query),...(saved.position?{position:saved.position,province:saved.province,district:saved.district}:{})}})}};
  const cards=[
   ['pharmacy','Nöbetçi Eczaneler','Yakınınızdaki nöbetçi eczaneleri görüntüleyin','red',Pill,imgs.pharmacy],
   ['hospital','Hastaneler','En yakın hastaneler, poliklinikler ve aciller','blue',Hospital,imgs.hospital],
@@ -463,7 +464,7 @@ function Nearby(){
    setLoading(true);setErr('');
    if(submitted.category==='pharmacy'){setDutyFeedDate(null);setDutyError(false);}
    findPlaces(submitted.category,submitted.pos,submitted.province,submitted.district,{radiusKm:submitted.radius,nearbyDistricts:submitted.nearbyDistricts,anchor:submitted.anchor,forceRefresh:submitted.forceRefresh,onFeedDate:submitted.category==='pharmacy'?(date)=>{if(!cancelled)setDutyFeedDate(date)}:undefined})
-     .then(r=>{if(!cancelled){setPlaces(r);if(submitted.category==='pharmacy')setDutyError(false)}})
+     .then(r=>{if(!cancelled){setPlaces(r);track(r.length?'search':'search_zero_results',{category:submitted.category,query:submitted.category,province:submitted.province,district:submitted.district,result_count:r.length});if(submitted.category==='pharmacy')setDutyError(false)}})
      .catch((error:unknown)=>{if(!cancelled){const message=error instanceof Error&&error.message.trim()?error.message:'Nöbetçi eczane kaynağına ulaşılamadı.';setPlaces([]);setErr(message);if(submitted.category==='pharmacy')setDutyError(true)}})
      .finally(()=>{if(!cancelled)setLoading(false)});
    return()=>{cancelled=true};
@@ -487,7 +488,6 @@ function Nearby(){
 
  const search=async(forceRefresh=false,categoryOverride=cat)=>{
    setErr('');setLocationNotice('');setPlaces([]);setLoading(true);
-   track('search',{category:categoryOverride,province:canonProvince,district:canonDistrict});
    let searchPosition=pos;
    let searchProvince=canonProvince;
    let searchDistrict=canonDistrict;
@@ -499,6 +499,7 @@ function Nearby(){
        searchPosition=fresh;
        setPos(fresh);
        setLocationState('granted');
+       track('location_permission',{result:'granted'});
        manualAreaChosenRef.current=false;
        try{
          const area=await resolveLocationArea(fresh);
@@ -508,7 +509,7 @@ function Nearby(){
      }catch(error){
        const denied=error instanceof LocationError&&error.code==='permission_denied';
        const unsupported=error instanceof LocationError&&error.code==='unsupported';
-       if(denied)setLocationState('denied');
+       if(denied){setLocationState('denied');track('location_permission',{result:'denied'});}
        else if(unsupported)setLocationState('unsupported');
        else setLocationState('prompt');
        const fallbackArea=searchDistrict||searchProvince||'seçili bölge';
@@ -535,6 +536,7 @@ function Nearby(){
      // The button must always request a fresh device position. Never reuse
      // an old cached coordinate when the user explicitly taps "Konumumu Kullan".
      const current=await getCurrentLocation({forceFresh:true});
+     track('location_permission',{result:'granted'});
      // Resolve GPS coordinates to the same province/district fields used by
      // manual selection, so the same live duty-pharmacy widget is selected.
      const area=await resolveLocationArea(current);
@@ -689,8 +691,8 @@ function LegacyPlaceCard({p}:{p:Place}){
 
 function AdCampaigns(){
  const nav=useNavigate();const[tabs,setTabs]=useState<'ads'|'campaigns'|'discounts'|'partners'>('ads');const[ads,setAds]=useState<AdRow[]>([]);
- useEffect(()=>{let live=true;Promise.all(['home_top','home_mid','home_bottom'].map(placement=>fetch('/api/ads?placement='+placement).then(r=>r.ok?r.json():null).catch(()=>null))).then(rows=>{if(!live)return;const seen=new Set<number>();const all=rows.flatMap((x:unknown)=>{if(!x||typeof x!=='object')return [];const record=x as Record<string,unknown>;return Array.isArray(record.ads)?record.ads as AdRow[]:[];});setAds(all.filter((x:AdRow)=>{if(seen.has(x.id))return false;seen.add(x.id);return true}))});return()=>{live=false}},[]);
- return <main className="campaign-page"><header className="campaign-hero"><button onClick={()=>nav(-1)}>‹</button><div><small>YANINDA TÜRKİYE</small><h1>Reklam & Kampanyalar</h1></div></header><div className="campaign-tabs">{([['ads','Reklamlar'],['campaigns','Kampanyalar'],['discounts','İndirimler'],['partners','İş Birlikleri']] as const).map(([id,label])=><button key={id} className={tabs===id?'active':''} onClick={()=>setTabs(id)}>{label}</button>)}</div><section className="campaign-feature"><div><span>YANIMDA TÜRKİYE'DE ÖNE ÇIKIN</span><h2>İşletmenizi doğru kişilere tanıtın.</h2><p>Bölgesel görünürlük kazanın, yeni müşterilere ulaşın.</p><button onClick={()=>nav('/add-business')}>Reklam başvurusu <ArrowRight/></button></div><div className="campaign-feature-art"><Store/><MapPin/></div></section>{tabs==='ads'?<section className="campaign-list"><h2>Öne Çıkan Reklamlar</h2>{ads.length?ads.map(ad=><article className="campaign-ad-card" key={ad.id}>{httpUrl(ad.image_url)&&<img src={httpUrl(ad.image_url)} alt=""/>}<div><small>SPONSORLU</small><h3>{ad.title}</h3><p>{ad.text||'Yanımda Türkiye üzerinde tanıtım.'}</p>{httpUrl(ad.target_url)&&<a href={httpUrl(ad.target_url)} target="_blank" rel="sponsored noreferrer">İncele <ExternalLink/></a>}</div></article>):<div className="campaign-empty"><Store/><b>Henüz yayınlanmış reklam bulunmuyor.</b><span>Onaylanan reklamlar burada görüntülenecek.</span></div>}</section>:<div className="campaign-empty"><Bell/><b>{tabs==='campaigns'?'Yayındaki kampanyalar burada yer alacak.':tabs==='discounts'?'Güncel indirimler burada yer alacak.':'İş ortaklığı duyuruları burada yer alacak.'}</b><span>Yeni içerikler yayınlandığında bu bölümde görebileceksin.</span></div>}<button className="campaign-business-cta" onClick={()=>nav('/add-business')}><span><b>İşletmeniz için Reklam Verin</b><small>Yanımda Türkiye’de yerinizi alın</small></span><ArrowRight/></button></main>
+ useEffect(()=>{let live=true;Promise.all(['home_top','home_mid','home_bottom'].map(placement=>fetch('/api/ads?placement='+placement).then(r=>r.ok?r.json():null).catch(()=>null))).then(rows=>{if(!live)return;const seen=new Set<number>();const all=rows.flatMap((x:unknown)=>{if(!x||typeof x!=='object')return [];const record=x as Record<string,unknown>;return Array.isArray(record.ads)?record.ads as AdRow[]:[];});const unique=all.filter((x:AdRow)=>{if(seen.has(x.id))return false;seen.add(x.id);return true});unique.forEach(ad=>track('ad_impression',{target_id:String(ad.id),target_label:ad.title,placement:ad.placement||'unknown'}));setAds(unique)});return()=>{live=false}},[]);
+ return <main className="campaign-page"><header className="campaign-hero"><button onClick={()=>nav(-1)}>‹</button><div><small>YANINDA TÜRKİYE</small><h1>Reklam & Kampanyalar</h1></div></header><div className="campaign-tabs">{([['ads','Reklamlar'],['campaigns','Kampanyalar'],['discounts','İndirimler'],['partners','İş Birlikleri']] as const).map(([id,label])=><button key={id} className={tabs===id?'active':''} onClick={()=>setTabs(id)}>{label}</button>)}</div><section className="campaign-feature"><div><span>YANIMDA TÜRKİYE'DE ÖNE ÇIKIN</span><h2>İşletmenizi doğru kişilere tanıtın.</h2><p>Bölgesel görünürlük kazanın, yeni müşterilere ulaşın.</p><button onClick={()=>nav('/add-business')}>Reklam başvurusu <ArrowRight/></button></div><div className="campaign-feature-art"><Store/><MapPin/></div></section>{tabs==='ads'?<section className="campaign-list"><h2>Öne Çıkan Reklamlar</h2>{ads.length?ads.map(ad=><article className="campaign-ad-card" key={ad.id}>{httpUrl(ad.image_url)&&<img src={httpUrl(ad.image_url)} alt=""/>}<div><small>SPONSORLU</small><h3>{ad.title}</h3><p>{ad.text||'Yanımda Türkiye üzerinde tanıtım.'}</p>{httpUrl(ad.target_url)&&<a href={httpUrl(ad.target_url)} target="_blank" rel="sponsored noreferrer" data-track-id={"ad:"+ad.id} onClick={()=>track("ad_click",{target_id:String(ad.id),target_label:ad.title,placement:ad.placement||"unknown"})}>İncele <ExternalLink/></a>}</div></article>):<div className="campaign-empty"><Store/><b>Henüz yayınlanmış reklam bulunmuyor.</b><span>Onaylanan reklamlar burada görüntülenecek.</span></div>}</section>:<div className="campaign-empty"><Bell/><b>{tabs==='campaigns'?'Yayındaki kampanyalar burada yer alacak.':tabs==='discounts'?'Güncel indirimler burada yer alacak.':'İş ortaklığı duyuruları burada yer alacak.'}</b><span>Yeni içerikler yayınlandığında bu bölümde görebileceksin.</span></div>}<button className="campaign-business-cta" onClick={()=>nav('/add-business')}><span><b>İşletmeniz için Reklam Verin</b><small>Yanımda Türkiye’de yerinizi alın</small></span><ArrowRight/></button></main>
 }
 
 function Services(){const nav=useNavigate();return <main className="inner services-page"><div className="page-title"><button onClick={()=>nav(-1)} aria-label="Geri">‹</button><div><small>YANINDA TÜRKİYE</small><h1>Hizmetler</h1></div></div><p className="lead">İhtiyacın olan hizmeti seç. İl / ilçe seçimin korunur ve aynı bölgeyi tekrar seçmek zorunda kalmazsın.</p><div className="services">{services.map(([id,label,Icon])=><button key={id} onClick={()=>nav('/nearby',{state:{category:id}})}><span><Icon/></span><b>{label}</b><ChevronRight/></button>)}</div><button className="business" onClick={()=>nav('/add-business')}><Building2/><div><b>İşletmeni / Hizmetini Ekle</b><small>Ücretsiz başvur · İnceleme sonrası yayın</small></div><ArrowRight/></button></main>}
@@ -765,14 +767,46 @@ function AddBusiness(){
 function MenuPage(){return <main className="menu-page"><h1>Menü</h1>{[['/calendar','Takvim & Önemli Günler',CalendarDays],['/nearby','Yakınımdaki hizmetler',Compass],['/services','Çözüm Merkezi',Wrench],['/emergency','Acil Durum',Siren],['/add-business','İşletmeni Ekle',Building2],['/admin','Admin Girişi',LockKeyhole]].map(([to,t,I])=><NavLink key={String(to)} to={String(to)}><I/><b>{String(t)}</b><ChevronRight/></NavLink>)}</main>}
 
 type AdminStats={visitorsTotal:number;visitorsToday:number;searchesTotal:number;searchesToday:number;phoneClicks:number;directionsClicks:number;emergencyClicks:number;favoriteClicks:number};
-type AdminAd={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null;placement:string;status:string};
-type AdminSubmission={id:number;name:string;category:string;phone:string;address:string;province:string;district:string;status:string};
-type AdminReport={id:number;place_name:string;reason:string;details?:string;created_at:string};
+type AdminAd={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null;placement:string;status:string;starts_at?:string|null;ends_at?:string|null};
+type AdminSubmission={id:number;name:string;category:string;phone:string;address:string;province:string;district:string;status:string;admin_note?:string|null};
+type AdminReport={id:number;place_id:string;place_name:string;reason:string;details?:string;created_at:string;status:string};
 type AdminData={stats?:AdminStats;ads?:AdminAd[];submissions?:AdminSubmission[];reports?:AdminReport[]};
 function Admin(){
  const[email,setEmail]=useState(''),[password,setPassword]=useState(''),[ok,setOk]=useState(false),[data,setData]=useState<AdminData>(),[error,setError]=useState(''),[notice,setNotice]=useState(''),[loading,setLoading]=useState(false);
  const[editingId,setEditingId]=useState<number|null>(null);
- const[adForm,setAdForm]=useState({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});
+ const[adForm,setAdForm]=useState({title:'',text:'',image_url:'',target_url:'',placement:'home_top',starts_at:'',ends_at:''});
+ const[submissionFilter,setSubmissionFilter]=useState('all');
+ const[reportFilter,setReportFilter]=useState('open');
+ const[analytics,setAnalytics]=useState<Record<string,unknown>|null>(null);
+ const[analyticsRange,setAnalyticsRange]=useState<'today'|'7'|'30'|'custom'>('7');
+ const[analyticsFrom,setAnalyticsFrom]=useState(new Date(Date.now()-6*86400000).toISOString().slice(0,10));
+ const[analyticsTo,setAnalyticsTo]=useState(new Date().toISOString().slice(0,10));
+ const[analyticsLoading,setAnalyticsLoading]=useState(false);
+ const[heatmapPath,setHeatmapPath]=useState('/');
+ useEffect(()=>{
+  if(!ok)return;
+  let active=true;setAnalyticsLoading(true);
+  const end=new Date();const start=new Date(end);
+  if(analyticsRange==='today')start.setHours(0,0,0,0);else if(analyticsRange!=='custom')start.setDate(start.getDate()-(Number(analyticsRange)-1));
+  const from=analyticsRange==='custom'?analyticsFrom:start.toISOString().slice(0,10),to=analyticsRange==='custom'?analyticsTo:end.toISOString().slice(0,10);
+  const load=()=>fetch('/api/admin/analytics?from='+from+'&to='+to,{cache:'no-store'}).then(async response=>{
+   if(!response.ok)throw new Error('Analitik verileri alınamadı.');
+   return await response.json() as Record<string,unknown>;
+  }).then(value=>{if(active)setAnalytics(value);}).catch(()=>{if(active)setAnalytics(null);}).finally(()=>{if(active)setAnalyticsLoading(false);});
+  void load();
+  const timer=window.setInterval(()=>{void load();},30000);
+  return()=>{active=false;window.clearInterval(timer);};
+ },[ok,analyticsRange,analyticsFrom,analyticsTo]);
+ const analyticsRows=(key:string):Record<string,unknown>[]=>Array.isArray(analytics?.[key])?analytics[key] as Record<string,unknown>[]:[];
+ const exportAnalytics=()=>{
+  if(!analytics)return;
+  const groups=['summary','previousSummary','topTargets','searches','zeroSearches','categories','locations','actions','pages','heatmap','ads','ai','traffic','devices','browsers','sources','live'];
+  const rows=groups.flatMap(section=>{const value=analytics[section];if(Array.isArray(value))return value.map(row=>({section,data:JSON.stringify(row)}));return value&&typeof value==='object'?[{section,data:JSON.stringify(value)}]:[];});
+  if(!rows.length){setNotice('Dışa aktarılacak analitik verisi yok.');return;}
+  const csv=['bolum,veri',...rows.map(row=>[JSON.stringify(row.section),JSON.stringify(row.data)].join(','))].join('\\n');
+  const blob=new Blob(['\\ufeff'+csv],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');
+  link.href=url;link.download='yaninda-turkiye-analitik.csv';link.click();URL.revokeObjectURL(url);
+ };
  const refresh=async()=>{
    const r=await fetch('/api/admin',{cache:'no-store'});
    if(!r.ok)throw new Error(r.status===401?'Oturum süresi dolmuş. Yeniden giriş yap.':'Yönetim verileri alınamadı.');
@@ -797,7 +831,7 @@ function Admin(){
    e.preventDefault();
    const saved=await action({action:'save_ad',...(editingId?{id:editingId}:{}),...adForm});
    if(!saved)return;
-   setEditingId(null);setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top'});
+   setEditingId(null);setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top',starts_at:'',ends_at:''});
  };
  const logout=async()=>{
    try{await fetch('/api/admin',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'logout'})})}catch{}
@@ -807,30 +841,59 @@ function Admin(){
  const stats=data?.stats;
  const ads=data?.ads||[];
  return <main className="admin"><section>
-   <header><div><h1>Yönetim Paneli</h1><p>Yalnızca veritabanından gelen gerçek kayıtlar gösterilir.</p></div><button type="button" onClick={logout}>Güvenli Çıkış</button></header>
+   <header><div><h1>Yönetim Paneli</h1><p>Yönetici: {email} · Yalnızca veritabanından gelen gerçek kayıtlar gösterilir.</p></div><button type="button" onClick={logout}>Güvenli Çıkış</button></header>
    {error&&<div className="error" role="alert">{error}</div>}{notice&&<div className="success" role="status">{notice}</div>}
    <div className="stats">
     {[['Toplam ziyaret',stats?.visitorsTotal],['Bugünkü ziyaret',stats?.visitorsToday],['Toplam arama',stats?.searchesTotal],['Bugünkü arama',stats?.searchesToday]].map(([label,value])=><article key={String(label)}><small>{label}</small><strong>{typeof value==='number'?value.toLocaleString('tr-TR'):'Veri yok'}</strong></article>)}
    </div>
    {!stats&&<p className="admin-data-note">İstatistikler henüz alınamadı; tahmini rakam gösterilmiyor.</p>}
+   <section className="panel admin-analytics">
+    <div className="analytics-head"><div><h2>Analitik ve Ziyaretçi Davranışı</h2><p>Gerçek kullanıcı olayları üzerinden site performansını inceleyin.</p></div><div className="analytics-controls"><select aria-label="Analitik tarih aralığı" value={analyticsRange} onChange={e=>setAnalyticsRange(e.target.value as 'today'|'7'|'30')}><option value="today">Bugün</option><option value="7">Son 7 gün</option><option value="30">Son 30 gün</option><option value="custom">Özel tarih</option></select>{analyticsRange==='custom'&&<><input type="date" aria-label="Başlangıç tarihi" value={analyticsFrom} onChange={e=>setAnalyticsFrom(e.target.value)}/><input type="date" aria-label="Bitiş tarihi" value={analyticsTo} onChange={e=>setAnalyticsTo(e.target.value)}/></>}<button type="button" onClick={exportAnalytics}>CSV indir</button></div></div>
+    {analyticsLoading?<p role="status">Analitik verileri yükleniyor…</p>:!analytics?<p>Analitik verisi alınamadı veya henüz kayıt yok.</p>:<>
+     <div className="analytics-kpis">{(['page_views','sessions','visitors','searches','zero_searches','avg_seconds','bounce_rate'] as const).map(key=><article key={key}><small title={key==='visitors'?'IP hash ile ölçülen izinli tekil tarayıcılar':key==='sessions'?'İzin verilmiş anonim oturumlar':key==='page_views'?'Kaydedilen sayfa görüntülemeleri':key==='searches'?'Arama olaylarının sayısı':'Sonuçsuz arama sayısı'}>{({page_views:'Sayfa görüntüleme',sessions:'Oturum',visitors:'Tekil ziyaretçi',searches:'Arama',zero_searches:'0 sonuçlu arama',avg_seconds:'Ort. süre (sn)',bounce_rate:'Hemen çıkma (%)'})[key]}</small><strong>{String((analytics.summary as Record<string,unknown>|undefined)?.[key]??'0')}</strong><em>{(()=>{const current=Number((analytics.summary as Record<string,unknown>|undefined)?.[key]||0),previous=Number((analytics.previousSummary as Record<string,unknown>|undefined)?.[key]||0);return previous?((current-previous)/previous*100).toFixed(1)+'% önceki döneme göre':current?'Önceki dönemde veri yok':'—'})()}</em></article>)}</div>
+     <div className="analytics-grid">
+      <article><h3>En çok tıklanan yerler</h3>{analyticsRows('topTargets').length?analyticsRows('topTargets').slice(0,20).map((row,i)=><p key={String(row.id??i)}>{String(row.name||'Adsız')} <b>{String(row.clicks||0)}</b> · Ara {String(row.calls||0)} · Yol {String(row.directions||0)} · Favori {String(row.favorites||0)}</p>):<p>Henüz yer tıklaması yok.</p>}</article>
+      <article><h3>En çok arananlar</h3>{analyticsRows('searches').length?analyticsRows('searches').map((row,i)=><p key={i}>{String(row.query||'Arama terimi yok')} <b>{String(row.count||0)}</b></p>):<p>Henüz arama kaydı yok.</p>}<h3>0 sonuç verenler</h3>{analyticsRows('zeroSearches').length?analyticsRows('zeroSearches').map((row,i)=><p key={i}>{String(row.query||'Arama terimi yok')} <b>{String(row.count||0)}</b></p>):<p>Sonuçsuz arama yok.</p>}</article>
+      <article><h3>Kategoriler</h3>{analyticsRows('categories').length?analyticsRows('categories').map((row,i)=><p key={i}>{String(row.category||'Belirtilmedi')} <b>{String(row.count||0)}</b></p>):<p>Kategori olayı yok.</p>}</article>
+      <article><h3>İl dağılımı</h3>{analyticsRows('locations').length?analyticsRows('locations').map((row,i)=><p key={i}>{String(row.city||'Belirtilmedi')} <b>{String(row.count||0)}</b></p>):<p>İzinli konum verisi yok.</p>}</article>
+      <article><h3>Buton kullanımı</h3>{analyticsRows('actions').length?analyticsRows('actions').map((row,i)=><p key={i}>{String(row.event)} <b>{String(row.count)}</b></p>):<p>Henüz aksiyon olayı yok.</p>}</article>
+      <article><h3>Sayfa görüntülemeleri</h3>{analyticsRows('pages').length?analyticsRows('pages').map((row,i)=><p key={i}>{String(row.path)} <b>{String(row.views)}</b> · Ort. {String(row.avg_seconds??'—')} sn · Kaydırma {String(row.max_scroll??'—')}%</p>):<p>Sayfa görüntülemesi yok.</p>}</article>
+     </div>
+     <article className="analytics-heatmap"><h3>Tıklama ısı haritası</h3><select value={heatmapPath} onChange={e=>setHeatmapPath(e.target.value)} aria-label="Isı haritası sayfası"><option value="/">Ana sayfa</option>{analyticsRows('heatmap').map(row=>String(row.path)).filter((v,i,a)=>a.indexOf(v)===i&&v!=='/').map(path=><option key={path} value={path}>{path}</option>)}</select><svg viewBox="0 0 100 100" role="img" aria-label="Sayfa üzerindeki tıklama yoğunluğu">{analyticsRows('heatmap').filter(row=>row.path===heatmapPath).map((row,i)=><circle key={i} cx={Number(row.x)||0} cy={Number(row.y)||0} r={Math.min(8,2+Number(row.weight||1))} fill="#e11d48" fillOpacity=".45"/>)}</svg>{!analyticsRows('heatmap').some(row=>row.path===heatmapPath)&&<p>Bu sayfa için ısı haritası verisi yok.</p>}</article>
+     <div className="analytics-grid">
+      <article><h3>Saatlik trafik</h3>{analyticsRows('traffic').length?<svg viewBox="0 0 600 150" role="img" aria-label="Saatlik trafik çubuk grafiği">{analyticsRows('traffic').map((row,i)=>{const max=Math.max(1,...analyticsRows('traffic').map(v=>Number(v.count)||0));const value=Number(row.count)||0;const height=Math.max(2,value/max*112);return <g key={i}><rect x={i* Math.max(8,580/analyticsRows('traffic').length)+8} y={130-height} width={Math.max(4,Math.min(22,560/analyticsRows('traffic').length-3))} height={height} rx="3" fill="#2878c8"/><title>{String(row.hour)} · {value} olay</title></g>})}</svg>:<p>Trafik kaydı yok.</p>}</article>
+      <article><h3>Cihaz dağılımı</h3>{analyticsRows('devices').length?analyticsRows('devices').map((row,i)=><p key={i}>{String(row.device||'Belirtilmedi')} <b>{String(row.count)}</b></p>):<p>Cihaz verisi yok.</p>}</article>
+      <article><h3>Tarayıcı dağılımı</h3>{analyticsRows('browsers').length?analyticsRows('browsers').map((row,i)=><p key={i}>{String(row.browser||'Belirtilmedi')} <b>{String(row.count)}</b></p>):<p>Tarayıcı verisi yok.</p>}</article>
+      <article><h3>Trafik kaynakları</h3>{analyticsRows('sources').length?analyticsRows('sources').map((row,i)=><p key={i}>{String(row.referrer)} <b>{String(row.count)}</b></p>):<p>Yönlendiren kaynak kaydı yok.</p>}</article>
+      <article><h3>Reklam performansı</h3>{analyticsRows('ads').length?analyticsRows('ads').map((row,i)=>{const impressions=Number(row.impressions)||0,clicks=Number(row.clicks)||0;return <p key={i}>{String(row.placement||'Alan yok')} · {impressions} gösterim · {clicks} tıklama · CTR {impressions?((clicks/impressions)*100).toFixed(1):'0'}%</p>}):<p>Reklam gösterimi kaydı yok.</p>}</article>
+      <article><h3>Yanımda AI</h3>{analyticsRows('ai').length?analyticsRows('ai').map((row,i)=><p key={i}>{String(row.topic||row.event)} <b>{String(row.count)}</b></p>):<p>AI sohbet olayı yok.</p>}</article>
+     </div>
+     <article><h3>Canlı olay akışı</h3><span className="analytics-live">Gerçek zamanlı · 30 saniyede yenilenir · Son 50 olay</span>{analyticsRows('live').length?analyticsRows('live').map((row,i)=><p key={i}>{String(row.ts||'')} · {String(row.event||'')} · {String(row.path||'')} · {String(row.city||'Konum yok')} · {String(row.device||'Cihaz yok')}</p>):<p>Henüz olay kaydı yok.</p>}</article>
+    </>}
+   </section>
    <div className="panel ads">
     <div className="panel-title"><div><h2>Reklam Yönetimi</h2><p>Gerçek reklam kayıtlarını ekle, düzenle, duraklat veya sil.</p></div></div>
     <form className="admin-ad-form" onSubmit={saveAd}>
-     <label>Başlık<input required maxLength={120} value={adForm.title} onChange={e=>setAdForm(v=>({...v,title:e.target.value}))}/></label>
-     <label>Açıklama<input maxLength={300} value={adForm.text} onChange={e=>setAdForm(v=>({...v,text:e.target.value}))}/></label>
-     <label>Görsel URL<input type="url" value={adForm.image_url} onChange={e=>setAdForm(v=>({...v,image_url:e.target.value}))}/></label>
-     <label>Hedef URL<input type="url" value={adForm.target_url} onChange={e=>setAdForm(v=>({...v,target_url:e.target.value}))}/></label>
-     <label>Alan<select value={adForm.placement} onChange={e=>setAdForm(v=>({...v,placement:e.target.value}))}><option value="home_top">Ana sayfa üst</option><option value="home_mid">Ana sayfa orta</option><option value="home_bottom">Ana sayfa alt</option></select></label>
-     <div><button disabled={loading}>{editingId?'Reklamı Güncelle':'Reklam Ekle'}</button>{editingId&&<button type="button" onClick={()=>{setEditingId(null);setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top'})}}>Vazgeç</button>}</div>
+     <label>Başlık<input required maxLength={120} placeholder="Örn. Hafta sonu fırsatları" value={adForm.title} onChange={e=>setAdForm(v=>({...v,title:e.target.value}))}/><small>Reklam kartında görülecek kısa başlık.</small></label>
+     <label>Açıklama<textarea maxLength={300} rows={3} placeholder="Kampanyayı kısaca açıklayın." value={adForm.text} onChange={e=>setAdForm(v=>({...v,text:e.target.value}))}/><small>En fazla 300 karakter.</small></label>
+     <label>Görsel URL<input type="url" placeholder="https://ornek.com/reklam.jpg" value={adForm.image_url} onChange={e=>setAdForm(v=>({...v,image_url:e.target.value}))}/><small>https ile başlayan herkese açık görsel adresi.</small></label>
+     <label>Hedef URL<input type="url" placeholder="https://ornek.com/kampanya" value={adForm.target_url} onChange={e=>setAdForm(v=>({...v,target_url:e.target.value}))}/><small>Kullanıcı reklama dokunduğunda açılacak sayfa.</small></label>
+     <label>Başlangıç tarihi<input type="date" value={adForm.starts_at} onChange={e=>setAdForm(v=>({...v,starts_at:e.target.value}))}/><small>Boş bırakılırsa hemen geçerli olur.</small></label>
+     <label>Bitiş tarihi<input type="date" value={adForm.ends_at} onChange={e=>setAdForm(v=>({...v,ends_at:e.target.value}))}/><small>Boş bırakılırsa bitiş tarihi uygulanmaz.</small></label>
+     <label>Alan<select value={adForm.placement} onChange={e=>setAdForm(v=>({...v,placement:e.target.value}))}><option value="home_top">Ana sayfa üst – ilk içerik alanı</option><option value="home_mid">Ana sayfa orta – içerik akışı</option><option value="home_bottom">Ana sayfa alt – sayfa sonu</option></select><small>Reklamın ana sayfada gösterileceği konum.</small></label>
+     <div className="admin-ad-preview"><b>Önizleme</b><span>{adForm.placement==='home_top'?'Ana sayfa üst alanı':adForm.placement==='home_mid'?'Ana sayfa orta alanı':'Ana sayfa alt alanı'}</span>{adForm.image_url&&<img src={adForm.image_url} alt="Reklam görseli önizlemesi" onError={e=>{e.currentTarget.style.display='none'}}/>}<strong>{adForm.title||'Reklam başlığı'}</strong><p>{adForm.text||'Reklam açıklaması burada görünecek.'}</p></div>
+     <div className="admin-ad-actions"><button disabled={loading}>{loading?'Kaydediliyor…':editingId?'Reklamı Güncelle':'Reklam Ekle'}</button>{editingId&&<button type="button" onClick={()=>{setEditingId(null);setAdForm({title:'',text:'',image_url:'',target_url:'',placement:'home_top',starts_at:'',ends_at:''})}}>Vazgeç</button>}</div>
     </form>
-    {ads.length?ads.map(ad=><div className="ad-row" key={ad.id}>{ad.image_url&&<img src={ad.image_url} alt=""/>}<div><b>{ad.title}</b><small>{ad.placement} · {ad.status==='active'?'Yayında':'Duraklatıldı'}</small></div><button type="button" onClick={()=>{setEditingId(ad.id);setAdForm({title:ad.title,text:ad.text||'',image_url:ad.image_url||'',target_url:ad.target_url||'',placement:ad.placement||'home_top'})}}>Düzenle</button><button type="button" disabled={loading} onClick={()=>void action({action:'toggle_ad',id:ad.id})}>{ad.status==='active'?'Duraklat':'Yayınla'}</button><button type="button" disabled={loading} onClick={()=>{if(window.confirm('Bu reklam silinsin mi?'))void action({action:'delete_ad',id:ad.id})}}>Sil</button></div>):<p>Henüz kayıtlı reklam yok.</p>}
+    {ads.length?ads.map(ad=><div className="ad-row" key={ad.id}>{ad.image_url&&<img src={ad.image_url} alt={ad.title}/>}<div><b>{ad.title}</b><small>{ad.placement} · {ad.status==='active'?'Yayında':'Duraklatıldı'} · Başlangıç: {ad.starts_at||'Hemen'} · Bitiş: {ad.ends_at||'Süresiz'}</small></div><button type="button" onClick={()=>{setEditingId(ad.id);setAdForm({title:ad.title,text:ad.text||'',image_url:ad.image_url||'',target_url:ad.target_url||'',placement:ad.placement||'home_top',starts_at:ad.starts_at||'',ends_at:ad.ends_at||''})}}>Düzenle</button><button type="button" disabled={loading} onClick={()=>void action({action:'toggle_ad',id:ad.id})}>{ad.status==='active'?'Duraklat':'Yayınla'}</button><button type="button" disabled={loading} onClick={()=>{if(window.confirm('Bu reklam silinsin mi?'))void action({action:'delete_ad',id:ad.id})}}>Sil</button></div>):<p>Henüz kayıtlı reklam yok.</p>}
    </div>
-   <div className="panel"><h2>İşletme Başvuruları</h2>{(data?.submissions||[]).length?(data?.submissions||[]).map(item=><div className="ad-row" key={item.id}><div><b>{item.name}</b><small>{item.category} · {item.province}/{item.district} · {item.phone}</small><small>{item.address} · {item.status}</small></div>{item.status==='pending'&&<><button disabled={loading} onClick={()=>void action({action:'approve_submission',id:item.id})}>Onayla</button><button disabled={loading} onClick={()=>void action({action:'reject_submission',id:item.id})}>Reddet</button></>}</div>):<p>Bekleyen veya kayıtlı başvuru yok.</p>}</div>
-   <div className="panel"><h2>Hatalı Bilgi Bildirimleri</h2>{(data?.reports||[]).length?(data?.reports||[]).map(item=><div className="ad-row" key={item.id}><div><b>{item.place_name}</b><small>{item.reason} · {item.details||'Açıklama yok'}</small></div><button disabled={loading} onClick={()=>void action({action:'resolve_report',id:item.id})}>Çözüldü</button></div>):<p>Açık bildirim yok.</p>}</div>
+   <div className="panel"><h2>İşletme Başvuruları</h2><p className="admin-section-help">İşletme kayıt taleplerini inceleyip yayın onayı verin veya reddedin; iç not ekleyin.</p><label className="admin-filter">Durum filtresi<select value={submissionFilter} onChange={e=>setSubmissionFilter(e.target.value)}><option value="all">Tümü</option><option value="pending">Bekliyor</option><option value="approved">Onaylandı</option><option value="rejected">Reddedildi</option></select></label>{(data?.submissions||[]).filter(item=>submissionFilter==='all'||item.status===submissionFilter).length?(data?.submissions||[]).filter(item=>submissionFilter==='all'||item.status===submissionFilter).map(item=><div className="ad-row" key={item.id}><div><b>{item.name}</b><small>{item.category} · {item.province}/{item.district} · {item.phone}</small><small>{item.address} · Durum: {item.status}</small><small>İç not: {item.admin_note||'Not eklenmedi'}</small></div>{item.status==='pending'&&<><button disabled={loading} onClick={()=>void action({action:'approve_submission',id:item.id})}>Onayla</button><button disabled={loading} onClick={()=>void action({action:'reject_submission',id:item.id})}>Reddet</button></>}<button disabled={loading} onClick={()=>{const note=window.prompt('Başvuru için yönetici notu:',item.admin_note||'');if(note!==null)void action({action:'update_submission_note',id:item.id,note})}}>Not ekle</button></div>):<p>Bu filtrede başvuru yok.</p>}</div>
+   <div className="panel"><h2>Hatalı Bilgi Bildirimleri</h2><p className="admin-section-help">Kullanıcıların bildirdiği yanlış veya güncel olmayan bilgileri takip edin.</p><label className="admin-filter">Durum filtresi<select value={reportFilter} onChange={e=>setReportFilter(e.target.value)}><option value="open">Açık</option><option value="resolved">Çözüldü</option><option value="all">Tümü</option></select></label>{(data?.reports||[]).filter(item=>reportFilter==='all'||item.status===reportFilter).length?(data?.reports||[]).filter(item=>reportFilter==='all'||item.status===reportFilter).map(item=><div className="ad-row" key={item.id}><div><b>{item.place_name}</b><small>{item.reason} · {item.details||'Açıklama yok'} · {item.status}</small><small>Yer kimliği: {item.place_id}</small><a href={"https://www.openstreetmap.org/search?query="+encodeURIComponent(item.place_name)} target="_blank" rel="noreferrer">İlgili yeri haritada ara</a></div>{item.status==='open'&&<button disabled={loading} onClick={()=>void action({action:'resolve_report',id:item.id})}>Çözüldü işaretle</button>}</div>):<p>Bu filtrede bildirim yok.</p>}</div>
   </section></main>;
 }
 function Legal({type}:{type:'kvkk'|'privacy'}){
  const privacy=type==='privacy';
+ const [deleteStatus,setDeleteStatus]=useState('');
+ const deleteMyAnalytics=async()=>{setDeleteStatus('Talep gönderiliyor…');const ok=await requestAnalyticsDeletion();setDeleteStatus(ok?'Analitik oturum verileriniz silindi.':'Silme talebi gönderilemedi. Bu cihazda analitik oturumu bulunmayabilir.');};
  return <main className="inner legal nearby-page">
    <div className="page-title"><button className="back-btn" onClick={()=>history.back()} aria-label="Geri">‹</button><div><small>YANINDA TÜRKİYE</small><h1>{privacy?'Gizlilik':'KVKK'}</h1></div></div>
    <section><h2>{privacy?'Gizlilik ve Konum Verisi':'Kişisel Verilerin Korunması'}</h2>
@@ -838,6 +901,10 @@ function Legal({type}:{type:'kvkk'|'privacy'}){
    <p>İl, ilçe, kategori ve yarıçap seçimleri yalnızca kullanıcı deneyimini kolaylaştırmak için cihazda saklanır. Kullanıcı bunları tarayıcı verilerini temizleyerek silebilir.</p>
    <p>Harita ve açık veri sonuçlarında OpenStreetMap kaynakları kullanılabilir. Sonuçların kaynağı kart üzerinde gösterilir; işletme bilgilerinin güncelliği veri sağlayıcısına bağlıdır.</p>
    <p>İletişim veya işletme başvurusu sırasında gönderilen bilgiler yalnızca başvurunun değerlendirilmesi ve hizmetin yürütülmesi amacıyla işlenir.</p>
+   <p><b>Analitik verileri:</b> Kabul tercihiyle sayfa görüntüleme, arama terimi, tıklanan öğe, cihaz/tarayıcı türü ve oturum süresi ölçülebilir. Sadece zorunlu tercihinde oturum kimliği, kullanıcı kimliği, IP özeti, yönlendiren adres ve ısı haritası koordinatları kaydedilmez; yalnızca olay adı, sayfa ve tarih anonim toplu sayım için tutulur.</p>
+   <p><b>Saklama süresi:</b> Analitik olayları en fazla 90 gün tutulacak şekilde planlanır. Süre sonunda her gün çalışan zamanlanmış temizlik görevi kayıtları siler. Kabul edilmiş analitik oturum verilerinizi aşağıdaki düğmeyle silebilirsiniz. Silme işlemi mevcut cihazdaki anonim oturum kimliği üzerinden yapılır.</p>
+   <p><b>Tercihinizi değiştirin:</b> Aşağıdaki seçeneklerden birini seçerek analitik iznini güncelleyebilirsiniz.</p>
+   <div className="analytics-consent-actions legal-consent"><button type="button" onClick={()=>{setAnalyticsConsent('accepted');window.location.reload();}}>Analitiği kabul et</button><button type="button" onClick={()=>{setAnalyticsConsent('essential');window.location.reload();}}>İzni geri çek ve izlemeyi durdur</button><button type="button" onClick={deleteMyAnalytics}>Verilerimi sil</button></div><p role="status" aria-live="polite">{deleteStatus}</p>
    <p><b>Önemli:</b> Nöbetçi eczane durumu, resmi/güvenilir yapılandırılmış veri kaynağı doğrulanmadan “nöbetçi” olarak gösterilmez.</p>
  </section>
  </main>
@@ -847,6 +914,49 @@ function Simple({title}:{title:string}){return <main className="simple"><h1>{tit
 
 export default function TargetApp(){
  const location=useLocation();
- useEffect(()=>{track('page_view',{path:location.pathname});},[location.pathname]);
- return <div><Header/><Routes><Route path="/" element={<Home/>}/><Route path="/nearby" element={<Nearby/>}/><Route path="/services" element={<Services/>}/><Route path="/ads" element={<AdCampaigns/>}/><Route path="/emergency" element={<Emergency/>}/><Route path="/add-business" element={<AddBusiness/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/admin" element={<Admin/>}/><Route path="/favorites" element={<FavoritesPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/news" element={<Simple title="Haberler"/>}/><Route path="/contact" element={<Simple title="İletişim"/>}/><Route path="/kvkk" element={<Legal type="kvkk"/>}/><Route path="/gizlilik" element={<Legal type="privacy"/>}/><Route path="*" element={<Home/>}/></Routes><MobileNav/><ChatWidget/></div>
+ useEffect(()=>{
+  track('page_view',{path:location.pathname});
+  const started=Date.now(),sent=new Set<number>();let exited=false;
+  const thresholds=[25,50,75,100];
+  const onScroll=()=>{
+   const root=document.documentElement;
+   const max=Math.max(1,root.scrollHeight-window.innerHeight);
+   const depth=Math.min(100,Math.round(window.scrollY/max*100));
+   for(const mark of thresholds){if(depth>=mark&&!sent.has(mark)){sent.add(mark);track('scroll_depth',{depth:mark});}}
+  };
+  const onClick=(event:MouseEvent)=>{
+   const node=event.target instanceof Element?event.target.closest('a,button,[role="button"],[data-track-id]'):null;
+   if(!node)return;
+   const el=node as HTMLElement;
+   const label=(el.getAttribute('aria-label')||el.textContent||el.getAttribute('title')||'').trim().replace(/\\s+/g,' ').slice(0,100);
+   const href=el instanceof HTMLAnchorElement?el.href:'';
+   const key=el.dataset.trackId||[location.pathname,el.tagName,label.toLocaleLowerCase('tr-TR')].join(':').slice(0,140);
+   el.dataset.trackId=key;
+   let eventName:'phone_click'|'whatsapp_click'|'directions_click'|'website_click'|'category_click'|'place_click'|'favorite_click'|'share_click'|'button_click'='button_click';
+   if(href.startsWith('tel:'))eventName='phone_click';
+   else if(/wa\\.me|whatsapp/i.test(href))eventName='whatsapp_click';
+   else if(/maps|directions/i.test(href))eventName='directions_click';
+   else if(href&&new URL(href,window.location.origin).origin!==window.location.origin)eventName='website_click';
+   else if(el.closest('.place'))eventName='place_click';
+   else if(/favori|kalp/i.test(label))eventName='favorite_click';
+   else if(/paylaş/i.test(label))eventName='share_click';
+   else if(el.closest('.quick-grid,.popular-grid,.category-grid'))eventName='category_click';
+   const rect=el.getBoundingClientRect();
+   const x=Math.max(0,Math.min(100,Math.round((event.clientX/Math.max(1,window.innerWidth))*100)));
+   const y=Math.max(0,Math.min(100,Math.round(((event.clientY+window.scrollY)/Math.max(1,document.documentElement.scrollHeight))*100)));
+   track(eventName,{target_id:key,target_label:label,target_type:el.tagName.toLowerCase(),x,y});
+   track('heatmap_click',{target_id:key,target_label:label,x,y});
+  };
+  const onExit=()=>{if(exited)return;exited=true;track('time_on_page',{duration_seconds:Math.max(0,Math.round((Date.now()-started)/1000))});};
+  const onError=()=>track('error',{source:'window'});
+  const onUnhandled=()=>track('error',{source:'promise'});
+  window.addEventListener('scroll',onScroll,{passive:true});
+  document.addEventListener('click',onClick,true);
+  window.addEventListener('pagehide',onExit,{once:true});
+  window.addEventListener('error',onError);
+  window.addEventListener('unhandledrejection',onUnhandled);
+  onScroll();
+  return()=>{onExit();window.removeEventListener('scroll',onScroll);document.removeEventListener('click',onClick,true);window.removeEventListener('pagehide',onExit);window.removeEventListener('error',onError);window.removeEventListener('unhandledrejection',onUnhandled);};
+ },[location.pathname]);
+ return <div><Header/><Routes><Route path="/" element={<Home/>}/><Route path="/nearby" element={<Nearby/>}/><Route path="/services" element={<Services/>}/><Route path="/ads" element={<AdCampaigns/>}/><Route path="/emergency" element={<Emergency/>}/><Route path="/add-business" element={<AddBusiness/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/admin" element={<Admin/>}/><Route path="/favorites" element={<FavoritesPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/news" element={<Simple title="Haberler"/>}/><Route path="/contact" element={<Simple title="İletişim"/>}/><Route path="/kvkk" element={<Legal type="kvkk"/>}/><Route path="/gizlilik" element={<Legal type="privacy"/>}/><Route path="*" element={<Home/>}/></Routes><MobileNav/><ChatWidget/><AnalyticsConsentBanner/></div>
 }

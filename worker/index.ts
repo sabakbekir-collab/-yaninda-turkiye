@@ -1,11 +1,15 @@
 import { onRequestGet as getPlaces, onRequestAreaGet as getLocationArea } from "../functions/api/places";
 import { onRequestGet as getAds } from "../functions/api/ads";
 import { onRequestPost as postEvents } from "../functions/api/events";
+import { onRequestPost as postTrack } from "../functions/api/track";
+import { onRequestPost as postTelegram } from "../functions/api/telegram";
+import { onRequestPost as postDeleteRequest } from "../functions/api/delete-request";
 import { onRequestGet as getAdmin, onRequestPost as postAdmin } from "../functions/api/admin";
 import { onRequestPost as postSubmissions } from "../functions/api/submissions";
 import { onRequestPost as postReports } from "../functions/api/reports";
 import { onRequestPost as postAiChat } from "../functions/api/ai";
 import { onRequestPost as postAdminAi } from "../functions/api/admin-ai";
+import { onRequestGet as getAdminAnalytics } from "../functions/api/admin-analytics";
 import type { Env } from "../functions/lib/types";
 import { ensureSchema } from "../functions/lib/schema";
 import { validSession } from "../functions/lib/auth";
@@ -26,6 +30,14 @@ type CfLocation = {
 const json404 = () => Response.json({ error: "not_found" }, { status: 404 });
 
 export default {
+  async scheduled(_event: ScheduledController, env: RuntimeEnv): Promise<void> {
+    if (!env.DB) return;
+    try {
+      await env.DB.prepare("DELETE FROM events WHERE COALESCE(ts, created_at) < datetime('now', '-90 days')").run();
+    } catch (error) {
+      console.error("Analytics retention cleanup failed", error);
+    }
+  },
   async fetch(request: Request, env: RuntimeEnv): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
@@ -115,6 +127,22 @@ export default {
             { status: 503, headers: { "Cache-Control": "no-store" } },
           );
         }
+      }
+
+      if (path === "/api/telegram" && request.method === "POST") {
+        return await postTelegram({ request, env });
+      }
+
+      if (path === "/api/delete-request" && request.method === "POST") {
+        return await postDeleteRequest({ request, env });
+      }
+
+      if (path === "/api/track" && request.method === "POST") {
+        return await postTrack({ request, env });
+      }
+
+      if (path === "/api/admin/analytics" && request.method === "GET") {
+        return await getAdminAnalytics({ request, env });
       }
 
       if (path === "/api/admin/ai" && request.method === "POST") {

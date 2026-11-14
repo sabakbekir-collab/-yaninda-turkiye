@@ -5,3 +5,8 @@ dist
 android/.gradle
 android/app/build
 *.jks
+
+# Local database exports, production backups, and local E2E reports
+/e2e-report.txt
+/backups/
+/d1-audit-report.txt
