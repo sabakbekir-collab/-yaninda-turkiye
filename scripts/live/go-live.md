@@ -1,3 +1,4 @@
+bash scripts/live/finish.sh
 # PR #32 — canlı geçiş rehberi
 Canlı D1 yazımı, deploy ve merge bu PR hazırlığı kapsamında yapılmaz.
 
