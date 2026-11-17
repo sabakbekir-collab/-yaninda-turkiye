@@ -11,8 +11,8 @@ export async function updateSubmissionStatus(env: Env, id: number, decision: Sub
     if (!row) return 'not_found';
     if (row.status !== 'pending') return 'unavailable';
     if (decision === 'reject_submission') {
-      await env.DB.prepare("UPDATE submissions SET status='rejected',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'").bind(id).run();
-      return 'ok';
+      const changed = await env.DB.prepare("UPDATE submissions SET status='rejected',updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'").bind(id).run() as { meta?: { changes?: number } };
+      return Number(changed.meta?.changes || 0) > 0 ? 'ok' : 'unavailable';
     }
     const q = new URL('https://nominatim.openstreetmap.org/search');
     q.searchParams.set('format', 'jsonv2');
@@ -28,9 +28,9 @@ export async function updateSubmissionStatus(env: Env, id: number, decision: Sub
     const latitude = Number(results[0]?.lat);
     const longitude = Number(results[0]?.lon);
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || latitude < 35 || latitude > 43 || longitude < 25 || longitude > 46) return 'geocode_failed';
-    await env.DB.prepare("UPDATE submissions SET status='approved',latitude=?,longitude=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'")
-      .bind(latitude, longitude, id).run();
-    return 'ok';
+    const changed = await env.DB.prepare("UPDATE submissions SET status='approved',latitude=?,longitude=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND status='pending'")
+      .bind(latitude, longitude, id).run() as { meta?: { changes?: number } };
+    return Number(changed.meta?.changes || 0) > 0 ? 'ok' : 'unavailable';
   } catch {
     return 'unavailable';
   }
