@@ -4,12 +4,14 @@ import { onRequestPost } from '../functions/api/telegram.ts';
 
 function makeEnv() {
   const sent = [];
+  const queries = [];
   const env = {
     TELEGRAM_BOT_TOKEN: 'fake-local-token',
     TELEGRAM_WEBHOOK_SECRET: 'fake-local-secret',
     TELEGRAM_ADMIN_CHAT_IDS: '12345',
     DB: {
       prepare(sql) {
+        queries.push(sql);
         const first = async () => {
           if (sql.includes('SELECT payload FROM api_cache')) return { payload: '1' };
           if (sql.includes("SUM(CASE WHEN type='error'")) return { total: 8, errors: 2 };
@@ -29,7 +31,7 @@ function makeEnv() {
       },
     },
   };
-  return { env, sent };
+  return { env, sent, queries };
 }
 
 function makeRequest(secret, update) {
@@ -92,7 +94,7 @@ test('/start and /yardim return the help text to an allowlisted admin', async ()
 });
 
 test('/durum uses the actual D1 schema columns', async () => {
-  const { env } = makeEnv();
+  const { env, queries } = makeEnv();
   const previousFetch = globalThis.fetch;
   let payload;
   globalThis.fetch = async (_url, init) => {
@@ -105,6 +107,7 @@ test('/durum uses the actual D1 schema columns', async () => {
       env,
     });
     assert.equal(response.status, 200);
+    assert.ok(queries.some((sql) => sql.includes("created_at>=datetime('now','-24 hours')")));
     assert.match(payload.text, /Olay sayısı: 8/);
     assert.match(payload.text, /Hata sayısı: 2/);
     assert.match(payload.text, /Bekleyen işletme başvurusu: 3/);
