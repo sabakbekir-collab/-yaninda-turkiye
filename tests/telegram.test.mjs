@@ -18,7 +18,7 @@ function makeEnv() {
           return null;
         };
         return {
-          bind(...values) {
+          bind() {
             return {
               async run() { return { meta: { changes: 1 } }; },
               first,
