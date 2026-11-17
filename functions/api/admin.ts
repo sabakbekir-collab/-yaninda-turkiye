@@ -1,7 +1,7 @@
 import type {Env} from '../lib/types';
 import {cookieHeader,clearCookie,makeSession,strictSameOrigin,validSession,secureCompare} from '../lib/auth';
 import {rateLimited,clientIp} from '../lib/ratelimit';
-import {updateSubmissionStatus} from '../lib/submissionStatus.ts;
+import {updateSubmissionStatus} from '../lib/submissionStatus.ts';
 
 const json=async(r:Request)=>await r.json() as Record<string,unknown>;
 const clean=(v:unknown,n=300)=>typeof v==='string'?v.trim().replace(/[<>]/g,'').slice(0,n):'';
