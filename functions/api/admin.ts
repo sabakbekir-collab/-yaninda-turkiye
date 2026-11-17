@@ -1,7 +1,6 @@
 import type {Env} from '../lib/types';
 import {cookieHeader,clearCookie,makeSession,strictSameOrigin,validSession,secureCompare} from '../lib/auth';
 import {rateLimited,clientIp} from '../lib/ratelimit';
-import {parseTurkeyCoordinates} from '../lib/locationValidation';
 import {updateSubmissionStatus} from '../lib/submissionStatus';
 
 const json=async(r:Request)=>await r.json() as Record<string,unknown>;
