@@ -103,7 +103,7 @@ test('/durum uses the actual D1 schema columns', async () => {
   };
   try {
     const response = await onRequestPost({
-      request: makeRequest('fake-local-secret', { message: { chat: { id: 12345 }, text: '/durum' } }),
+      request: makeRequest('fake-local-secret', { message: { chat: { id: 12345, type: 'private' }, text: '/durum' } }),
       env,
     });
     assert.equal(response.status, 200);
