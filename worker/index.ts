@@ -28,7 +28,7 @@ const json404 = () => Response.json({ error: "not_found" }, { status: 404 });
 
 export default {
   async scheduled(_event: { scheduledTime: number; cron: string }, env: RuntimeEnv, ctx: { waitUntil(promise: Promise<unknown>): void }): Promise<void> {
-    ctx.waitUntil(sendDailyTelegramReport(env));
+    ctx.waitUntil(ensureSchema(env).then(() => sendDailyTelegramReport(env)));
   },
   async fetch(request: Request, env: RuntimeEnv): Promise<Response> {
     const url = new URL(request.url);
