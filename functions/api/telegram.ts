@@ -107,7 +107,7 @@ async function reportPeriod(env: Env, hours: number): Promise<Record<string, num
     SUM(CASE WHEN type='search' AND COALESCE(json_extract(metadata,'$.result_count'),json_extract(metadata,'$.resultCount'),json_extract(metadata,'$.results'),1)=0 THEN 1 ELSE 0 END) AS empty_searches,
     SUM(CASE WHEN type='ad_impression' THEN 1 ELSE 0 END) AS ad_impressions,
     SUM(CASE WHEN type='ad_click' THEN 1 ELSE 0 END) AS ad_clicks,
-    SUM(CASE WHEN type IN ('client_error','error') THEN 1 ELSE 0 END) AS client_errors,
+    SUM(CASE WHEN type='client_error' THEN 1 ELSE 0 END) AS client_errors,
     COUNT(DISTINCT COALESCE(json_extract(metadata,'$.session_id'),json_extract(metadata,'$.sessionId'))) AS sessions
     FROM events WHERE created_at>=datetime('now',?)`).bind(since).first<Row>();
   return Object.fromEntries(['events','sessions','searches','empty_searches','ad_impressions','ad_clicks','client_errors'].map((key) => [key, Number(row?.[key] || 0)]));
