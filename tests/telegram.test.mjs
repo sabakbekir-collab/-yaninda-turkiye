@@ -111,7 +111,7 @@ test('/durum uses the actual D1 schema columns', async () => {
     assert.match(payload.text, /Olay sayısı: 8/);
     assert.match(payload.text, /Hata sayısı: 2/);
     assert.match(payload.text, /Bekleyen işletme başvurusu: 3/);
-    assert.match(payload.text, /Açık bildirim: 4/);
+    assert.match(payload.text, /Açık hatalı bildirim: 4/);
   } finally {
     globalThis.fetch = previousFetch;
   }
