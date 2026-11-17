@@ -14,7 +14,7 @@ function makeEnv() {
         queries.push(sql);
         const first = async () => {
           if (sql.includes('SELECT payload FROM api_cache')) return { payload: '1' };
-          if (sql.includes("SUM(CASE WHEN type='error'")) return { total: 8, errors: 2 };
+          if (sql.includes('SUM(CASE WHEN type IN')) return { total: 8, errors: 2 };
           if (sql.includes('FROM submissions')) return { total: 3 };
           if (sql.includes('FROM reports')) return { total: 4 };
           return null;
