@@ -82,7 +82,7 @@ async function getStatus(env: Env): Promise<string> {
       env.DB.prepare("SELECT COUNT(*) AS total FROM submissions WHERE status='pending'").first<Row>(),
       env.DB.prepare("SELECT COUNT(*) AS total FROM reports WHERE status='open'").first<Row>(),
     ]);
-    return ['📊 Yanımda Türkiye — Son 24 saat', `• Olay: ${Number(events?.total || 0)}`, `• Hata: ${Number(events?.errors || 0)}`, `• Bekleyen başvuru: ${Number(pending?.total || 0)}`, `• Açık hatalı bildirim: ${Number(reports?.total || 0)}`].join('\n');
+    return ['📊 Yanımda Türkiye — Son 24 saat', `• Olay sayısı: ${Number(events?.total || 0)}`, `• Hata sayısı: ${Number(events?.errors || 0)}`, `• Bekleyen başvuru: ${Number(pending?.total || 0)}`, `• Açık hatalı bildirim: ${Number(reports?.total || 0)}`].join('\n');
   } catch { return 'Durum bilgisi alınamadı. Veritabanı bağlantısını kontrol edin.'; }
 }
 async function listSubmissions(env: Env): Promise<string> {
