@@ -14,3 +14,9 @@ test('Telegram route is wired and cron does not expose secrets', () => {
   assert.match(worker, /sendDailyTelegramReport/);
   assert.match(config, /"0 6 \* \* \*"/);
 });
+
+test('custom ad placements emit privacy-safe impression and click events', () => {
+  const app = readFileSync('src/TargetApp.tsx', 'utf8');
+  assert.match(app, /track\('ad_impression'/);
+  assert.match(app, /track\('ad_click'/);
+});
