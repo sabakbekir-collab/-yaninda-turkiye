@@ -1,5 +1,5 @@
 import type { Env } from '../lib/types';
-import { rateLimited } from '../lib/ratelimit';
+import { rateLimited } from '../lib/ratelimit.ts';
 
 type TelegramUpdate = {
   message?: {
