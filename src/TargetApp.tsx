@@ -246,6 +246,7 @@ function Home(){
       <button onClick={()=>nav('/emergency')}><Siren/><b>Acil</b></button>
       <button onClick={()=>nav('/nearby',{state:{query:"Beyoğlu'na nasıl gidilir?"}})}><Navigation/><b>Yol Tarifi</b></button>
       <button onClick={()=>nav('/favorites')}><Heart/><b>Favorilerim</b></button>
+      <button onClick={()=>nav('/customer-support')}><Phone/><b>Müşteri Hizmetleri</b></button>
       <button onClick={()=>{if(navigator.share)navigator.share({title:'Yanımda Türkiye',text:'Yanımda Türkiye'});else void navigator.clipboard?.writeText(location.href)}}><ExternalLink/><b>Paylaş</b></button>
     </div>
    </section>

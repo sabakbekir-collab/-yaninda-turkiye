@@ -128,3 +128,35 @@
 .nearby-non-duty-pharmacies h2{margin:0 0 6px;font-size:1.05rem}
 .nearby-non-duty-pharmacies>p{margin:0 0 12px;font-size:.9rem;line-height:1.45}
 .nearby-non-duty-pharmacies>p strong{font-weight:800}
+
+
+/* Customer support quick dial — responsive mobile-first layout. */
+.support-page{max-width:920px;margin:0 auto;padding-bottom:110px}
+.support-page .page-title{display:flex;align-items:center;gap:14px}
+.support-page .page-title>a{width:42px;height:42px;display:grid;place-items:center;border:1px solid var(--line);border-radius:13px;background:#fff;color:var(--ink)}
+.support-page .page-title h1{margin:3px 0 0;font:800 clamp(25px,5vw,36px) Manrope;color:var(--ink)}
+.support-page .page-title small{font-size:10px;letter-spacing:.12em;color:var(--muted);font-weight:800}
+.support-lead{max-width:680px;color:var(--muted);line-height:1.6;margin:14px 0 18px}
+.support-warning{display:flex;align-items:flex-start;gap:11px;padding:14px;border:1px solid #f0d69a;background:#fff8e8;color:#755016;border-radius:15px;font-size:12px;line-height:1.55}
+.support-warning svg{width:21px;height:21px;flex:none;margin-top:1px}
+.support-search{height:52px;margin:18px 0 12px;padding:0 15px;display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:15px;background:#fff}
+.support-search svg{width:20px;color:var(--muted)}
+.support-search input{width:100%;min-width:0;border:0;outline:0;background:transparent;color:var(--ink);font:inherit}
+.support-filters{display:flex;flex-wrap:wrap;gap:8px}
+.support-filters button{min-height:38px;padding:0 15px;border:1px solid var(--line);border-radius:22px;background:#fff;color:var(--ink);font-size:12px;font-weight:800}
+.support-filters button.active{border-color:#ed1c2e;background:#fff0f2;color:#c51d2d}
+.support-count{margin:14px 0 9px;color:var(--muted);font-size:11px;font-weight:700}
+.support-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}
+.support-card{min-width:0;padding:15px;border:1px solid var(--line);border-radius:17px;background:#fff;box-shadow:0 5px 18px rgba(20,40,65,.045)}
+.support-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.support-card h2{min-width:0;margin:0;color:var(--ink);font:800 15px Manrope;text-align:right}
+.support-category{flex:none;padding:5px 8px;border-radius:20px;background:#eef3f8;color:#526579;font-size:9px;font-weight:900}
+.support-phone{min-height:45px;display:flex;align-items:center;gap:9px;padding:0 11px;border-radius:12px;background:#f2f6fb;color:#173c5b;text-decoration:none}
+.support-phone svg{width:18px;color:#1676bd}
+.support-phone strong{flex:1;font-size:14px;letter-spacing:.01em}
+.support-phone span{padding:6px 10px;border-radius:9px;background:#176ed0;color:#fff;font-size:10px;font-weight:900}
+.support-keys,.support-note{display:block;margin:10px 0 0;color:var(--muted);font-size:11px;line-height:1.5}
+.support-keys b{color:var(--ink)}
+.support-note{color:#8a5a16}
+.support-empty,.support-foot{margin-top:18px;color:var(--muted);font-size:12px;line-height:1.6}
+@media(max-width:600px){.support-page{padding-left:14px;padding-right:14px}.support-list{grid-template-columns:1fr}.support-card{padding:13px}.support-card h2{font-size:14px}.support-phone strong{font-size:15px}}
