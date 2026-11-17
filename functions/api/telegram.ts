@@ -1,6 +1,6 @@
 import type { Env } from '../lib/types';
 import { rateLimited } from '../lib/ratelimit.ts';
-import { updateSubmissionStatus } from '../lib/submissionStatus';
+import { updateSubmissionStatus } from '../lib/submissionStatus.ts;
 
 type TelegramUpdate = { message?: { text?: unknown; chat?: { id?: number | string; type?: string } } };
 type Row = Record<string, unknown>;
