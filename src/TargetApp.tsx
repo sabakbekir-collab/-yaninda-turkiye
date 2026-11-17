@@ -15,6 +15,7 @@ import ChatWidget from './ChatWidget';
 import AdminAI from './AdminAI';
 import FavoritesPage from './FavoritesPage';
 import CalendarPage from './CalendarPage';
+import CustomerSupport from './CustomerSupport';
 import EnhancedPlaceCard from './PlaceCard';
 import {getTheme,applyTheme,saveTheme} from './theme';
 import {shareText,mapsLink} from './share';
@@ -762,7 +763,7 @@ function AddBusiness(){
   <button disabled={busy}>{busy?'Gönderiliyor…':'Başvuruyu Gönder'} <ArrowRight/></button>
  </form>}</main>
 }
-function MenuPage(){return <main className="menu-page"><h1>Menü</h1>{[['/calendar','Takvim & Önemli Günler',CalendarDays],['/nearby','Yakınımdaki hizmetler',Compass],['/services','Çözüm Merkezi',Wrench],['/emergency','Acil Durum',Siren],['/add-business','İşletmeni Ekle',Building2],['/admin','Admin Girişi',LockKeyhole]].map(([to,t,I])=><NavLink key={String(to)} to={String(to)}><I/><b>{String(t)}</b><ChevronRight/></NavLink>)}</main>}
+function MenuPage(){return <main className="menu-page"><h1>Menü</h1>{[['/customer-support','Müşteri Hizmetleri',Phone],['/calendar','Takvim & Önemli Günler',CalendarDays],['/nearby','Yakınımdaki hizmetler',Compass],['/services','Çözüm Merkezi',Wrench],['/emergency','Acil Durum',Siren],['/add-business','İşletmeni Ekle',Building2],['/admin','Admin Girişi',LockKeyhole]].map(([to,t,I])=><NavLink key={String(to)} to={String(to)}><I/><b>{String(t)}</b><ChevronRight/></NavLink>)}</main>}
 
 type AdminStats={visitorsTotal:number;visitorsToday:number;searchesTotal:number;searchesToday:number;phoneClicks:number;directionsClicks:number;emergencyClicks:number;favoriteClicks:number};
 type AdminAd={id:number;title:string;text?:string|null;image_url?:string|null;target_url?:string|null;placement:string;status:string};
@@ -848,5 +849,5 @@ function Simple({title}:{title:string}){return <main className="simple"><h1>{tit
 export default function TargetApp(){
  const location=useLocation();
  useEffect(()=>{track('page_view',{path:location.pathname});},[location.pathname]);
- return <div><Header/><Routes><Route path="/" element={<Home/>}/><Route path="/nearby" element={<Nearby/>}/><Route path="/services" element={<Services/>}/><Route path="/ads" element={<AdCampaigns/>}/><Route path="/emergency" element={<Emergency/>}/><Route path="/add-business" element={<AddBusiness/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/admin" element={<Admin/>}/><Route path="/favorites" element={<FavoritesPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/news" element={<Simple title="Haberler"/>}/><Route path="/contact" element={<Simple title="İletişim"/>}/><Route path="/kvkk" element={<Legal type="kvkk"/>}/><Route path="/gizlilik" element={<Legal type="privacy"/>}/><Route path="*" element={<Home/>}/></Routes><MobileNav/><ChatWidget/></div>
+ return <div><Header/><Routes><Route path="/" element={<Home/>}/><Route path="/nearby" element={<Nearby/>}/><Route path="/services" element={<Services/>}/><Route path="/customer-support" element={<CustomerSupport/>}/><Route path="/ads" element={<AdCampaigns/>}/><Route path="/emergency" element={<Emergency/>}/><Route path="/add-business" element={<AddBusiness/>}/><Route path="/menu" element={<MenuPage/>}/><Route path="/admin" element={<Admin/>}/><Route path="/favorites" element={<FavoritesPage/>}/><Route path="/calendar" element={<CalendarPage/>}/><Route path="/news" element={<Simple title="Haberler"/>}/><Route path="/contact" element={<Simple title="İletişim"/>}/><Route path="/kvkk" element={<Legal type="kvkk"/>}/><Route path="/gizlilik" element={<Legal type="privacy"/>}/><Route path="*" element={<Home/>}/></Routes><MobileNav/><ChatWidget/></div>
 }
