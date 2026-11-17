@@ -98,7 +98,7 @@ test('all read commands respond and omit personal/free-text data', async () => {
     assert.match(c.sent[2].text, /Son 24 saat/);
     assert.match(c.sent[3].text, /Deneme İşletmesi/);
     assert.match(c.sent[4].text, /Yönetim paneli/);
-    assert.match(c.sent[5].text, /Bilgi yanlış/);
+    assert.match(c.sent[5].text, /Telefon yanlış/);
     assert.match(c.sent[6].text, /Son 7 gün/);
     assert.match(c.sent[7].text, /abcdef012345/);
     const combined = c.sent.map((x) => x.text).join('\n');
