@@ -118,7 +118,7 @@ async function report(env: Env): Promise<string> {
     title, `Olay: ${row.events} • Tekil oturum: ${row.sessions}`, `Arama: ${row.searches} • Sonuçsuz: ${row.empty_searches}`,
     `Reklam gösterimi: ${row.ad_impressions} • Tıklama: ${row.ad_clicks}`, `İstemci hatası: ${row.client_errors}`,
   ].join('\n');
-  return [format('📈 Son 24 saat', day), format('Son 7 gün', week), 'Not: Onay vermeyen kullanıcılar ölçüm dışında olduğundan sayılar yalnızca ölçüme izin veren kullanıcıları kapsar.'].join('\n\n');
+  return [format('📈 Son 24 saat', day), format('Son 7 gün', week), 'Not: Mevcut olay akışı ölçüm izni ve oturum kimliği alanlarını henüz göndermiyor; bu nedenle onay bazlı kapsam ve tekil oturum sayısı henüz doğrulanamaz.'].join('\n\n');
 }
 async function health(env: Env): Promise<string> {
   let db = 'kullanılamıyor';
