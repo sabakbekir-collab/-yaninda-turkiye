@@ -54,12 +54,11 @@ async function reply(env: Env, chatId: string, message: string): Promise<void> {
 
 async function getStatus(env: Env): Promise<string> {
   if (!env.DB) return 'Durum alınamadı: veritabanı kullanılamıyor.';
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
   try {
     const [events, pending, reports] = await Promise.all([
       env.DB.prepare(
-        "SELECT COUNT(*) AS total, SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS errors FROM events WHERE created_at>=?",
-      ).bind(since).first<{ total: number; errors: number }>(),
+        "SELECT COUNT(*) AS total, SUM(CASE WHEN type='error' THEN 1 ELSE 0 END) AS errors FROM events WHERE created_at>=datetime('now','-24 hours')",
+      ).first<{ total: number; errors: number }>(),
       env.DB.prepare("SELECT COUNT(*) AS total FROM submissions WHERE status='pending'")
         .first<{ total: number }>(),
       env.DB.prepare("SELECT COUNT(*) AS total FROM reports WHERE status='open'")
