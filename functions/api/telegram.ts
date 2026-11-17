@@ -15,7 +15,7 @@ function allowedAdminIds(env: Env): Set<string> {
   return new Set((env.TELEGRAM_ADMIN_CHAT_IDS || '')
     .split(',')
     .map((value) => value.trim())
-    .filter((value) => /^-?\\d+$/.test(value)));
+    .filter((value) => /^-?\d+$/.test(value)));
 }
 
 function apiBase(env: Env): string {
@@ -71,7 +71,7 @@ async function getStatus(env: Env): Promise<string> {
       `• Hata sayısı: ${Number(events?.errors || 0)}`,
       `• Bekleyen işletme başvurusu: ${Number(pending?.total || 0)}`,
       `• Açık bildirim: ${Number(reports?.total || 0)}`,
-    ].join('\\n');
+    ].join('\n');
   } catch {
     return 'Durum bilgisi alınamadı. Veritabanı tablolarını ve bağlantısını kontrol edin.';
   }
@@ -81,7 +81,7 @@ const HELP_TEXT = [
   '🤖 Yanımda Türkiye yönetim botu',
   '/durum — Son 24 saat sistem özeti',
   '/yardim — Komut listesini gösterir',
-].join('\\n');
+].join('\n');
 
 export async function onRequestPost({ request, env }: { request: Request; env: Env }): Promise<Response> {
   const expected = env.TELEGRAM_WEBHOOK_SECRET || '';
@@ -113,11 +113,11 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
   const chatId = message?.chat?.id;
   if (chatId === undefined || chatId === null) return new Response(null, { status: 200 });
   const chat = String(chatId);
-  if (!/^-?\\d+$/.test(chat) || !allowedAdminIds(env).has(chat)) return new Response(null, { status: 200 });
+  if (!/^-?\d+$/.test(chat) || !allowedAdminIds(env).has(chat)) return new Response(null, { status: 200 });
   if (message?.chat?.type === 'channel') return new Response(null, { status: 200 });
 
   const rawText = typeof message?.text === 'string' ? message.text.trim() : '';
-  const firstToken = rawText.split(/\\s+/, 1)[0];
+  const firstToken = rawText.split(/\s+/, 1)[0];
   if (!firstToken.startsWith('/')) return new Response(null, { status: 200 });
   const command = firstToken.split('@', 1)[0].toLocaleLowerCase('en-US');
 
