@@ -1,7 +1,7 @@
 import { onRequestGet as getPlaces, onRequestAreaGet as getLocationArea } from "../functions/api/places";
 import { onRequestGet as getAds } from "../functions/api/ads";
 import { onRequestPost as postEvents } from "../functions/api/events";
-import { onRequestPost as postTelegram } from "../functions/api/telegram";
+import { onRequestPost as postTelegram, sendDailyTelegramReport } from "../functions/api/telegram";
 import { onRequestGet as getAdmin, onRequestPost as postAdmin } from "../functions/api/admin";
 import { onRequestPost as postSubmissions } from "../functions/api/submissions";
 import { onRequestPost as postReports } from "../functions/api/reports";
