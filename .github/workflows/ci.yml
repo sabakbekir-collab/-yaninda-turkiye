@@ -13,8 +13,9 @@ permissions:
 
 jobs:
   verify:
+    name: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -26,3 +27,32 @@ jobs:
       - run: npx tsc -b
       - run: npm run lint
       - run: npm run build
+      - run: shellcheck scripts/telegram-commands.sh scripts/local-e2e.sh scripts/smoke.sh
+
+  local-worker-e2e:
+    name: Local Worker E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: bash scripts/local-e2e.sh
+
+  additive-d1-schema-smoke-worker-e2e:
+    name: Additive D1 schema smoke + Worker E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: SCHEMA_SMOKE=1 bash scripts/local-e2e.sh
