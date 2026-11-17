@@ -26,7 +26,10 @@ type CfLocation = {
 
 const json404 = () => Response.json({ error: "not_found" }, { status: 404 });
 
-export default {\n  async scheduled(_event: { scheduledTime: number; cron: string }, env: RuntimeEnv, ctx: { waitUntil(promise: Promise<unknown>): void }): Promise<void> {\n    ctx.waitUntil(sendDailyTelegramReport(env));\n  },
+export default {
+  async scheduled(_event: { scheduledTime: number; cron: string }, env: RuntimeEnv, ctx: { waitUntil(promise: Promise<unknown>): void }): Promise<void> {
+    ctx.waitUntil(sendDailyTelegramReport(env));
+  },
   async fetch(request: Request, env: RuntimeEnv): Promise<Response> {
     const url = new URL(request.url);
     const path = url.pathname;
