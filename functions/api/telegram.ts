@@ -59,7 +59,7 @@ function parseId(value: string | undefined): number | null {
   const id = Number(value);
   return Number.isSafeInteger(id) ? id : null;
 }
-function normalizeCommand(raw:string):string { return raw.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/ı/g,'i').toLowerCase(); }
+function normalizeCommand(raw:string):string { return raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').toLowerCase(); }
 async function dutyReport(env:Env):Promise<string>{
  const date=new Date(Date.now()+3*3600000).toISOString().slice(0,10);
  const run=await env.DB!.prepare('SELECT finished_at,status,error_kind FROM duty_sync_runs ORDER BY id DESC LIMIT 1').first<Row>();
