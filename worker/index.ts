@@ -11,7 +11,8 @@ import type { Env } from "../functions/lib/types";
 import { ensureSchema } from "../functions/lib/schema";
 import { validSession } from "../functions/lib/auth";
 import { healthResponse } from "../functions/lib/health";
-import { dutyGet } from "../functions/api/duty";\nimport { syncDutyChunk } from "../functions/lib/dutySync";
+import { dutyGet } from "../functions/api/duty";
+import { syncDutyChunk } from "../functions/lib/dutySync";
 
 type RuntimeEnv = Env & {
   ASSETS: { fetch(request: Request): Promise<Response> };
