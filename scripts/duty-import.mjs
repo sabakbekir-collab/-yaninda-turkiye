@@ -24,6 +24,6 @@ for(const line of lines){if(!line.trim())continue;const r=parseRow(line);const p
   valid.push({...r,il:p,telefon:r.telefon.replace(/[^0-9+]/g,'')});
 }
 const statements=valid.map(r=>`INSERT INTO duty_pharmacies(duty_date,province,district,name,phone,address,source,fetched_at) VALUES(${escape(r.tarih)},${escape(r.il)},${escape(r.ilce)},${escape(r.ad)},${escape(r.telefon)},${escape(r.adres)},'manual-csv',CURRENT_TIMESTAMP) ON CONFLICT(duty_date,province,district,name) DO UPDATE SET phone=excluded.phone,address=excluded.address,source=excluded.source,fetched_at=excluded.fetched_at;`);
-const out=process.argv[3]||path.resolve(root,'duty-import-output.sql');
+const out=process.argv[3]||path.resolve(process.cwd(),'duty-import-output.sql');
 fs.writeFileSync(out,`-- Generated local import only. Review and manually apply. Valid rows: ${valid.length}; rejected: ${rejected}\n${statements.join('\n')}\n`);
 console.log(`SQL generated locally. Valid rows: ${valid.length}; rejected: ${rejected}. No database connection or write was performed.`);
