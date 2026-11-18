@@ -1,7 +1,8 @@
 import type { Env } from '../lib/types';
 import { rateLimited } from '../lib/ratelimit.ts';
 import { updateSubmissionStatus } from '../lib/submissionStatus.ts';
-import { dutyProvinces, resolveProvince, resolveDistrict } from './duty.ts';\nimport { syncDutyChunk } from '../lib/dutySync.ts';
+import { dutyProvinces, resolveProvince, resolveDistrict } from './duty.ts';
+import { syncDutyChunk } from '../lib/dutySync.ts';
 
 type TelegramUpdate = { message?: { text?: unknown; chat?: { id?: number | string; type?: string } } };
 type Row = Record<string, unknown>;
