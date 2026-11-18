@@ -26,7 +26,7 @@ export async function syncDutyChunk(env:Env,chunk:number,limit=41):Promise<{prov
     const district=typeof p.district==='string'?p.district.trim(): '';
     const phone=safePhone(p.phone),address=typeof p.address==='string'?p.address.trim().slice(0,400):null;
     const [latitude,longitude]=validCoords(p.latitude??p.lat,p.longitude??p.lon);
-    if(!name||!district||district.length>80||!resolveDistrict(province,district))continue;
+    if(!name||!phone||!district||district.length>80||!resolveDistrict(province,district))continue;
     const date=new Date(Date.now()+3*3600000).toISOString().slice(0,10);
     await env.DB.prepare('INSERT INTO duty_pharmacies(duty_date,province,district,name,phone,address,latitude,longitude,source,fetched_at) VALUES(?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(duty_date,province,district,name) DO UPDATE SET phone=excluded.phone,address=excluded.address,latitude=excluded.latitude,longitude=excluded.longitude,source=excluded.source,fetched_at=excluded.fetched_at').bind(date,province,district,name,phone,address,latitude,longitude,SOURCE).run();
     accepted++;total++;
