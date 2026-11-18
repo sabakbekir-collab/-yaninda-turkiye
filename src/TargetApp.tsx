@@ -89,10 +89,12 @@ const httpUrl=(v?:string|null)=>{try{const u=new URL(v||'');return u.protocol===
 function Ad({kind}:{kind:'top'|'mid'|'bottom'}){
  const[ad,setAd]=useState<AdRow|null>(null);
  useEffect(()=>{let live=true;fetch('/api/ads?placement='+adPlacement[kind]).then(r=>r.ok?r.json():null).then((d:{ads?:AdRow[]}|null)=>{if(live&&d&&Array.isArray(d.ads)&&d.ads[0]&&typeof d.ads[0].title==='string')setAd(d.ads[0])}).catch(()=>undefined);return()=>{live=false}},[kind]);
+ useEffect(()=>{if(ad)track('ad_impression',{adId:ad.id,placement:adPlacement[kind]})},[ad,kind]);
  if(!ad)return null;
  const href=httpUrl(ad.target_url),img=httpUrl(ad.image_url);
  const body=<>{img&&<img src={img} alt="" loading="lazy"/>}<div><small>REKLAM</small><strong>{ad.title}</strong>{ad.text&&<b>{ad.text}</b>}</div></>;
- return href?<a href={href} target="_blank" rel="sponsored noopener noreferrer" className="yt-ad red">{body}</a>:<div className="yt-ad red">{body}</div>
+ const onAdClick=()=>track('ad_click',{adId:ad.id,placement:adPlacement[kind]});
+ return href?<a href={href} onClick={onAdClick} target="_blank" rel="sponsored noopener noreferrer" className="yt-ad red">{body}</a>:<div className="yt-ad red">{body}</div>
 }
 
 const quick:[string,string,LucideIcon,string][]=[

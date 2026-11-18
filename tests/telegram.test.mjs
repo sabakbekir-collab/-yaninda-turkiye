@@ -14,7 +14,7 @@ function makeEnv() {
         queries.push(sql);
         const first = async () => {
           if (sql.includes('SELECT payload FROM api_cache')) return { payload: '1' };
-          if (sql.includes("SUM(CASE WHEN type='error'")) return { total: 8, errors: 2 };
+          if (sql.includes('SUM(CASE WHEN type IN')) return { total: 8, errors: 2 };
           if (sql.includes('FROM submissions')) return { total: 3 };
           if (sql.includes('FROM reports')) return { total: 4 };
           return null;
@@ -103,7 +103,7 @@ test('/durum uses the actual D1 schema columns', async () => {
   };
   try {
     const response = await onRequestPost({
-      request: makeRequest('fake-local-secret', { message: { chat: { id: 12345 }, text: '/durum' } }),
+      request: makeRequest('fake-local-secret', { message: { chat: { id: 12345, type: 'private' }, text: '/durum' } }),
       env,
     });
     assert.equal(response.status, 200);
@@ -111,7 +111,7 @@ test('/durum uses the actual D1 schema columns', async () => {
     assert.match(payload.text, /Olay sayısı: 8/);
     assert.match(payload.text, /Hata sayısı: 2/);
     assert.match(payload.text, /Bekleyen işletme başvurusu: 3/);
-    assert.match(payload.text, /Açık bildirim: 4/);
+    assert.match(payload.text, /Açık hatalı bildirim: 4/);
   } finally {
     globalThis.fetch = previousFetch;
   }

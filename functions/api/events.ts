@@ -1,8 +1,9 @@
 import type {Env} from '../lib/types';
 import {sameOrigin} from '../lib/auth';
 import {rateLimited} from '../lib/ratelimit';
+import {sendAdminMessage} from './telegram';
 
-const allowed=new Set(['page_view','search','location_click','pharmacy_click','hospital_click','atm_click','service_click','phone_click','whatsapp_click','directions_click','emergency_click','favorite_click']);
+const allowed=new Set(['page_view','search','location_click','pharmacy_click','hospital_click','atm_click','service_click','phone_click','whatsapp_click','directions_click','emergency_click','favorite_click','ad_impression','ad_click','client_error']);
 
 export async function onRequestPost({request,env}:{request:Request;env:Env}){
   if(!sameOrigin(request))return new Response(null,{status:403});
@@ -15,6 +16,7 @@ export async function onRequestPost({request,env}:{request:Request;env:Env}){
       ? Object.fromEntries(Object.entries(body.metadata).slice(0,10).map(([k,v])=>[String(k).slice(0,40),String(v).slice(0,120)]))
       : {};
     await env.DB.prepare('INSERT INTO events(type,metadata,city) VALUES(?,?,?)').bind(body.type,JSON.stringify(metadata),typeof metadata.city==='string'?metadata.city:null).run();
+    if(body.type==='client_error') await sendAdminMessage(env,'Tekrarlayan istemci hatası algılandı. Ayrıntı için /rapor komutunu kullanın.','repeated-client-error');
   }catch{/* analytics must never break the app */}
   return new Response(null,{status:204});
 }
