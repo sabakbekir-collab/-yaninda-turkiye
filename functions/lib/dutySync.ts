@@ -7,9 +7,9 @@ const slug=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace
 type Pharmacy={name?:unknown;district?:unknown;phone?:unknown;address?:unknown;latitude?:unknown;longitude?:unknown;lat?:unknown;lon?:unknown};
 function safePhone(v:unknown){if(typeof v!=='string')return null;const p=v.trim().replace(/[^0-9+]/g,'');return p.length>=7&&p.length<=20?p:null;}
 function validCoords(lat:unknown,lon:unknown):[number|null,number|null]{const a=Number(lat),b=Number(lon);return Number.isFinite(a)&&a>=35&&a<=43&&Number.isFinite(b)&&b>=25&&b<=46?[a,b]:[null,null];}
-export async function syncDutyChunk(env:Env,chunk:number):Promise<{provinces:number;rows:number;errors:number}>{
+export async function syncDutyChunk(env:Env,chunk:number,limit=41):Promise<{provinces:number;rows:number;errors:number}>{
  if(!env.DB)return {provinces:0,rows:0,errors:1};
- const start=new Date(); const chosen=dutyProvinces.filter((_,i)=>i%2===chunk).slice(0,41);
+ const start=new Date(); const chosen=dutyProvinces.filter((_,i)=>i%2===chunk).slice(0,Math.max(1,Math.min(limit,41)));
  let good=0,total=0,errors=0;
  for(const province of chosen){
   try{
@@ -35,5 +35,12 @@ export async function syncDutyChunk(env:Env,chunk:number):Promise<{provinces:num
  }
  const finish=new Date();
  await env.DB.prepare('INSERT INTO duty_sync_runs(started_at,finished_at,source,province_count,row_count,status,error_kind) VALUES(?,?,?,?,?,?,?)').bind(start.toISOString(),finish.toISOString(),SOURCE,good,total,errors?'partial':'success',errors?'provider_error':null).run();
+ if(chunk===1){
+  const date=new Date(Date.now()+3*3600000).toISOString().slice(0,10);
+  const coverage=await env.DB.prepare('SELECT COUNT(DISTINCT province) AS total FROM duty_pharmacies WHERE duty_date=?').bind(date).first<{total:number}>();
+  const recent=await env.DB.prepare('SELECT status FROM duty_sync_runs ORDER BY id DESC LIMIT 2').all<{status:string}>();
+  const consecutive=recent.results.length===2&&recent.results.every(r=>r.status!=='success');
+  if(Number(coverage?.total||0)<65||consecutive){const hour=new Date(Date.now()+3*3600000).toISOString().slice(0,13);await sendAdminMessage(env,`⚠️ Nöbet veri uyarısı: Bugün ${Number(coverage?.total||0)}/81 il verisi var; son senkronlarda hata/eksik görüldü. /nobetrapor ile kontrol edin.`,`duty-alert-${hour}`);}
+ }
  return {provinces:good,rows:total,errors};
 }
