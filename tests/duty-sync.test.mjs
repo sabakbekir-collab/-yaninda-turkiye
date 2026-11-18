@@ -9,16 +9,14 @@ function fakeDb(existing=[]){
 }
 test('mocked provider validates bad rows, counts failures and upserts idempotently',async()=>{
  const db=fakeDb();const env={DB:db,DUTY_SYNC_ENABLED:'true'};
- const originalFetch=globalThis.fetch;let adanaCalls=0;
+ const originalFetch=globalThis.fetch;let calls=0;
  globalThis.fetch=async input=>{
-  const city=new URL(String(input)).searchParams.get('city');
-  if(city==='adana'){adanaCalls++;return Response.json({pharmacies:[
+  calls++;\n  if(calls===1)return Response.json({pharmacies:[
    {name:'Valid Pharmacy',district:'Ceyhan',phone:'03220000000',address:'Test address',lat:37.1,lon:35.3},
    {name:'Bad district',district:'Unknown',phone:'03220000000',address:'bad'},
    {name:'Bad phone',district:'Ceyhan',phone:'bad',address:'bad'}
   ]});}
-  if(city==='afyonkarahisar')return new Response(null,{status:503});
-  return Response.json({pharmacies:[]});
+  if(calls===2)return new Response(null,{status:503});\n  return Response.json({pharmacies:[]});
  };
  try{
   const first=await syncDutyChunk(env,0);
@@ -28,7 +26,7 @@ test('mocked provider validates bad rows, counts failures and upserts idempotent
   const second=await syncDutyChunk(env,0);
   assert.equal(second.rows,1);
   assert.equal(db.rows.size,1);
-  assert.equal(adanaCalls,2);
+  assert.equal(calls,82);
   assert.equal(db.syncRuns.length,2);
  }finally{globalThis.fetch=originalFetch;}
 });
