@@ -21,7 +21,10 @@ cat >"$tmp_dir/commands.json" <<'JSON'
  {"command":"rapor","description":"24 saat ve 7 günlük rapor"},
  {"command":"sessiz","description":"Bildirimleri geçici sustur"},
  {"command":"ac","description":"Bildirimleri yeniden aç"},
- {"command":"saglik","description":"Sistem sağlık kontrolü"}
+ {"command":"saglik","description":"Sistem sağlık kontrolü"},
+ {"command":"nobet","description":"İl veya ilçe nöbetçi eczaneleri"},
+ {"command":"nobetrapor","description":"Nöbet veri senkron özeti"},
+ {"command":"nobetsenk","description":"Elle nöbet senkronu iste"}
 ]}
 JSON
 

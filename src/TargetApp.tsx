@@ -683,7 +683,7 @@ function LegacyPlaceCard({p}:{p:Place}){
      <div className="place-title-row"><h3>{p.name?.trim()||'İşletme adı bulunamadı'}</h3>{p.isDuty&&<span className="duty-badge">NÖBETÇİ</span>}</div>
      <p>{cleanCardAddress(p.address)}</p>
      <small className="place-meta-line"><Navigation/> <b>{formatDistance(p.distance)}</b> · Kuş uçuşu · <ShieldCheck/> {p.source}</small>
-     {p.district&&<small className="place-district">İlçe: {p.district}</small>}{p.isDuty&&<small className="place-source-note">Veri: Eczane Adresi</small>}
+     {p.district&&<small className="place-district">İlçe: {p.district}</small>}{p.isDuty&&<small className="place-source-note"><a href="https://eczaneadresi.com" target="_blank" rel="noopener noreferrer">Veri: Eczane Adresi (CC BY 4.0)</a></small>}
 
      {p.phone?<footer className="place-actions"><a href={'tel:'+p.phone}><Phone/>Ara</a><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>:<footer className="place-actions"><span className="no-phone">Telefon bilgisi yok</span><a target="_blank" rel="noreferrer" href={'https://www.google.com/maps/dir/?api=1&destination='+p.lat+','+p.lon}><Navigation/>Yol Tarifi</a><button><Heart/>Favori</button></footer>}
    </div>

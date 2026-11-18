@@ -6,7 +6,7 @@ on:
     paths-ignore:
       - 'yaninda-turkiye-fixed*.zip'
   pull_request:
-    branches: [main]
+    branches: [main, feat/telegram-admin-suite]
 
 permissions:
   contents: read
@@ -41,6 +41,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - run: node tests/duty-import.test.mjs
       - run: bash scripts/local-e2e.sh
 
   additive-d1-schema-smoke-worker-e2e:

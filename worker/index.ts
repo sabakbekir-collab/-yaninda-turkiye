@@ -11,6 +11,8 @@ import type { Env } from "../functions/lib/types";
 import { ensureSchema } from "../functions/lib/schema";
 import { validSession } from "../functions/lib/auth";
 import { healthResponse } from "../functions/lib/health";
+import { dutyGet } from "../functions/api/duty";
+import { syncDutyChunk } from "../functions/lib/dutySync";
 
 type RuntimeEnv = Env & {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -28,7 +30,14 @@ const json404 = () => Response.json({ error: "not_found" }, { status: 404 });
 
 export default {
   async scheduled(_event: { scheduledTime: number; cron: string }, env: RuntimeEnv, ctx: { waitUntil(promise: Promise<unknown>): void }): Promise<void> {
-    ctx.waitUntil(ensureSchema(env).then(() => sendDailyTelegramReport(env)));
+    ctx.waitUntil(ensureSchema(env).then(async () => {
+      if (_event.cron === "30 21 * * *") await syncDutyChunk(env, 0);
+      if (_event.cron === "0 3 * * *") await syncDutyChunk(env, 1);
+      if (_event.cron === "0 6 * * *") {
+        await sendDailyTelegramReport(env);
+        try { await env.DB!.prepare("DELETE FROM duty_pharmacies WHERE duty_date < date('now','+3 hours','-7 days')").run(); } catch { /* duty schema is manually applied */ }
+      }
+    }));
   },
   async fetch(request: Request, env: RuntimeEnv): Promise<Response> {
     const url = new URL(request.url);
@@ -120,6 +129,8 @@ export default {
           );
         }
       }
+
+      if (path === "/api/duty" && request.method === "GET") return dutyGet({ request, env });
 
       if (path === "/api/telegram" && request.method === "POST") {
         return await postTelegram({ request, env });

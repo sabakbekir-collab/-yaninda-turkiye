@@ -1,6 +1,8 @@
 import type { Env } from '../lib/types';
 import { rateLimited } from '../lib/ratelimit.ts';
 import { updateSubmissionStatus } from '../lib/submissionStatus.ts';
+import { dutyProvinces, resolveProvince, resolveDistrict } from './duty.ts';
+import { syncDutyChunk } from '../lib/dutySync.ts';
 
 type TelegramUpdate = { message?: { text?: unknown; chat?: { id?: number | string; type?: string } } };
 type Row = Record<string, unknown>;
@@ -57,6 +59,25 @@ function parseId(value: string | undefined): number | null {
   const id = Number(value);
   return Number.isSafeInteger(id) ? id : null;
 }
+function normalizeCommand(raw:string):string { return raw.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').toLowerCase(); }
+async function dutyReport(env:Env):Promise<string>{
+ const date=new Date(Date.now()+3*3600000).toISOString().slice(0,10);
+ const run=await env.DB!.prepare('SELECT finished_at,status,error_kind FROM duty_sync_runs ORDER BY id DESC LIMIT 1').first<Row>();
+ const rows=await env.DB!.prepare('SELECT DISTINCT province FROM duty_pharmacies WHERE duty_date=?').bind(date).all<Row>();
+ const filled=new Set(rows.results.map(r=>String(r.province||'')));
+ const missing=dutyProvinces.filter(p=>!filled.has(p));
+ const failures=await env.DB!.prepare("SELECT COUNT(*) AS total FROM duty_sync_runs WHERE status IN ('partial','error') AND started_at>=datetime('now','-24 hours')").first<Row>();
+ return ['🗓 Nöbet veri raporu',`Son senkron: ${String(run?.finished_at||'yok')} • ${String(run?.status||'durum yok')}`,`Bugün verisi olan il: ${filled.size}/81`,`Eksik: ${missing.slice(0,14).join(', ')||'yok'}`,`Kaynak hata sayısı (24 saat): ${Number(failures?.total||0)}`].join('\\n');
+}
+async function dutyList(env:Env,rawProvince:string,rawDistrict=''):Promise<string>{
+ const province=resolveProvince(rawProvince);if(!province)return 'İl adı tanınmadı. Örnek: /nobet İstanbul';
+ const district=rawDistrict?resolveDistrict(province,rawDistrict):null;if(rawDistrict&&!district)return 'İlçe adı tanınmadı.';
+ const date=new Date(Date.now()+3*3600000).toISOString().slice(0,10);
+ const results=await env.DB!.prepare('SELECT district,name,phone,fetched_at FROM duty_pharmacies WHERE duty_date=? AND province=? AND (? IS NULL OR district=?) ORDER BY district,name LIMIT 10').bind(date,province,district,district).all<Row>();
+ if(!results.results.length)return `Bugün ${province} için nöbet verisi bulunamadı. /nobetrapor ile kontrol edin.\\nVeri: Eczane Adresi (CC BY 4.0)`;
+ const stale=String(results.results[0].fetched_at||'').slice(0,10)!==date;
+ return [`💊 ${province}${district?' / '+district:''}`,...results.results.map(r=>`${String(r.name).slice(0,100)} • ${String(r.district).slice(0,40)} • ${String(r.phone||'Telefon yok')}`),stale?'⚠️ Veri güncel olmayabilir. Eczaneyi aramadan önce telefonla doğrulayın.':'','Veri: Eczane Adresi (CC BY 4.0)'].filter(Boolean).join('\\n');
+}
 function helpText(): string {
   return [
     '🤖 Yanımda Türkiye yönetim botu',
@@ -71,6 +92,9 @@ function helpText(): string {
     '/sessiz <dakika> — Bildirimleri geçici kapat',
     '/ac — Bildirimleri aç',
     '/saglik — Sistem sağlık kontrolü',
+    '/nobet <il> [ilçe] — Bugünkü nöbetçi eczaneler',
+    '/nobetrapor — Nöbet veri özeti',
+    '/nobetsenk — Elle senkron isteği',
     '/yardim — Komut listesi',
   ].join('\n');
 }
@@ -206,7 +230,7 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
   const raw = typeof message.text === 'string' ? message.text.trim() : '';
   if (raw.length > 4096) { await send(env, chat, 'Komut 4096 karakter sınırını aşıyor.'); return new Response(null, { status: 200 }); }
   const [token, ...args] = raw.split(/\s+/);
-  const command = (token || '').split('@',1)[0].toLocaleLowerCase('tr-TR');
+  const command = normalizeCommand((token || '').split('@',1)[0]);
   try {
     let response = '';
     if (command === '/start' || command === '/yardim') response = helpText();
@@ -215,6 +239,22 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
     else if (command === '/basvuru') { const id = parseId(args[0]); response = id ? await submission(env,id) : 'Kullanım: /basvuru <pozitif_id>'; }
     else if (command === '/onayla') { const id = parseId(args[0]); response = id ? await requestDecision(env,chat,id,'approve_submission') : 'Kullanım: /onayla <pozitif_id>'; }
     else if (command === '/reddet') { const id = parseId(args[0]); const reason = args.slice(1).join(' ').trim().slice(0,100); response = id && reason ? await requestDecision(env,chat,id,'reject_submission',reason) : 'Kullanım: /reddet <pozitif_id> <kısa_neden>'; }
+    else if (command === '/evet' && normalizeCommand(args[0]||'') === 'nobet') {
+      const key='telegram:nobetsenk:'+await hashChat(chat); const pending=await cacheGet(env,key);
+      if(!pending||Number(pending.payload)<Date.now()) response='Onay isteği yok veya süresi dolmuş.';
+      else if(env.DUTY_SYNC_ENABLED!=='true') response='Otomatik kaynak senkronu kapalı. CSV elle yükleme kullanılıyor; API yanıt şeması doğrulanmadan açılmayacak.';
+      else {
+        const day=new Date(Date.now()+3*3600000).toISOString().slice(0,10), countKey='telegram:nobetsenk-count:'+day;
+        const count=Number((await env.DB!.prepare('SELECT payload FROM api_cache WHERE cache_key=?').bind(countKey).first<Row>())?.payload||0);
+        if(count>=5) response='Günlük senkron sınırı doldu (5).';
+        else {
+          await cacheDelete(env,key);
+          await env.DB!.prepare('INSERT INTO api_cache(cache_key,payload,expires_at) VALUES(?,?,?) ON CONFLICT(cache_key) DO UPDATE SET payload=CAST(api_cache.payload AS INTEGER)+1,expires_at=excluded.expires_at').bind(countKey,'1',new Date(Date.now()+48*3600000).toISOString()).run();
+          const result=await syncDutyChunk(env,Date.now()%2,10);
+          response=`Senkron tamamlandı: ${result.provinces} il, ${result.rows} kayıt, ${result.errors} hata.`;
+        }
+      }
+    }
     else if (command === '/evet') { const id = parseId(args[0]); response = id ? await confirmDecision(env,chat,id) : 'Kullanım: /evet <pozitif_id>'; }
     else if (command === '/bildirimler') response = await listReports(env);
     else if (command === '/rapor') response = await report(env);
@@ -225,6 +265,9 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
     }
     else if (command === '/ac') { await cacheDelete(env,'telegram:notifications:silence'); response = 'Bildirimler yeniden açıldı.'; }
     else if (command === '/saglik') response = await health(env);
+    else if (command === '/nobet') response = args[0] ? await dutyList(env,args[0],args.slice(1).join(' ')) : 'Kullanım: /nobet <il> [ilçe]';
+    else if (command === '/nobetrapor') response = await dutyReport(env);
+    else if (command === '/nobetsenk') { const key='telegram:nobetsenk:'+await hashChat(chat); await cachePut(env,key,String(Date.now()+60000),60000); response='Emin misin? 60 saniye içinde /evet nobet yaz. Günlük en fazla 5 kez.'; }
     else response = 'Bilinmeyen komut. Komut listesi için /yardim yazın.';
     await send(env,chat,response);
   } catch {
