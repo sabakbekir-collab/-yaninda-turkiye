@@ -13,6 +13,7 @@ export type Env = {
   TELEGRAM_API_BASE_URL?: string;
   DUTY_API_KEY?: string;
   DUTY_SOURCE_URL?: string;
+  DUTY_SYNC_ENABLED?: string;
 };
 export type D1Result<T=Record<string, unknown>>={results:T[];success?:boolean;meta?:Record<string,unknown>};
 export type D1Prepared={bind(...values:unknown[]):D1Prepared;first<T=Record<string,unknown>>(column?:string):Promise<T|null>;all<T=Record<string,unknown>>():Promise<D1Result<T>>;run():Promise<unknown>};
