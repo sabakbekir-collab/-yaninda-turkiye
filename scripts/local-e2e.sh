@@ -59,6 +59,8 @@ if [[ "${SCHEMA_SMOKE:-0}" == "1" ]]; then
   npx --yes wrangler@4 d1 execute yaninda-turkiye-db --local --persist-to "$TMP/d1" --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('duty_pharmacies','duty_sync_runs') ORDER BY name" >"$TMP/schema.txt"
   grep -q duty_pharmacies "$TMP/schema.txt"
   grep -q duty_sync_runs "$TMP/schema.txt"
+  npx --yes wrangler@4 d1 execute yaninda-turkiye-db --local --persist-to "$TMP/d1" --file scripts/live/verify-duty.sql >"$TMP/verify-duty.txt"
+  grep -q idx_duty_pharmacies_date_area "$TMP/verify-duty.txt"
 fi
 printf '%s\n' "node tests/duty-import.test.mjs
 Local Worker E2E başarılı."
