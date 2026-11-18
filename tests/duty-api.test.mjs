@@ -11,7 +11,7 @@ test('Turkish province/district normalization accepts casing and diacritics',()=
 });
 
 function dbMock(rows){
- return {prepare(sql){let bound=[];return{bind(...v){bound=v;return this;},async run(){return{meta:{changes:1}};},async first(){return sql.includes('SELECT payload')?{payload:'1'}:null;},async all(){return {results:rows};}};}};
+ return {prepare(sql){return{bind(){return this;},async run(){return{meta:{changes:1}};},async first(){return sql.includes('SELECT payload')?{payload:'1'}:null;},async all(){return {results:rows};}};}};
 }
 test('duty API returns data and source attribution for Turkish city slug',async()=>{
  const today=new Date(Date.now()+3*60*60*1000).toISOString().slice(0,10);
