@@ -260,7 +260,8 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
       else { await cachePut(env,'telegram:notifications:silence',String(Date.now()+minutes*60_000),Math.min(minutes,1440)*60_000); response = `Bildirimler ${minutes} dakika susturuldu.`; }
     }
     else if (command === '/ac') { await cacheDelete(env,'telegram:notifications:silence'); response = 'Bildirimler yeniden açıldı.'; }
-    else if (command === '/saglik') response = await health(env);\n    else if (command === '/nobet') response = args[0] ? await dutyList(env,args[0],args.slice(1).join(' ')) : 'Kullanım: /nobet <il> [ilçe]';\n    else if (command === '/nobetrapor') response = await dutyReport(env);\n    else if (command === '/nobetsenk') { const key='telegram:nobetsenk:'+await hashChat(chat); await cachePut(env,key,String(Date.now()+60000),60000); response='Emin misin? 60 saniye içinde /evet nobet yaz. Günlük en fazla 5 kez.'; }
+    else if (command === '/saglik') response = await health(env);
+    else if (command === '/nobet') response = args[0] ? await dutyList(env,args[0],args.slice(1).join(' ')) : 'Kullanım: /nobet <il> [ilçe]';\n    else if (command === '/nobetrapor') response = await dutyReport(env);\n    else if (command === '/nobetsenk') { const key='telegram:nobetsenk:'+await hashChat(chat); await cachePut(env,key,String(Date.now()+60000),60000); response='Emin misin? 60 saniye içinde /evet nobet yaz. Günlük en fazla 5 kez.'; }
     else response = 'Bilinmeyen komut. Komut listesi için /yardim yazın.';
     await send(env,chat,response);
   } catch {
