@@ -91,7 +91,8 @@ function helpText(): string {
     '/rapor — 24 saat ve 7 günlük rapor',
     '/sessiz <dakika> — Bildirimleri geçici kapat',
     '/ac — Bildirimleri aç',
-    '/saglik — Sistem sağlık kontrolü',\n    '/nobet <il> [ilçe] — Bugünkü nöbetçi eczaneler',\n    '/nobetrapor — Nöbet veri özeti',\n    '/nobetsenk — Elle senkron isteği',
+    '/saglik — Sistem sağlık kontrolü',
+    '/nobet <il> [ilçe] — Bugünkü nöbetçi eczaneler',\n    '/nobetrapor — Nöbet veri özeti',\n    '/nobetsenk — Elle senkron isteği',
     '/yardim — Komut listesi',
   ].join('\n');
 }
@@ -236,7 +237,7 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
     else if (command === '/basvuru') { const id = parseId(args[0]); response = id ? await submission(env,id) : 'Kullanım: /basvuru <pozitif_id>'; }
     else if (command === '/onayla') { const id = parseId(args[0]); response = id ? await requestDecision(env,chat,id,'approve_submission') : 'Kullanım: /onayla <pozitif_id>'; }
     else if (command === '/reddet') { const id = parseId(args[0]); const reason = args.slice(1).join(' ').trim().slice(0,100); response = id && reason ? await requestDecision(env,chat,id,'reject_submission',reason) : 'Kullanım: /reddet <pozitif_id> <kısa_neden>'; }
-    else if (command === '/evet' && normalizeCommand(args[0]||'') === 'nobet') { const key='telegram:nobetsenk:'+await hashChat(chat); const pending=await cacheGet(env,key); if(!pending||Number(pending.payload)<Date.now()) response='Onay isteği yok veya süresi dolmuş.'; else { const day=new Date(Date.now()+3*3600000).toISOString().slice(0,10); const count=Number((await env.DB!.prepare('SELECT payload FROM api_cache WHERE cache_key=?').bind('telegram:nobetsenk-count:'+day).first<Row>())?.payload||0); if(count>=5)response='Günlük senkron sınırı doldu (5).'; else { await cacheDelete(env,key); await cachePut(env,'telegram:nobetsenk-count:'+day,String(count+1),48*60*60*1000); const result=await syncDutyChunk(Date.now()%2?env:env,Date.now()%2); response=`Senkron tamamlandı: ${result.provinces} il, ${result.rows} eczane, ${result.errors} hata.`; } } }\n    else if (command === '/evet' && normalizeCommand(args[0]||'') === 'nobet') {
+    else if (command === '/evet' && normalizeCommand(args[0]||'') === 'nobet') {
       const key='telegram:nobetsenk:'+await hashChat(chat); const pending=await cacheGet(env,key);
       if(!pending||Number(pending.payload)<Date.now()) response='Onay isteği yok veya süresi dolmuş.';
       else {
