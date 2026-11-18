@@ -130,7 +130,9 @@ export default {
         }
       }
 
-      if (path === "/api/duty" && request.method === "GET") return dutyGet({ request, env });\n\n      if (path === "/api/telegram" && request.method === "POST") {
+      if (path === "/api/duty" && request.method === "GET") return dutyGet({ request, env });
+
+      if (path === "/api/telegram" && request.method === "POST") {
         return await postTelegram({ request, env });
       }
 
