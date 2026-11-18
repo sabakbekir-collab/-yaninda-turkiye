@@ -27,7 +27,7 @@ jobs:
       - run: npx tsc -b
       - run: npm run lint
       - run: npm run build
-      - run: shellcheck scripts/telegram-commands.sh scripts/local-e2e.sh scripts/smoke.sh
+      - run: shellcheck scripts/telegram-commands.sh scripts/local-e2e.sh scripts/smoke.sh scripts/duty-import.mjs
 
   local-worker-e2e:
     name: Local Worker E2E
@@ -41,6 +41,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - run: node tests/duty-import.test.mjs
       - run: bash scripts/local-e2e.sh
 
   additive-d1-schema-smoke-worker-e2e:
