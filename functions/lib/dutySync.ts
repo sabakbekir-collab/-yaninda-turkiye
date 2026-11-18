@@ -1,5 +1,6 @@
 import type { Env } from '../lib/types';
-import { dutyProvinces, resolveDistrict } from '../api/duty';\nimport { sendAdminMessage } from '../api/telegram';
+import { dutyProvinces, resolveDistrict } from '../api/duty';
+import { sendAdminMessage } from '../api/telegram';
 
 const SOURCE='Eczane Adresi API';
 const slug=(s:string)=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').toLowerCase();
