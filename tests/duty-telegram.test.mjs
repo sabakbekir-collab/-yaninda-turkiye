@@ -6,7 +6,7 @@ function mockDb(rows=[]) {
  const cache=new Map();
  return {prepare(sql){let values=[];return{
   bind(...v){values=v;return this;},
-  async first(){if(sql.includes('SELECT payload FROM api_cache'))return {payload:'1'}; if(sql.includes('SELECT payload,expires_at FROM api_cache'))return cache.get(values[0])||null; return null;},
+  async first(){if(sql.includes('SELECT payload,expires_at FROM api_cache'))return cache.get(values[0])||null; if(sql.includes('SELECT payload FROM api_cache'))return {payload:'1'}; return null;},
   async all(){if(sql.includes('FROM duty_pharmacies'))return {results:rows};return {results:[]};},
   async run(){if(sql.includes('INSERT INTO api_cache'))cache.set(values[0],{payload:values[1],expires_at:values[2]});return {meta:{changes:1}};}
  };}};
