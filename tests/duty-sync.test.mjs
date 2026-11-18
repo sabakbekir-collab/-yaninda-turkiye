@@ -22,7 +22,7 @@ test('mocked provider validates bad rows, counts failures and upserts idempotent
  };
  try{
   const first=await syncDutyChunk(env,0);
-  assert.equal(first.rows,1);
+  assert.equal(first.rows,1,JSON.stringify(first));
   assert.ok(first.errors>=1);
   assert.equal(db.rows.size,1);
   const second=await syncDutyChunk(env,0);
