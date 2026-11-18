@@ -1,6 +1,6 @@
 import type { Env } from '../lib/types';
 import { districtMap } from '../../src/turkeyDistricts.ts';
-import { rateLimited } from '../lib/ratelimit';
+import { rateLimited } from '../lib/ratelimit.ts';
 
 export const dutyProvinces = Object.keys(districtMap);
 const fold=(v:string)=>v.normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/ı/g,'i').toLowerCase().trim();
