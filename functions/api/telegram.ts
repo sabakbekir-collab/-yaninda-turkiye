@@ -93,7 +93,8 @@ function helpText(): string {
     '/ac — Bildirimleri aç',
     '/saglik — Sistem sağlık kontrolü',
     '/nobet <il> [ilçe] — Bugünkü nöbetçi eczaneler',
-    '/nobetrapor — Nöbet veri özeti',\n    '/nobetsenk — Elle senkron isteği',
+    '/nobetrapor — Nöbet veri özeti',
+    '/nobetsenk — Elle senkron isteği',
     '/yardim — Komut listesi',
   ].join('\n');
 }
@@ -264,7 +265,8 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
     else if (command === '/ac') { await cacheDelete(env,'telegram:notifications:silence'); response = 'Bildirimler yeniden açıldı.'; }
     else if (command === '/saglik') response = await health(env);
     else if (command === '/nobet') response = args[0] ? await dutyList(env,args[0],args.slice(1).join(' ')) : 'Kullanım: /nobet <il> [ilçe]';
-    else if (command === '/nobetrapor') response = await dutyReport(env);\n    else if (command === '/nobetsenk') { const key='telegram:nobetsenk:'+await hashChat(chat); await cachePut(env,key,String(Date.now()+60000),60000); response='Emin misin? 60 saniye içinde /evet nobet yaz. Günlük en fazla 5 kez.'; }
+    else if (command === '/nobetrapor') response = await dutyReport(env);
+    else if (command === '/nobetsenk') { const key='telegram:nobetsenk:'+await hashChat(chat); await cachePut(env,key,String(Date.now()+60000),60000); response='Emin misin? 60 saniye içinde /evet nobet yaz. Günlük en fazla 5 kez.'; }
     else response = 'Bilinmeyen komut. Komut listesi için /yardim yazın.';
     await send(env,chat,response);
   } catch {
