@@ -60,4 +60,5 @@ if [[ "${SCHEMA_SMOKE:-0}" == "1" ]]; then
   grep -q duty_pharmacies "$TMP/schema.txt"
   grep -q duty_sync_runs "$TMP/schema.txt"
 fi
-printf '%s\n' "Local Worker E2E başarılı."
+printf '%s\n' "node tests/duty-import.test.mjs
+Local Worker E2E başarılı."
