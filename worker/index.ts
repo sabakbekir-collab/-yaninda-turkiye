@@ -32,7 +32,8 @@ export default {
   async scheduled(_event: { scheduledTime: number; cron: string }, env: RuntimeEnv, ctx: { waitUntil(promise: Promise<unknown>): void }): Promise<void> {
     ctx.waitUntil(ensureSchema(env).then(async () => {
       if (_event.cron === "30 21 * * *") await syncDutyChunk(env, 0);
-      if (_event.cron === "0 3 * * *") await syncDutyChunk(env, 1);\n      if (_event.cron === "0 6 * * *") {
+      if (_event.cron === "0 3 * * *") await syncDutyChunk(env, 1);
+      if (_event.cron === "0 6 * * *") {
         await sendDailyTelegramReport(env);
         try { await env.DB!.prepare("DELETE FROM duty_pharmacies WHERE duty_date < date('now','+3 hours','-7 days')").run(); } catch { /* duty schema is manually applied */ }
       }
