@@ -62,5 +62,6 @@ if [[ "${SCHEMA_SMOKE:-0}" == "1" ]]; then
   npx --yes wrangler@4 d1 execute yaninda-turkiye-db --local --persist-to "$TMP/d1" --file scripts/live/verify-duty.sql >"$TMP/verify-duty.txt"
   grep -q idx_duty_pharmacies_date_area "$TMP/verify-duty.txt"
 fi
+node tests/duty-import.test.mjs
 printf '%s\n' "node tests/duty-import.test.mjs
 Local Worker E2E başarılı."
