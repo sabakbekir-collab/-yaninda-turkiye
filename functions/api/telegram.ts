@@ -242,6 +242,7 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
     else if (command === '/evet' && normalizeCommand(args[0]||'') === 'nobet') {
       const key='telegram:nobetsenk:'+await hashChat(chat); const pending=await cacheGet(env,key);
       if(!pending||Number(pending.payload)<Date.now()) response='Onay isteği yok veya süresi dolmuş.';
+      else if(env.DUTY_SYNC_ENABLED!=='true') response='Otomatik kaynak senkronu kapalı. CSV elle yükleme kullanılıyor; API yanıt şeması doğrulanmadan açılmayacak.';
       else {
         const day=new Date(Date.now()+3*3600000).toISOString().slice(0,10), countKey='telegram:nobetsenk-count:'+day;
         const count=Number((await env.DB!.prepare('SELECT payload FROM api_cache WHERE cache_key=?').bind(countKey).first<Row>())?.payload||0);
