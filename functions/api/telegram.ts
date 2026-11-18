@@ -236,7 +236,22 @@ export async function onRequestPost({ request, env }: { request: Request; env: E
     else if (command === '/basvuru') { const id = parseId(args[0]); response = id ? await submission(env,id) : 'Kullanım: /basvuru <pozitif_id>'; }
     else if (command === '/onayla') { const id = parseId(args[0]); response = id ? await requestDecision(env,chat,id,'approve_submission') : 'Kullanım: /onayla <pozitif_id>'; }
     else if (command === '/reddet') { const id = parseId(args[0]); const reason = args.slice(1).join(' ').trim().slice(0,100); response = id && reason ? await requestDecision(env,chat,id,'reject_submission',reason) : 'Kullanım: /reddet <pozitif_id> <kısa_neden>'; }
-    else if (command === '/evet' && normalizeCommand(args[0]||'') === 'nobet') { const key='telegram:nobetsenk:'+await hashChat(chat); const pending=await cacheGet(env,key); if(!pending||Number(pending.payload)<Date.now()) response='Onay isteği yok veya süresi dolmuş.'; else { const day=new Date(Date.now()+3*3600000).toISOString().slice(0,10); const count=Number((await env.DB!.prepare('SELECT payload FROM api_cache WHERE cache_key=?').bind('telegram:nobetsenk-count:'+day).first<Row>())?.payload||0); if(count>=5)response='Günlük senkron sınırı doldu (5).'; else { await cacheDelete(env,key); await cachePut(env,'telegram:nobetsenk-count:'+day,String(count+1),48*60*60*1000); const result=await syncDutyChunk(Date.now()%2?env:env,Date.now()%2); response=`Senkron tamamlandı: ${result.provinces} il, ${result.rows} eczane, ${result.errors} hata.`; } } }\n    else if (command === '/evet') { const id = parseId(args[0]); response = id ? await confirmDecision(env,chat,id) : 'Kullanım: /evet <pozitif_id>'; }
+    else if (command === '/evet' && normalizeCommand(args[0]||'') === 'nobet') { const key='telegram:nobetsenk:'+await hashChat(chat); const pending=await cacheGet(env,key); if(!pending||Number(pending.payload)<Date.now()) response='Onay isteği yok veya süresi dolmuş.'; else { const day=new Date(Date.now()+3*3600000).toISOString().slice(0,10); const count=Number((await env.DB!.prepare('SELECT payload FROM api_cache WHERE cache_key=?').bind('telegram:nobetsenk-count:'+day).first<Row>())?.payload||0); if(count>=5)response='Günlük senkron sınırı doldu (5).'; else { await cacheDelete(env,key); await cachePut(env,'telegram:nobetsenk-count:'+day,String(count+1),48*60*60*1000); const result=await syncDutyChunk(Date.now()%2?env:env,Date.now()%2); response=`Senkron tamamlandı: ${result.provinces} il, ${result.rows} eczane, ${result.errors} hata.`; } } }\n    else if (command === '/evet' && normalizeCommand(args[0]||'') === 'nobet') {
+      const key='telegram:nobetsenk:'+await hashChat(chat); const pending=await cacheGet(env,key);
+      if(!pending||Number(pending.payload)<Date.now()) response='Onay isteği yok veya süresi dolmuş.';
+      else {
+        const day=new Date(Date.now()+3*3600000).toISOString().slice(0,10), countKey='telegram:nobetsenk-count:'+day;
+        const count=Number((await env.DB!.prepare('SELECT payload FROM api_cache WHERE cache_key=?').bind(countKey).first<Row>())?.payload||0);
+        if(count>=5) response='Günlük senkron sınırı doldu (5).';
+        else {
+          await cacheDelete(env,key);
+          await env.DB!.prepare('INSERT INTO api_cache(cache_key,payload,expires_at) VALUES(?,?,?) ON CONFLICT(cache_key) DO UPDATE SET payload=CAST(api_cache.payload AS INTEGER)+1,expires_at=excluded.expires_at').bind(countKey,'1',new Date(Date.now()+48*3600000).toISOString()).run();
+          const result=await syncDutyChunk(env,Date.now()%2,10);
+          response=`Senkron tamamlandı: ${result.provinces} il, ${result.rows} kayıt, ${result.errors} hata.`;
+        }
+      }
+    }
+    else if (command === '/evet') { const id = parseId(args[0]); response = id ? await confirmDecision(env,chat,id) : 'Kullanım: /evet <pozitif_id>'; }
     else if (command === '/bildirimler') response = await listReports(env);
     else if (command === '/rapor') response = await report(env);
     else if (command === '/sessiz') {
