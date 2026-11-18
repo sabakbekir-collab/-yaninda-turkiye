@@ -33,4 +33,4 @@ Bu PR merge edilip Worker ayrıca dağıtıldıktan sonra aşağıdaki adımlar�
 7. `/nobetrapor` ve `/nobet İstanbul` test et.
 8. Geri dönüş: önceki Worker deployment'a dön; veri silme gerekiyorsa yedek kontrolünden sonra `scripts/live/rollback-duty.md` yönergesini elle uygula.
 
-**Kaynak:** Eczane Adresi API, CC BY 4.0, ticari kullanıma açık ve atıf gerekli. Diğer probe kaynaklarının koşulları doğrulanamadığı için otomatik bağlanmadı; CSV elle yükleme birincil yedek yoldur.
+**Kaynak:** Eczane Adresi API, CC BY 4.0, ticari kullanıma açık ve atıf gerekli. Diğer probe kaynaklarının koşulları doğrulanamadığı için otomatik bağlanmadı; CSV elle yükleme yedek yoldur; Eczane Adresi API'si için açık lisans ve atıf şartı bulunduğundan otomatik bağlayıcı kullanılabilir.
