@@ -1,5 +1,5 @@
 import type { Env } from '../lib/types';
-import { districtMap } from '../../src/turkeyDistricts';
+import { districtMap } from '../../src/turkeyDistricts.ts';
 import { rateLimited } from '../lib/ratelimit';
 
 export const dutyProvinces = Object.keys(districtMap);
