@@ -25,12 +25,12 @@ test('mocked provider validates bad rows, counts failures and upserts idempotent
  const originalFetch=globalThis.fetch;let calls=0;
  globalThis.fetch=async()=>{
   calls++;
-  if(calls===1)return Response.json({pharmacies:[
+  if(calls%41===1)return Response.json({pharmacies:[
    {name:'Valid Pharmacy',district:'Ceyhan',phone:'03220000000',address:'Test address',lat:37.1,lon:35.3},
    {name:'Bad district',district:'Unknown',phone:'03220000000',address:'bad'},
    {name:'Bad phone',district:'Ceyhan',phone:'bad',address:'bad'}
   ]});
-  if(calls===2)return new Response(null,{status:503});
+  if(calls%41===2return new Response(null,{status:503});
   return Response.json({pharmacies:[]});
  };
  try{
