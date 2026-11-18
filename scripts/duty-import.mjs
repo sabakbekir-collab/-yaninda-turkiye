@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const root = path.dirname(fileURLToPath(import.meta.url));
+/* global process, console */
 const input = process.argv[2];
 if (!input) { console.error('Kullanım: node scripts/duty-import.mjs <dosya.csv> [çıktı.sql]'); process.exit(2); }
 const csv = fs.readFileSync(input, 'utf8').replace(/^\uFEFF/, '');
