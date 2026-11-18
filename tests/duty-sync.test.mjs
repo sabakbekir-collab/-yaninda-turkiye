@@ -30,7 +30,7 @@ test('mocked provider validates bad rows, counts failures and upserts idempotent
    {name:'Bad district',district:'Unknown',phone:'03220000000',address:'bad'},
    {name:'Bad phone',district:'Ceyhan',phone:'bad',address:'bad'}
   ]});
-  if(calls%41===2return new Response(null,{status:503});
+  if(calls%41===2)return new Response(null,{status:503});
   return Response.json({pharmacies:[]});
  };
  try{
