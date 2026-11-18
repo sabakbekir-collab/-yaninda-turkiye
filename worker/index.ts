@@ -10,7 +10,7 @@ import { onRequestPost as postAdminAi } from "../functions/api/admin-ai";
 import type { Env } from "../functions/lib/types";
 import { ensureSchema } from "../functions/lib/schema";
 import { validSession } from "../functions/lib/auth";
-import { healthResponse } from "../functions/lib/health";
+import { healthResponse } from "../functions/lib/health";\nimport { dutyGet } from "../functions/api/duty";\nimport { syncDutyChunk } from "../functions/lib/dutySync";
 
 type RuntimeEnv = Env & {
   ASSETS: { fetch(request: Request): Promise<Response> };
@@ -28,7 +28,7 @@ const json404 = () => Response.json({ error: "not_found" }, { status: 404 });
 
 export default {
   async scheduled(_event: { scheduledTime: number; cron: string }, env: RuntimeEnv, ctx: { waitUntil(promise: Promise<unknown>): void }): Promise<void> {
-    ctx.waitUntil(ensureSchema(env).then(() => sendDailyTelegramReport(env)));
+    ctx.waitUntil(ensureSchema(env).then(async () => {\n      if (_event.cron === "30 21 * * *") await syncDutyChunk(env, 0);\n      if (_event.cron === "0 3 * * *") await syncDutyChunk(env, 1);\n      if (_event.cron === "0 6 * * *") await sendDailyTelegramReport(env);\n    }));
   },
   async fetch(request: Request, env: RuntimeEnv): Promise<Response> {
     const url = new URL(request.url);
@@ -121,7 +121,7 @@ export default {
         }
       }
 
-      if (path === "/api/telegram" && request.method === "POST") {
+      if (path === "/api/duty" && request.method === "GET") return dutyGet({ request, env });\n\n      if (path === "/api/telegram" && request.method === "POST") {
         return await postTelegram({ request, env });
       }
 
