@@ -21,3 +21,16 @@ Bu PR merge edilip Worker ayrıca dağıtıldıktan sonra aşağıdaki adımlar�
 - Bu PR canlıya otomatik geçiş yapmaz. Canlı D1'e erişmez ve migration uygulamaz.
 - Yeni bir migration eklenirse yalnızca eklemeli/idempotent olacak ve canlıda elle uygulanacaktır.
 - `scripts/local-e2e.sh` yalnızca Wrangler yerel D1 kullanır; canlı/uzak D1 seçeneği yoktur.
+
+## Nöbetçi eczane
+
+1. Canlı D1 yedeğini al.
+2. `scripts/live/apply-duty.sql` dosyasını `wrangler d1 execute yaninda-turkiye-db --remote --file scripts/live/apply-duty.sql` ile elle uygula. PR/CI aşamasında bu komutu çalıştırma.
+3. `scripts/live/verify-duty.sql` ile tabloları doğrula.
+4. Cloudflare Worker Secrets'a gerekirse `DUTY_API_KEY` ekle; mevcut açık API anahtarsız. Secret paylaşma.
+5. PR'ı merge et ve Worker'ı deploy et.
+6. Telegram'da `/nobetsenk`, ardından 60 saniye içinde `/evet nobet` ile elle senkron iste.
+7. `/nobetrapor` ve `/nobet İstanbul` test et.
+8. Geri dönüş: önceki Worker deployment'a dön; veri silme gerekiyorsa yedek kontrolünden sonra `scripts/live/rollback-duty.md` yönergesini elle uygula.
+
+**Kaynak:** Eczane Adresi API, CC BY 4.0, ticari kullanıma açık ve atıf gerekli. Diğer probe kaynaklarının koşulları doğrulanamadığı için otomatik bağlanmadı; CSV elle yükleme birincil yedek yoldur.
