@@ -8,7 +8,8 @@ type Pharmacy={name?:unknown;district?:unknown;phone?:unknown;address?:unknown;l
 function safePhone(v:unknown){if(typeof v!=='string')return null;const p=v.trim().replace(/[^0-9+]/g,'');return p.length>=7&&p.length<=20?p:null;}
 function validCoords(lat:unknown,lon:unknown):[number|null,number|null]{const a=Number(lat),b=Number(lon);return Number.isFinite(a)&&a>=35&&a<=43&&Number.isFinite(b)&&b>=25&&b<=46?[a,b]:[null,null];}
 export async function syncDutyChunk(env:Env,chunk:number,limit=41):Promise<{provinces:number;rows:number;errors:number}>{
- if(!env.DB)return {provinces:0,rows:0,errors:1};\n if(env.DUTY_SYNC_ENABLED!=='true')return {provinces:0,rows:0,errors:0};
+ if(!env.DB)return {provinces:0,rows:0,errors:1};
+ if(env.DUTY_SYNC_ENABLED!=='true')return {provinces:0,rows:0,errors:0};
  const start=new Date(); const chosen=dutyProvinces.filter((_,i)=>i%2===chunk).slice(0,Math.max(1,Math.min(limit,41)));
  let good=0,total=0,errors=0;
  for(const province of chosen){
