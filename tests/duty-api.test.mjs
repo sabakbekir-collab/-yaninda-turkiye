@@ -14,7 +14,8 @@ function dbMock(rows){
  return {prepare(sql){let bound=[];return{bind(...v){bound=v;return this;},async run(){return{meta:{changes:1}};},async first(){return sql.includes('SELECT payload')?{payload:'1'}:null;},async all(){return {results:rows};}};}};
 }
 test('duty API returns data and source attribution for Turkish city slug',async()=>{
- const today=new Date(Date.now()+3*60*60*1000).toISOString().slice(0,10);\n const env={DB:dbMock([{id:1,duty_date:today,province:'İstanbul',district:'Kadıköy',name:'Mock Pharmacy',phone:'02160000000',fetched_at:today}])};
+ const today=new Date(Date.now()+3*60*60*1000).toISOString().slice(0,10);
+ const env={DB:dbMock([{id:1,duty_date:today,province:'İstanbul',district:'Kadıköy',name:'Mock Pharmacy',phone:'02160000000',fetched_at:today}])};
  const request=new Request('https://example.test/api/duty?il=ISTANBUL');
  const response=await dutyGet({request,env});
  assert.equal(response.status,200);
