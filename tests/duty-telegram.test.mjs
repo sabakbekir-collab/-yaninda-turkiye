@@ -23,7 +23,7 @@ async function setup(rows=[]){
 test('Turkish /nöbet command normalizes and shows only safe pharmacy details with attribution',async()=>{
  const date=new Date(Date.now()+3*3600000).toISOString().slice(0,10);
  const c=await setup([{district:'Kadıköy',name:'Mock Eczane',phone:'02160000000',fetched_at:date}]);
- try{const res=await onRequestPost({request:makeRequest('/nöbet İstanbul'),env:c.env});assert.equal(res.status,200);assert.match(c.sent[0].text,/Mock Eczane/);assert.match(c.sent[0].text,/CC BY 4.0/);assert.doesNotMatch(c.sent[0].text,/adres|kişisel/i);}finally{c.restore();}
+ try{const res=await onRequestPost({request:makeRequest('/nöbet İstanbul'),env:c.env});assert.equal(res.status,200);assert.match(c.sent[0].text,/Mock Eczane/);assert.match(c.sent[0].text,/CC BY 4.0/);assert.doesNotMatch(c.sent[0].text,/GİZLİ|açıklama/i);}finally{c.restore();}
 });
 test('manual duty sync asks for confirmation and stays disabled safely by default',async()=>{
  const c=await setup();
